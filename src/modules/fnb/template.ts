@@ -1,0 +1,39 @@
+import type { AccountSeed, WorkspaceTemplate } from "@/core/types";
+
+/**
+ * CoA awal template F&B. Akun pajak (PB1/PPN) serta piutang/utang usaha
+ * belum disertakan: menunggu Keputusan Tertunda 1 & 2 di docs/ROADMAP.md.
+ */
+export const FNB_ACCOUNTS: AccountSeed[] = [
+  // Aset
+  { code: "1-1100", name: "Kas", accountType: "asset", normalBalance: "debit", cashFlowCategory: "none", isCash: true, systemRole: null },
+  { code: "1-1200", name: "Bank", accountType: "asset", normalBalance: "debit", cashFlowCategory: "none", isCash: true, systemRole: null },
+  { code: "1-1300", name: "Persediaan Bahan Baku", accountType: "asset", normalBalance: "debit", cashFlowCategory: "operating", isCash: false, systemRole: "raw_material_inventory" },
+  { code: "1-2100", name: "Peralatan Dapur", accountType: "asset", normalBalance: "debit", cashFlowCategory: "investing", isCash: false, systemRole: null },
+  { code: "1-2190", name: "Akumulasi Penyusutan Peralatan", accountType: "asset", normalBalance: "credit", cashFlowCategory: "investing", isCash: false, systemRole: null },
+  // Liabilitas
+  { code: "2-2100", name: "Utang Bank", accountType: "liability", normalBalance: "credit", cashFlowCategory: "financing", isCash: false, systemRole: null },
+  // Ekuitas
+  { code: "3-1000", name: "Modal Pemilik", accountType: "equity", normalBalance: "credit", cashFlowCategory: "financing", isCash: false, systemRole: "owner_capital" },
+  { code: "3-2000", name: "Prive", accountType: "equity", normalBalance: "debit", cashFlowCategory: "financing", isCash: false, systemRole: "drawings" },
+  { code: "3-3000", name: "Laba Ditahan", accountType: "equity", normalBalance: "credit", cashFlowCategory: "none", isCash: false, systemRole: "retained_earnings" },
+  { code: "3-9000", name: "Ekuitas Saldo Awal", accountType: "equity", normalBalance: "credit", cashFlowCategory: "none", isCash: false, systemRole: "opening_balance_equity" },
+  // Pendapatan
+  { code: "4-1000", name: "Penjualan Makanan", accountType: "revenue", normalBalance: "credit", cashFlowCategory: "operating", isCash: false, systemRole: null },
+  { code: "4-2000", name: "Penjualan Minuman", accountType: "revenue", normalBalance: "credit", cashFlowCategory: "operating", isCash: false, systemRole: null },
+  // HPP
+  { code: "5-1000", name: "HPP Bahan Baku", accountType: "cogs", normalBalance: "debit", cashFlowCategory: "operating", isCash: false, systemRole: "cogs" },
+  // Beban
+  { code: "6-1000", name: "Beban Gaji", accountType: "expense", normalBalance: "debit", cashFlowCategory: "operating", isCash: false, systemRole: null },
+  { code: "6-2000", name: "Beban Sewa", accountType: "expense", normalBalance: "debit", cashFlowCategory: "operating", isCash: false, systemRole: null },
+  { code: "6-3000", name: "Beban Listrik & Air", accountType: "expense", normalBalance: "debit", cashFlowCategory: "operating", isCash: false, systemRole: null },
+  { code: "6-4000", name: "Beban Penyusutan", accountType: "expense", normalBalance: "debit", cashFlowCategory: "operating", isCash: false, systemRole: null },
+  { code: "6-5000", name: "Beban Bunga", accountType: "expense", normalBalance: "debit", cashFlowCategory: "operating", isCash: false, systemRole: null },
+  { code: "6-9000", name: "Beban Lain-lain", accountType: "expense", normalBalance: "debit", cashFlowCategory: "operating", isCash: false, systemRole: null },
+];
+
+export const FNB_TEMPLATE: WorkspaceTemplate = {
+  type: "fnb",
+  label: "Food & Beverage (F&B)",
+  accounts: FNB_ACCOUNTS,
+};
