@@ -266,6 +266,8 @@ export function buildFnbMockState(): MockState {
     templateType: "fnb",
     currency: "IDR",
     booksStartDate: "2025-01-01",
+    salesTaxRateBps: 1000,
+    salesTaxInclusive: false,
     createdAt: SEED_TIMESTAMP,
     updatedAt: SEED_TIMESTAMP,
     deletedAt: null,

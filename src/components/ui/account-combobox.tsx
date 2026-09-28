@@ -13,8 +13,19 @@ import {
   CommandList,
 } from "@/components/ui/command"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
+import type { AccountType } from "@/core/types"
 import { cn } from "@/lib/utils"
-import { ACCOUNT_TYPE_LABELS, ACCOUNT_TYPE_ORDER } from "./labels"
+
+export const ACCOUNT_TYPE_LABELS: Record<AccountType, string> = {
+  asset: "Aset",
+  liability: "Liabilitas",
+  equity: "Ekuitas",
+  revenue: "Pendapatan",
+  cogs: "Harga Pokok Penjualan",
+  expense: "Beban",
+}
+
+const ACCOUNT_TYPE_ORDER: AccountType[] = ["asset", "liability", "equity", "revenue", "cogs", "expense"]
 
 /** Pilih akun dengan pencarian kode/nama, dikelompokkan per jenis akun. */
 export function AccountCombobox({
@@ -23,12 +34,14 @@ export function AccountCombobox({
   onChange,
   invalid,
   id,
+  placeholder = "Pilih akun",
 }: {
   accounts: readonly Account[]
   value: string
   onChange: (accountId: string) => void
   invalid?: boolean
   id?: string
+  placeholder?: string
 }) {
   const [open, setOpen] = useState(false)
   const selected = accounts.find((a) => a.id === value)
@@ -46,7 +59,7 @@ export function AccountCombobox({
           className="w-full justify-between bg-background font-normal"
         >
           <span className={cn("truncate", !selected && "text-muted-foreground")}>
-            {selected ? `${selected.code} · ${selected.name}` : "Pilih akun"}
+            {selected ? `${selected.code} · ${selected.name}` : placeholder}
           </span>
           <ChevronsUpDownIcon className="text-muted-foreground" />
         </Button>

@@ -1,6 +1,7 @@
 import { fail } from "@/core/errors";
 import type { PeriodRange } from "@/core/periods";
 import type { IWorkspaceRepository, NewWorkspace } from "@/core/ports";
+import type { SalesTaxSettings } from "@/core/sales-tax";
 import type { AccountSeed, Workspace } from "@/core/types";
 import type { MockDatabase } from "./mock-database";
 
@@ -32,6 +33,8 @@ export class MockWorkspaceRepository implements IWorkspaceRepository {
         templateType: input.templateType,
         currency: "IDR",
         booksStartDate: input.booksStartDate,
+        salesTaxRateBps: 1000,
+        salesTaxInclusive: false,
         createdAt: now,
         updatedAt: now,
         deletedAt: null,
@@ -67,6 +70,17 @@ export class MockWorkspaceRepository implements IWorkspaceRepository {
       const workspace = state.workspaces.find((w) => w.id === id && w.deletedAt === null);
       if (!workspace) fail("NOT_FOUND", "Workspace tidak ditemukan");
       workspace.name = name;
+      workspace.updatedAt = this.db.now();
+      return workspace;
+    });
+  }
+
+  async updateSalesTaxSettings(id: string, settings: SalesTaxSettings): Promise<Workspace> {
+    return this.db.write((state) => {
+      const workspace = state.workspaces.find((w) => w.id === id && w.deletedAt === null);
+      if (!workspace) fail("NOT_FOUND", "Workspace tidak ditemukan");
+      workspace.salesTaxRateBps = settings.rateBps;
+      workspace.salesTaxInclusive = settings.inclusive;
       workspace.updatedAt = this.db.now();
       return workspace;
     });

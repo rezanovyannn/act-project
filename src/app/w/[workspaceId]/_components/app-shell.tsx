@@ -5,14 +5,19 @@ import Link from "next/link"
 import { usePathname } from "next/navigation"
 import {
   BookOpenIcon,
+  ClipboardCheckIcon,
   FileTextIcon,
+  HandCoinsIcon,
+  LandmarkIcon,
   LayoutDashboardIcon,
   MenuIcon,
+  PackageIcon,
   ReceiptIcon,
   SettingsIcon,
   type LucideIcon,
 } from "lucide-react"
 import type { AppServices } from "@/core/services"
+import type { TemplateType } from "@/core/types"
 import { Button } from "@/components/ui/button"
 import { Sheet, SheetContent, SheetTitle, SheetTrigger } from "@/components/ui/sheet"
 import { cn } from "@/lib/utils"
@@ -28,24 +33,51 @@ interface NavItem {
   exact?: boolean
 }
 
-function navItems(workspaceId: string): NavItem[] {
-  return [
-    { label: "Dashboard", href: routes.dashboard(workspaceId), icon: LayoutDashboardIcon, exact: true },
-    { label: "Jurnal Umum", href: routes.journals(workspaceId), icon: FileTextIcon },
-    { label: "Input Transaksi", icon: ReceiptIcon, comingIn: "1C" },
-    { label: "Buku Besar", icon: BookOpenIcon, comingIn: "1C" },
-    { label: "Laporan Keuangan", icon: BookOpenIcon, comingIn: "1D" },
-    { label: "Pengaturan", icon: SettingsIcon, comingIn: "1E" },
+interface NavGroup {
+  label?: string
+  items: NavItem[]
+}
+
+function navGroups(workspaceId: string, templateType: TemplateType): NavGroup[] {
+  const groups: NavGroup[] = [
+    {
+      items: [
+        { label: "Dashboard", href: routes.dashboard(workspaceId), icon: LayoutDashboardIcon, exact: true },
+        { label: "Input Transaksi", href: routes.transactions(workspaceId), icon: ReceiptIcon },
+        { label: "Piutang & Utang", href: routes.credits(workspaceId), icon: HandCoinsIcon },
+        { label: "Jurnal Umum", href: routes.journals(workspaceId), icon: FileTextIcon },
+        { label: "Buku Besar", href: routes.ledger(workspaceId), icon: LandmarkIcon },
+      ],
+    },
   ]
+  // Modul aktif ditentukan template_type (ADR 002).
+  if (templateType === "fnb") {
+    groups.push({
+      label: "F&B",
+      items: [
+        { label: "Pembelian Bahan Baku", href: routes.fnbPurchases(workspaceId), icon: PackageIcon },
+        { label: "Stok Opname", href: routes.fnbStockOpname(workspaceId), icon: ClipboardCheckIcon },
+      ],
+    })
+  }
+  groups.push({
+    items: [
+      { label: "Laporan Keuangan", icon: BookOpenIcon, comingIn: "1D" },
+      { label: "Pengaturan", icon: SettingsIcon, comingIn: "1E" },
+    ],
+  })
+  return groups
 }
 
 function Navigation({
   services,
   workspaceId,
+  templateType,
   onNavigate,
 }: {
   services: AppServices
   workspaceId: string
+  templateType: TemplateType
   onNavigate?: () => void
 }) {
   const pathname = usePathname()
@@ -60,9 +92,14 @@ function Navigation({
         workspaceHref={routes.dashboard}
         allWorkspacesHref={routes.workspaces()}
       />
-      <nav aria-label="Menu utama">
+      <nav aria-label="Menu utama" className="grid gap-4">
+        {navGroups(workspaceId, templateType).map((group, groupIndex) => (
+        <div key={groupIndex} className="grid gap-1">
+        {group.label && (
+          <p className="px-3 text-xs font-semibold tracking-wide text-muted-foreground uppercase">{group.label}</p>
+        )}
         <ul className="grid gap-1">
-          {navItems(workspaceId).map((item) => {
+          {group.items.map((item) => {
             const active =
               item.href !== undefined &&
               (item.exact ? pathname === item.href : pathname.startsWith(item.href))
@@ -103,6 +140,8 @@ function Navigation({
             )
           })}
         </ul>
+        </div>
+        ))}
       </nav>
       <p className="mt-auto px-2 text-xs text-muted-foreground">
         Fase 1 · data contoh tersimpan di browser ini
@@ -114,17 +153,19 @@ function Navigation({
 export function AppShell({
   services,
   workspaceId,
+  templateType,
   children,
 }: {
   services: AppServices
   workspaceId: string
+  templateType: TemplateType
   children: React.ReactNode
 }) {
   const [mobileOpen, setMobileOpen] = useState(false)
   return (
     <div className="flex min-h-full flex-1">
       <aside className="sticky top-0 hidden h-dvh w-72 shrink-0 overflow-y-auto border-r bg-sidebar p-4 lg:block">
-        <Navigation services={services} workspaceId={workspaceId} />
+        <Navigation services={services} workspaceId={workspaceId} templateType={templateType} />
       </aside>
       <div className="flex min-w-0 flex-1 flex-col">
         <header className="sticky top-0 z-30 flex h-14 items-center gap-3 border-b bg-canvas px-4 lg:hidden">
@@ -139,6 +180,7 @@ export function AppShell({
               <Navigation
                 services={services}
                 workspaceId={workspaceId}
+                templateType={templateType}
                 onNavigate={() => setMobileOpen(false)}
               />
             </SheetContent>

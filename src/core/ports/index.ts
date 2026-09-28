@@ -14,6 +14,7 @@ import type {
   Workspace,
 } from "../types";
 import type { PeriodRange } from "../periods";
+import type { SalesTaxSettings } from "../sales-tax";
 
 export interface NewWorkspace {
   ownerId: string;
@@ -32,6 +33,7 @@ export interface IWorkspaceRepository {
     periods: PeriodRange[],
   ): Promise<Workspace>;
   rename(id: string, name: string): Promise<Workspace>;
+  updateSalesTaxSettings(id: string, settings: SalesTaxSettings): Promise<Workspace>;
   softDelete(id: string): Promise<void>;
 }
 

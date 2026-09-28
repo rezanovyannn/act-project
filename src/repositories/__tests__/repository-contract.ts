@@ -66,7 +66,18 @@ export function describeRepositoryContract(
 
     describe("workspace", () => {
       it("createWithSeed membuat workspace, akun, dan periode", async () => {
-        expect(workspace).toMatchObject({ currency: "IDR", templateType: "fnb", deletedAt: null });
+        expect(workspace).toMatchObject({
+          currency: "IDR",
+          templateType: "fnb",
+          salesTaxRateBps: 1000,
+          salesTaxInclusive: false,
+          deletedAt: null,
+        });
+        const updated = await repos.workspaces.updateSalesTaxSettings(workspace.id, {
+          rateBps: 500,
+          inclusive: true,
+        });
+        expect(updated).toMatchObject({ salesTaxRateBps: 500, salesTaxInclusive: true });
         expect(await repos.accounts.listByWorkspace(workspace.id)).toHaveLength(FNB_TEMPLATE.accounts.length);
         const periods = await repos.periods.listByWorkspace(workspace.id);
         expect(periods).toHaveLength(12);

@@ -1,4 +1,4 @@
-import type { AccountType, JournalEntry, JournalSource } from "@/core/types"
+import type { JournalEntry, JournalSource } from "@/core/types"
 import { Badge } from "@/components/ui/badge"
 import { cn } from "@/lib/utils"
 
@@ -14,24 +14,6 @@ export const SOURCE_LABELS: Record<JournalSource, string> = {
   reversal: "Pembalik",
   closing: "Penutup",
 }
-
-export const ACCOUNT_TYPE_LABELS: Record<AccountType, string> = {
-  asset: "Aset",
-  liability: "Liabilitas",
-  equity: "Ekuitas",
-  revenue: "Pendapatan",
-  cogs: "Harga Pokok Penjualan",
-  expense: "Beban",
-}
-
-export const ACCOUNT_TYPE_ORDER: AccountType[] = [
-  "asset",
-  "liability",
-  "equity",
-  "revenue",
-  "cogs",
-  "expense",
-]
 
 /** Badge status sesuai docs/DESIGN_SYSTEM.md (tidak hanya mengandalkan warna). */
 export function JournalStatusBadges({

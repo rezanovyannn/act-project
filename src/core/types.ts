@@ -57,6 +57,10 @@ export interface Workspace {
   templateType: TemplateType;
   currency: Currency;
   booksStartDate: IsoDate;
+  /** Tarif PB1 dalam basis poin (1000 = 10%), ADR 012. */
+  salesTaxRateBps: number;
+  /** `true` bila harga menu sudah termasuk PB1. */
+  salesTaxInclusive: boolean;
   createdAt: IsoTimestamp;
   updatedAt: IsoTimestamp;
   deletedAt: IsoTimestamp | null;

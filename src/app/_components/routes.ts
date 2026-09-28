@@ -7,4 +7,9 @@ export const routes = {
   journal: (workspaceId: string, entryId: string) => `/w/${workspaceId}/journals/${entryId}`,
   editJournal: (workspaceId: string, entryId: string) =>
     `/w/${workspaceId}/journals/${entryId}/edit`,
+  ledger: (workspaceId: string) => `/w/${workspaceId}/ledger`,
+  transactions: (workspaceId: string) => `/w/${workspaceId}/transactions`,
+  credits: (workspaceId: string) => `/w/${workspaceId}/credits`,
+  fnbPurchases: (workspaceId: string) => `/w/${workspaceId}/fnb/purchases`,
+  fnbStockOpname: (workspaceId: string) => `/w/${workspaceId}/fnb/stock-opname`,
 }

@@ -1,6 +1,7 @@
 import { isValidIsoDate } from "../dates";
 import { assertNoIssues, fail } from "../errors";
 import { monthlyPeriodsUntilYearEnd } from "../periods";
+import { isValidTaxRate, type SalesTaxSettings } from "../sales-tax";
 import type { IWorkspaceRepository, NewWorkspace } from "../ports";
 import { validateTemplate } from "../templates";
 import type { TemplateRegistry, Workspace } from "../types";
@@ -36,5 +37,13 @@ export class WorkspaceService {
       template.accounts,
       monthlyPeriodsUntilYearEnd(input.booksStartDate),
     );
+  }
+
+  /** Tarif & mode harga PB1 per workspace (ADR 012). */
+  async updateSalesTaxSettings(workspaceId: string, settings: SalesTaxSettings): Promise<Workspace> {
+    if (!isValidTaxRate(settings.rateBps)) {
+      fail("INVALID_AMOUNT", "Tarif PB1 harus antara 0% dan 100%");
+    }
+    return this.deps.workspaces.updateSalesTaxSettings(workspaceId, settings);
   }
 }

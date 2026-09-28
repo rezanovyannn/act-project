@@ -95,3 +95,53 @@ export function validateSettlement(
   }
   return [];
 }
+
+export interface CreditTransaction {
+  entry: JournalEntry;
+  kind: "receivable" | "payable";
+  counterparty: string | null;
+  /** Nominal piutang/utang awal. */
+  original: number;
+  paid: number;
+  outstanding: number;
+  /** Pelunasan aktif (belum di-void), urut tanggal. */
+  settlements: JournalEntry[];
+}
+
+/**
+ * Semua transaksi kredit posted yang belum di-void beserta sisa tagihannya
+ * (ADR 012). Filter `outstanding > 0` untuk daftar yang belum lunas.
+ */
+export function listCreditTransactions(
+  entries: readonly JournalEntry[],
+  accounts: readonly Account[],
+): CreditTransaction[] {
+  const byId = new Map(accounts.map((a) => [a.id, a]));
+  const posted = entries.filter((e) => e.status === "posted" && e.deletedAt === null);
+  const reversed = new Set(posted.filter((e) => e.reversalOf).map((e) => e.reversalOf!));
+  const active = posted.filter((e) => !reversed.has(e.id) && e.source !== "reversal");
+
+  const result: CreditTransaction[] = [];
+  for (const entry of active) {
+    if (entry.source === "settlement") continue;
+    const original = claimTotal(entry.lines, byId);
+    if (original <= 0) continue;
+    const receivable = entry.lines.some(
+      (l) => byId.get(l.accountId)?.systemRole === "accounts_receivable",
+    );
+    const settlements = active
+      .filter((s) => s.settlementOf === entry.id)
+      .sort((a, b) => a.entryDate.localeCompare(b.entryDate));
+    const outstanding = outstandingAmount(entry, settlements, byId);
+    result.push({
+      entry,
+      kind: receivable ? "receivable" : "payable",
+      counterparty: entry.counterparty,
+      original,
+      paid: original - outstanding,
+      outstanding,
+      settlements,
+    });
+  }
+  return result.sort((a, b) => a.entry.entryDate.localeCompare(b.entry.entryDate));
+}

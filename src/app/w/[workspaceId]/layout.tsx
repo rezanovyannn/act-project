@@ -31,7 +31,7 @@ export default function WorkspaceLayout({ children }: { children: React.ReactNod
     )
   }
   return (
-    <AppShell services={services} workspaceId={workspaceId}>
+    <AppShell services={services} workspaceId={workspaceId} templateType={workspace.data.templateType}>
       {children}
     </AppShell>
   )
