@@ -278,5 +278,6 @@ export function buildFnbMockState(): MockState {
     accounts: buildAccounts(),
     periods: buildPeriods(),
     journals: buildJournals(),
+    auditLogs: [],
   };
 }

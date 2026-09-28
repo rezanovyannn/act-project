@@ -34,7 +34,7 @@ Nama kolom ditulis `snake_case` (DB); di TypeScript memakai padanan `camelCase`.
    - `debit` dan `credit` (integer/bigint, >= 0) dengan aturan **tepat satu** bernilai > 0.
    - Jurnal minimal 2 baris; total `debit` = total `credit`.
 
-6. **`audit_logs`** (Fase 2): `entity_type`, `entity_id`, `action`, `before`, `after`, `actor_id`, `created_at`. Di Fase 1 cukup disimulasikan di mock bila diperlukan.
+6. **`audit_logs`**: `entity_type` (`workspace`/`account`/`period`/`journal`), `entity_id`, `action`, `reason` (nullable, wajib saat membuka kembali periode), `before`, `after`, `actor_id`, `created_at`. Fase 1: ditulis mock repository di dalam operasi tulis yang sama (atomik). Fase 2: trigger database; alasan diteruskan dari RPC perubahan status periode.
 
 7. Template (`src/modules/<template>/`) menyediakan seed CoA lengkap dengan `account_type`, `normal_balance`, `cash_flow_category`, `is_cash`, dan `system_role`. Template F&B menyertakan Piutang Usaha, Utang Usaha, dan Utang PB1 (ADR 012).
 

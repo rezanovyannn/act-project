@@ -1,4 +1,6 @@
+import { AccountService } from "@/core/services/account-service";
 import { JournalService } from "@/core/services/journal-service";
+import { PeriodService } from "@/core/services/period-service";
 import { WorkspaceService } from "@/core/services/workspace-service";
 import type { Account, JournalEntryInput, JournalLineInput } from "@/core/types";
 import { FNB_TEMPLATE } from "@/modules/fnb/template";
@@ -19,6 +21,7 @@ export function createTestEnv(seed: () => MockState = emptyMockState) {
     storage,
     seed,
     generateId: () => `id-${++idCounter}`,
+    actorId: "owner-a",
     now: () => new Date(Date.UTC(2026, 0, 1) + ++tick * 1000).toISOString(),
   });
   const repos = createMockRepositories(db);
@@ -27,6 +30,8 @@ export function createTestEnv(seed: () => MockState = emptyMockState) {
     storage,
     repos,
     journalService: new JournalService(repos),
+    accountService: new AccountService(repos),
+    periodService: new PeriodService(repos),
     workspaceService: new WorkspaceService({
       workspaces: repos.workspaces,
       templates: { fnb: FNB_TEMPLATE },

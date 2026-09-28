@@ -163,3 +163,23 @@ export interface WorkspaceTemplate {
 }
 
 export type TemplateRegistry = Record<TemplateType, WorkspaceTemplate>;
+
+export type AuditEntity = "workspace" | "account" | "period" | "journal";
+
+/**
+ * Jejak audit mutasi (AGENTS.md prinsip 10). Fase 1: ditulis mock repository
+ * dalam operasi yang sama; Fase 2: trigger database.
+ */
+export interface AuditLog {
+  id: string;
+  workspaceId: string;
+  entityType: AuditEntity;
+  entityId: string;
+  action: string;
+  /** Alasan dari pengguna, mis. saat membuka kembali periode. */
+  reason: string | null;
+  before: unknown;
+  after: unknown;
+  actorId: string;
+  createdAt: IsoTimestamp;
+}

@@ -63,7 +63,7 @@ function navGroups(workspaceId: string, templateType: TemplateType): NavGroup[] 
   }
   groups.push({
     items: [
-      { label: "Pengaturan", icon: SettingsIcon, comingIn: "1E" },
+      { label: "Pengaturan", href: routes.settings(workspaceId), icon: SettingsIcon },
     ],
   })
   return groups

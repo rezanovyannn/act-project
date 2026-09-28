@@ -7,6 +7,7 @@ import { AccountingError, type ValidationCode } from "@/core/errors";
 import { monthlyPeriodsForYear } from "@/core/periods";
 import type {
   IAccountRepository,
+  IAuditLogRepository,
   IJournalRepository,
   IPeriodRepository,
   IWorkspaceRepository,
@@ -19,6 +20,7 @@ export interface ContractRepositories {
   accounts: IAccountRepository;
   periods: IPeriodRepository;
   journals: IJournalRepository;
+  auditLogs: IAuditLogRepository;
 }
 
 async function expectCode(promise: Promise<unknown>, code: ValidationCode) {
@@ -122,6 +124,19 @@ export function describeRepositoryContract(
     });
 
     describe("periode", () => {
+      it("perubahan status periode tercatat di audit log beserta alasan", async () => {
+        const [january] = await repos.periods.listByWorkspace(workspace.id);
+        await repos.periods.setStatus(january.id, "closed");
+        await repos.periods.setStatus(january.id, "open", "Koreksi transaksi Januari");
+        const logs = await repos.auditLogs.listByWorkspace(workspace.id, { entityType: "period", entityId: january.id });
+        expect(logs.map((l) => [l.action, l.reason])).toEqual([
+          ["reopen", "Koreksi transaksi Januari"],
+          ["close", null],
+          ["create", null],
+        ]);
+        expect(logs[0]).toMatchObject({ before: { status: "closed" }, after: { status: "open" } });
+      });
+
       it("menolak periode tumpang tindih dan mengubah status", async () => {
         await expectCode(
           repos.periods.createMany(workspace.id, [{ startDate: "2026-12-15", endDate: "2027-01-14" }]),
@@ -224,6 +239,13 @@ export function describeRepositoryContract(
         await expect(repos.journals.postJournal(reverse(creditSale))).resolves.toMatchObject({
           reversalOf: creditSale.id,
         });
+      });
+
+      it("mutasi jurnal tercatat di audit log", async () => {
+        const draft = await repos.journals.saveDraft(sale(1000));
+        await repos.journals.postJournal(sale(1000), draft.id);
+        const logs = await repos.auditLogs.listByWorkspace(workspace.id, { entityType: "journal" });
+        expect(logs.map((l) => l.action)).toEqual(["post", "create_draft"]);
       });
 
       it("satu jurnal hanya bisa dibalik sekali", async () => {

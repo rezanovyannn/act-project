@@ -1,4 +1,4 @@
-import type { Account, JournalEntry, Period, Workspace } from "@/core/types";
+import type { Account, AuditEntity, AuditLog, JournalEntry, Period, Workspace } from "@/core/types";
 
 /** Subset API `localStorage` yang dipakai; memudahkan test dengan storage memori. */
 export interface KeyValueStorage {
@@ -21,7 +21,7 @@ export class MemoryStorage implements KeyValueStorage {
 }
 
 /** Naikkan bila bentuk data berubah; data lama di browser akan diganti seed. */
-export const MOCK_SCHEMA_VERSION = 3;
+export const MOCK_SCHEMA_VERSION = 4;
 export const MOCK_STORAGE_KEY = "act-project:mock-db";
 
 export interface MockState {
@@ -30,6 +30,7 @@ export interface MockState {
   accounts: Account[];
   periods: Period[];
   journals: JournalEntry[];
+  auditLogs: AuditLog[];
 }
 
 export function emptyMockState(): MockState {
@@ -39,6 +40,7 @@ export function emptyMockState(): MockState {
     accounts: [],
     periods: [],
     journals: [],
+    auditLogs: [],
   };
 }
 
@@ -48,6 +50,18 @@ export interface MockDatabaseOptions {
   storageKey?: string;
   now?: () => string;
   generateId?: () => string;
+  /** Pengguna yang melakukan mutasi (Fase 2: auth.uid()). */
+  actorId?: string;
+}
+
+export interface AuditInput {
+  workspaceId: string;
+  entityType: AuditEntity;
+  entityId: string;
+  action: string;
+  before: unknown;
+  after: unknown;
+  reason?: string | null;
 }
 
 /**
@@ -61,6 +75,7 @@ export class MockDatabase {
   private readonly storageKey: string;
   readonly now: () => string;
   readonly generateId: () => string;
+  readonly actorId: string;
 
   constructor(options: MockDatabaseOptions) {
     this.storage = options.storage;
@@ -68,6 +83,23 @@ export class MockDatabase {
     this.storageKey = options.storageKey ?? MOCK_STORAGE_KEY;
     this.now = options.now ?? (() => new Date().toISOString());
     this.generateId = options.generateId ?? (() => crypto.randomUUID());
+    this.actorId = options.actorId ?? "system";
+  }
+
+  /** Mencatat audit log di dalam `write()` yang sama (atomik, meniru trigger DB). */
+  audit(state: MockState, input: AuditInput): void {
+    state.auditLogs.push({
+      id: this.generateId(),
+      workspaceId: input.workspaceId,
+      entityType: input.entityType,
+      entityId: input.entityId,
+      action: input.action,
+      reason: input.reason ?? null,
+      before: structuredClone(input.before ?? null),
+      after: structuredClone(input.after ?? null),
+      actorId: this.actorId,
+      createdAt: this.now(),
+    });
   }
 
   /** Salinan state terkini (aman dimodifikasi pemanggil). */

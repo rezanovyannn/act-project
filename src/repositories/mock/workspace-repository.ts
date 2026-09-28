@@ -40,8 +40,11 @@ export class MockWorkspaceRepository implements IWorkspaceRepository {
         deletedAt: null,
       };
       state.workspaces.push(workspace);
+      const audit = (entityType: "workspace" | "account" | "period", entity: { id: string }) =>
+        this.db.audit(state, { workspaceId: workspace.id, entityType, entityId: entity.id, action: "create", before: null, after: entity });
+      audit("workspace", workspace);
       for (const seed of accounts) {
-        state.accounts.push({
+        const account = {
           ...seed,
           id: this.db.generateId(),
           workspaceId: workspace.id,
@@ -49,17 +52,21 @@ export class MockWorkspaceRepository implements IWorkspaceRepository {
           createdAt: now,
           updatedAt: now,
           deletedAt: null,
-        });
+        };
+        state.accounts.push(account);
+        audit("account", account);
       }
       for (const range of periods) {
-        state.periods.push({
+        const period = {
           ...range,
           id: this.db.generateId(),
           workspaceId: workspace.id,
-          status: "open",
+          status: "open" as const,
           createdAt: now,
           updatedAt: now,
-        });
+        };
+        state.periods.push(period);
+        audit("period", period);
       }
       return workspace;
     });
@@ -69,8 +76,10 @@ export class MockWorkspaceRepository implements IWorkspaceRepository {
     return this.db.write((state) => {
       const workspace = state.workspaces.find((w) => w.id === id && w.deletedAt === null);
       if (!workspace) fail("NOT_FOUND", "Workspace tidak ditemukan");
+      const before = { ...workspace };
       workspace.name = name;
       workspace.updatedAt = this.db.now();
+      this.db.audit(state, { workspaceId: id, entityType: "workspace", entityId: id, action: "update", before, after: workspace });
       return workspace;
     });
   }
@@ -79,9 +88,11 @@ export class MockWorkspaceRepository implements IWorkspaceRepository {
     return this.db.write((state) => {
       const workspace = state.workspaces.find((w) => w.id === id && w.deletedAt === null);
       if (!workspace) fail("NOT_FOUND", "Workspace tidak ditemukan");
+      const before = { ...workspace };
       workspace.salesTaxRateBps = settings.rateBps;
       workspace.salesTaxInclusive = settings.inclusive;
       workspace.updatedAt = this.db.now();
+      this.db.audit(state, { workspaceId: id, entityType: "workspace", entityId: id, action: "update_tax_settings", before, after: workspace });
       return workspace;
     });
   }
@@ -91,6 +102,7 @@ export class MockWorkspaceRepository implements IWorkspaceRepository {
       const workspace = state.workspaces.find((w) => w.id === id && w.deletedAt === null);
       if (!workspace) fail("NOT_FOUND", "Workspace tidak ditemukan");
       workspace.deletedAt = this.db.now();
+      this.db.audit(state, { workspaceId: id, entityType: "workspace", entityId: id, action: "delete", before: null, after: workspace });
     });
   }
 }

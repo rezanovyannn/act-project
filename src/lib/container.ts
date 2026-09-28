@@ -3,6 +3,8 @@
  * Fase 1: repository mock berbasis localStorage. Hanya boleh di-import oleh src/app/.
  */
 import type { AppServices } from "@/core/services";
+import { AccountService } from "@/core/services/account-service";
+import { PeriodService } from "@/core/services/period-service";
 import { JournalService } from "@/core/services/journal-service";
 import { WorkspaceService } from "@/core/services/workspace-service";
 import type { TemplateRegistry } from "@/core/types";
@@ -21,6 +23,7 @@ function createContainer(): Container {
   const db = new MockDatabase({
     storage: window.localStorage,
     seed: buildFnbMockState,
+    actorId: MOCK_OWNER_ID,
   });
   const repositories = createMockRepositories(db);
   return {
@@ -32,6 +35,8 @@ function createContainer(): Container {
       templates: TEMPLATES,
     }),
     journalService: new JournalService(repositories),
+    accountService: new AccountService(repositories),
+    periodService: new PeriodService(repositories),
     resetMockData: () => db.reset(),
   };
 }

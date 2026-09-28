@@ -1,4 +1,5 @@
 import { MockAccountRepository } from "./account-repository";
+import { MockAuditLogRepository } from "./audit-log-repository";
 import { MockJournalRepository } from "./journal-repository";
 import { MockDatabase } from "./mock-database";
 import { MockPeriodRepository } from "./period-repository";
@@ -12,6 +13,7 @@ export function createMockRepositories(db: MockDatabase) {
     accounts: new MockAccountRepository(db),
     periods: new MockPeriodRepository(db),
     journals: new MockJournalRepository(db),
+    auditLogs: new MockAuditLogRepository(db),
   };
 }
 

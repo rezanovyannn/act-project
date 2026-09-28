@@ -1,13 +1,18 @@
 import type {
   IAccountRepository,
+  IAuditLogRepository,
   IJournalRepository,
   IPeriodRepository,
   IWorkspaceRepository,
 } from "../ports";
+import type { AccountService } from "./account-service";
 import type { JournalService } from "./journal-service";
+import type { PeriodService } from "./period-service";
 import type { WorkspaceService } from "./workspace-service";
 
+export { AccountService } from "./account-service";
 export { JournalService } from "./journal-service";
+export { PeriodService } from "./period-service";
 export { WorkspaceService } from "./workspace-service";
 
 /**
@@ -19,6 +24,9 @@ export interface AppServices {
   ownerId: string;
   workspaceService: WorkspaceService;
   journalService: JournalService;
+  accountService: AccountService;
+  periodService: PeriodService;
+  auditLogs: IAuditLogRepository;
   workspaces: IWorkspaceRepository;
   accounts: IAccountRepository;
   periods: IPeriodRepository;

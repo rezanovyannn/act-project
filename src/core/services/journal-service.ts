@@ -1,5 +1,6 @@
 import { assertNoIssues, fail } from "../errors";
 import { validateForPosting, validateLineAmounts } from "../journal-validation";
+import { activeOpeningBalance } from "../opening-balance";
 import type {
   IAccountRepository,
   IJournalRepository,
@@ -104,6 +105,15 @@ export class JournalService {
     if (input.source === "settlement" || input.settlementOf) {
       const context = await this.settlementContext(input.settlementOf ?? null, accounts);
       issues.push(...validateSettlement(input, context));
+    }
+    if (input.source === "opening_balance") {
+      const existing = activeOpeningBalance(await this.deps.journals.listByWorkspace(input.workspaceId));
+      if (existing) {
+        issues.push({
+          code: "DUPLICATE_OPENING_BALANCE",
+          message: `Saldo awal sudah diposting (${existing.entryNumber}); void jurnal tersebut untuk membuat ulang`,
+        });
+      }
     }
     assertNoIssues(issues);
     return this.deps.journals.postJournal(input, draftId);

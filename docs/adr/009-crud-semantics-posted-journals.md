@@ -19,6 +19,8 @@ Aplikasi membutuhkan aturan ketat mengenai modifikasi data yang sudah ada guna m
    - Akun yang sudah pernah direferensikan oleh baris jurnal tidak boleh dihapus. Akun tersebut hanya dapat dinonaktifkan (`is_active = false`) agar tidak muncul di pilihan form input masa depan, namun tetap muncul di laporan historis.
    - Posting yang memakai akun nonaktif ditolak, kecuali jurnal pembalik (agar void tetap bisa dilakukan).
    - Akun dengan `system_role` (ADR 011) tidak boleh dihapus atau dinonaktifkan selama modul yang membutuhkannya aktif.
+   - Akun yang sudah dipakai jurnal (dan akun sistem) tidak boleh diubah jenis akun, saldo normal, maupun status kas/bank-nya karena mengubah arti angka historis; kode, nama, dan kategori arus kas boleh diubah.
+   - Akun kas/bank harus berjenis aset dan kategori arus kasnya `none`.
 3. **Validasi Tanggal:**
    - Tanggal jurnal saat posting harus berada dalam rentang periode berstatus **Open** (ADR 006).
 

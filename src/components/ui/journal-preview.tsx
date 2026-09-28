@@ -24,8 +24,8 @@ function JournalPreview({
           <thead className="text-xs text-muted-foreground">
             <tr className="border-b">
               <th className="py-1.5 pl-4 text-left font-medium">Akun</th>
-              <th className="w-28 px-2 py-1.5 text-right font-medium">Debit</th>
-              <th className="w-28 py-1.5 pr-4 pl-2 text-right font-medium">Kredit</th>
+              <th className="w-32 px-2 py-1.5 text-right font-medium">Debit</th>
+              <th className="w-32 py-1.5 pr-4 pl-2 text-right font-medium">Kredit</th>
             </tr>
           </thead>
           <tbody className="divide-y">
@@ -37,10 +37,10 @@ function JournalPreview({
                     <span className="block truncate text-ink">{account?.name ?? "—"}</span>
                     <span className="block text-xs text-muted-foreground tabular-nums">{account?.code}</span>
                   </td>
-                  <td className="w-28 px-2 py-2 text-right">
+                  <td className="w-32 px-2 py-2 text-right">
                     <Amount value={line.debit} hideZero />
                   </td>
-                  <td className="w-28 py-2 pr-4 pl-2 text-right">
+                  <td className="w-32 py-2 pr-4 pl-2 text-right">
                     <Amount value={line.credit} hideZero />
                   </td>
                 </tr>

@@ -37,16 +37,29 @@ export class MockPeriodRepository implements IPeriodRepository {
         created.push(period);
       }
       state.periods.push(...created);
+      for (const period of created) {
+        this.db.audit(state, { workspaceId, entityType: "period", entityId: period.id, action: "create", before: null, after: period });
+      }
       return created;
     });
   }
 
-  async setStatus(id: string, status: PeriodStatus): Promise<Period> {
+  async setStatus(id: string, status: PeriodStatus, reason?: string): Promise<Period> {
     return this.db.write((state) => {
       const period = state.periods.find((p) => p.id === id);
       if (!period) fail("NOT_FOUND", "Periode tidak ditemukan");
+      const before = { ...period };
       period.status = status;
       period.updatedAt = this.db.now();
+      this.db.audit(state, {
+        workspaceId: period.workspaceId,
+        entityType: "period",
+        entityId: period.id,
+        action: status === "closed" ? "close" : "reopen",
+        before,
+        after: period,
+        reason: reason?.trim() || null,
+      });
       return period;
     });
   }

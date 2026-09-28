@@ -2,6 +2,7 @@ import { assertNoIssues, fail } from "@/core/errors";
 import { validateForPosting, validateLineAmounts } from "@/core/journal-validation";
 import { nextEntryNumber } from "@/core/numbering";
 import type { IJournalRepository, JournalFilter } from "@/core/ports";
+import { activeOpeningBalance } from "@/core/opening-balance";
 import { validateReversal } from "@/core/reversal";
 import { validateSettlement } from "@/core/settlement";
 import type { JournalEntry, JournalEntryInput, JournalLine } from "@/core/types";
@@ -74,6 +75,14 @@ export class MockJournalRepository implements IJournalRepository {
       const now = this.db.now();
       const existing = draftId ? requireDraft(state, draftId) : undefined;
       const entry = this.buildEntry(input, "draft", now, existing);
+      this.db.audit(state, {
+        workspaceId: input.workspaceId,
+        entityType: "journal",
+        entityId: entry.id,
+        action: existing ? "update_draft" : "create_draft",
+        before: existing ?? null,
+        after: entry,
+      });
       if (existing) {
         Object.assign(existing, entry);
         return existing;
@@ -87,6 +96,7 @@ export class MockJournalRepository implements IJournalRepository {
     this.db.write((state) => {
       const entry = requireDraft(state, id);
       entry.deletedAt = this.db.now();
+      this.db.audit(state, { workspaceId: entry.workspaceId, entityType: "journal", entityId: id, action: "delete_draft", before: entry, after: null });
     });
   }
 
@@ -110,6 +120,12 @@ export class MockJournalRepository implements IJournalRepository {
             accounts,
           }),
         );
+      }
+      if (
+        input.source === "opening_balance" &&
+        activeOpeningBalance(state.journals.filter((j) => j.workspaceId === input.workspaceId))
+      ) {
+        fail("DUPLICATE_OPENING_BALANCE", "Saldo awal sudah diposting untuk workspace ini");
       }
       if (input.reversalOf) {
         const original = findActive(state, input.reversalOf);
@@ -136,6 +152,14 @@ export class MockJournalRepository implements IJournalRepository {
         input.entryDate,
       );
       entry.postedAt = now;
+      this.db.audit(state, {
+        workspaceId: input.workspaceId,
+        entityType: "journal",
+        entityId: entry.id,
+        action: input.reversalOf ? "reverse" : "post",
+        before: existing ?? null,
+        after: entry,
+      });
       if (existing) {
         Object.assign(existing, entry);
         return existing;

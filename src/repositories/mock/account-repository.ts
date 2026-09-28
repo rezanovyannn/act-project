@@ -55,6 +55,7 @@ export class MockAccountRepository implements IAccountRepository {
         deletedAt: null,
       };
       state.accounts.push(account);
+      this.db.audit(state, { workspaceId, entityType: "account", entityId: account.id, action: "create", before: null, after: account });
       return account;
     });
   }
@@ -66,7 +67,9 @@ export class MockAccountRepository implements IAccountRepository {
       if (patch.code !== undefined) {
         assertUniqueCode(state, account.workspaceId, patch.code, id);
       }
+      const before = { ...account };
       Object.assign(account, patch, { updatedAt: this.db.now() });
+      this.db.audit(state, { workspaceId: account.workspaceId, entityType: "account", entityId: id, action: "update", before, after: account });
       return account;
     });
   }
@@ -79,6 +82,7 @@ export class MockAccountRepository implements IAccountRepository {
         fail("ACCOUNT_INACTIVE", "Akun sudah dipakai jurnal; nonaktifkan saja, tidak bisa dihapus");
       }
       account.deletedAt = this.db.now();
+      this.db.audit(state, { workspaceId: account.workspaceId, entityType: "account", entityId: id, action: "delete", before: account, after: null });
     });
   }
 

@@ -5,6 +5,8 @@
 import type {
   Account,
   AccountSeed,
+  AuditEntity,
+  AuditLog,
   IsoDate,
   JournalEntry,
   JournalEntryInput,
@@ -65,7 +67,8 @@ export interface IPeriodRepository {
   listByWorkspace(workspaceId: string): Promise<Period[]>;
   /** Ditolak bila ada periode yang tumpang tindih. */
   createMany(workspaceId: string, periods: PeriodRange[]): Promise<Period[]>;
-  setStatus(id: string, status: PeriodStatus): Promise<Period>;
+  /** Perubahan status tercatat di audit log beserta alasan (wajib saat membuka kembali). */
+  setStatus(id: string, status: PeriodStatus, reason?: string): Promise<Period>;
 }
 
 export interface JournalFilter {
@@ -97,4 +100,14 @@ export interface IJournalRepository {
    * Dengan `draftId`, draft tersebut yang diposting.
    */
   postJournal(entry: JournalEntryInput, draftId?: string): Promise<JournalEntry>;
+}
+
+export interface AuditLogFilter {
+  entityType?: AuditEntity;
+  entityId?: string;
+}
+
+export interface IAuditLogRepository {
+  /** Terbaru lebih dulu. Hanya baca: log ditulis oleh repository lain / trigger DB. */
+  listByWorkspace(workspaceId: string, filter?: AuditLogFilter): Promise<AuditLog[]>;
 }
