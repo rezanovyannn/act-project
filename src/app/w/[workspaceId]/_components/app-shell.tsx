@@ -47,6 +47,7 @@ function navGroups(workspaceId: string, templateType: TemplateType): NavGroup[] 
         { label: "Piutang & Utang", href: routes.credits(workspaceId), icon: HandCoinsIcon },
         { label: "Jurnal Umum", href: routes.journals(workspaceId), icon: FileTextIcon },
         { label: "Buku Besar", href: routes.ledger(workspaceId), icon: LandmarkIcon },
+        { label: "Laporan Keuangan", href: routes.reports(workspaceId), icon: BookOpenIcon },
       ],
     },
   ]
@@ -62,7 +63,6 @@ function navGroups(workspaceId: string, templateType: TemplateType): NavGroup[] 
   }
   groups.push({
     items: [
-      { label: "Laporan Keuangan", icon: BookOpenIcon, comingIn: "1D" },
       { label: "Pengaturan", icon: SettingsIcon, comingIn: "1E" },
     ],
   })

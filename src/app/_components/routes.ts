@@ -8,6 +8,7 @@ export const routes = {
   editJournal: (workspaceId: string, entryId: string) =>
     `/w/${workspaceId}/journals/${entryId}/edit`,
   ledger: (workspaceId: string) => `/w/${workspaceId}/ledger`,
+  reports: (workspaceId: string) => `/w/${workspaceId}/reports`,
   transactions: (workspaceId: string) => `/w/${workspaceId}/transactions`,
   credits: (workspaceId: string) => `/w/${workspaceId}/credits`,
   fnbPurchases: (workspaceId: string) => `/w/${workspaceId}/fnb/purchases`,
