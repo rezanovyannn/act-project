@@ -6,7 +6,8 @@ import type {
   IPeriodRepository,
 } from "../ports";
 import { buildReversalInput, validateReversal } from "../reversal";
-import type { IsoDate, JournalEntry, JournalEntryInput } from "../types";
+import { validateSettlement, type SettlementContext } from "../settlement";
+import type { Account, IsoDate, JournalEntry, JournalEntryInput } from "../types";
 
 export interface JournalServiceDeps {
   journals: IJournalRepository;
@@ -61,8 +62,13 @@ export class JournalService {
     description?: string,
   ): Promise<JournalEntry> {
     const original = await this.requireEntry(entryId);
-    const existingReversal = await this.deps.journals.findReversalOf(entryId);
-    assertNoIssues(validateReversal(original, existingReversal, reversalDate));
+    const [existingReversal, activeSettlements] = await Promise.all([
+      this.deps.journals.findReversalOf(entryId),
+      this.deps.journals.listActiveSettlementsOf(entryId),
+    ]);
+    assertNoIssues(
+      validateReversal(original, existingReversal, reversalDate, activeSettlements),
+    );
     return this.validateAndPost(
       buildReversalInput(original, reversalDate, description),
     );
@@ -94,8 +100,28 @@ export class JournalService {
       this.deps.accounts.listByWorkspace(input.workspaceId),
       this.deps.periods.listByWorkspace(input.workspaceId),
     ]);
-    assertNoIssues(validateForPosting(input, { accounts, periods }));
+    const issues = validateForPosting(input, { accounts, periods });
+    if (input.source === "settlement" || input.settlementOf) {
+      const context = await this.settlementContext(input.settlementOf ?? null, accounts);
+      issues.push(...validateSettlement(input, context));
+    }
+    assertNoIssues(issues);
     return this.deps.journals.postJournal(input, draftId);
+  }
+
+  private async settlementContext(
+    targetId: string | null,
+    accounts: Account[],
+  ): Promise<SettlementContext> {
+    if (!targetId) {
+      return { target: null, targetReversed: false, activeSettlements: [], accounts };
+    }
+    const [target, reversal, activeSettlements] = await Promise.all([
+      this.deps.journals.getById(targetId),
+      this.deps.journals.findReversalOf(targetId),
+      this.deps.journals.listActiveSettlementsOf(targetId),
+    ]);
+    return { target, targetReversed: reversal !== null, activeSettlements, accounts };
   }
 
   private async requireEntry(id: string): Promise<JournalEntry> {
@@ -121,6 +147,8 @@ function toInput(entry: JournalEntry): JournalEntryInput {
     entryDate: entry.entryDate,
     description: entry.description,
     source: entry.source,
+    counterparty: entry.counterparty,
+    settlementOf: entry.settlementOf,
     reversalOf: entry.reversalOf,
     correctionOf: entry.correctionOf,
     lines: entry.lines.map((line) => ({

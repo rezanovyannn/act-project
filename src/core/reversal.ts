@@ -27,6 +27,8 @@ export function buildReversalInput(
     entryDate: reversalDate,
     description: description?.trim() || `Pembalik ${label}: ${original.description}`,
     source: "reversal",
+    counterparty: original.counterparty,
+    settlementOf: null,
     reversalOf: original.id,
     correctionOf: null,
     lines: reverseLines(original),
@@ -35,12 +37,14 @@ export function buildReversalInput(
 
 /**
  * Syarat sebuah jurnal boleh dibalik: sudah posted, bukan jurnal pembalik,
- * belum pernah dibalik, dan tanggal pembalik tidak sebelum tanggal asal.
+ * belum pernah dibalik, tanggal pembalik tidak sebelum tanggal asal, dan
+ * (untuk transaksi kredit) tidak punya pelunasan aktif (ADR 012).
  */
 export function validateReversal(
   original: JournalEntry,
   existingReversal: JournalEntry | null,
   reversalDate: IsoDate,
+  activeSettlements: readonly JournalEntry[] = [],
 ): ValidationIssue[] {
   const issues: ValidationIssue[] = [];
   if (original.status !== "posted" || original.deletedAt !== null) {
@@ -59,6 +63,12 @@ export function validateReversal(
     issues.push({
       code: "ALREADY_REVERSED",
       message: `Jurnal ini sudah dibalik oleh ${existingReversal.entryNumber ?? existingReversal.id}`,
+    });
+  }
+  if (activeSettlements.length > 0) {
+    issues.push({
+      code: "HAS_SETTLEMENTS",
+      message: `Transaksi ini sudah memiliki ${activeSettlements.length} pelunasan; void pelunasannya lebih dulu`,
     });
   }
   if (reversalDate < original.entryDate) {

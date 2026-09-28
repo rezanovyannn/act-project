@@ -29,7 +29,10 @@ export type SystemRole =
   | "owner_capital"
   | "drawings"
   | "raw_material_inventory"
-  | "cogs";
+  | "cogs"
+  | "accounts_receivable"
+  | "accounts_payable"
+  | "sales_tax_payable";
 
 export type PeriodStatus = "open" | "closed";
 
@@ -42,6 +45,8 @@ export type JournalSource =
   | "purchase"
   | "adjustment"
   | "opening_balance"
+  | "settlement"
+  | "tax_payment"
   | "reversal"
   | "closing";
 
@@ -102,6 +107,10 @@ export interface JournalEntry {
   description: string;
   status: JournalStatus;
   source: JournalSource;
+  /** Nama pelanggan/pemasok (transaksi kredit & pelunasan, ADR 012). */
+  counterparty: string | null;
+  /** Jurnal transaksi kredit yang dilunasi oleh jurnal ini (ADR 012). */
+  settlementOf: string | null;
   reversalOf: string | null;
   correctionOf: string | null;
   postedAt: IsoTimestamp | null;
@@ -125,6 +134,8 @@ export interface JournalEntryInput {
   entryDate: IsoDate;
   description: string;
   source: JournalSource;
+  counterparty?: string | null;
+  settlementOf?: string | null;
   reversalOf?: string | null;
   correctionOf?: string | null;
   lines: JournalLineInput[];

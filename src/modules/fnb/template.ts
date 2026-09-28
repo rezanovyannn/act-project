@@ -1,17 +1,20 @@
 import type { AccountSeed, WorkspaceTemplate } from "@/core/types";
 
 /**
- * CoA awal template F&B. Akun pajak (PB1/PPN) serta piutang/utang usaha
- * belum disertakan: menunggu Keputusan Tertunda 1 & 2 di docs/ROADMAP.md.
+ * CoA awal template F&B. Termasuk Piutang/Utang Usaha dan Utang PB1 (ADR 012).
+ * Akun ditemukan sistem lewat `systemRole`, sehingga kode/nama boleh diubah user.
  */
 export const FNB_ACCOUNTS: AccountSeed[] = [
   // Aset
   { code: "1-1100", name: "Kas", accountType: "asset", normalBalance: "debit", cashFlowCategory: "none", isCash: true, systemRole: null },
   { code: "1-1200", name: "Bank", accountType: "asset", normalBalance: "debit", cashFlowCategory: "none", isCash: true, systemRole: null },
   { code: "1-1300", name: "Persediaan Bahan Baku", accountType: "asset", normalBalance: "debit", cashFlowCategory: "operating", isCash: false, systemRole: "raw_material_inventory" },
+  { code: "1-1400", name: "Piutang Usaha", accountType: "asset", normalBalance: "debit", cashFlowCategory: "operating", isCash: false, systemRole: "accounts_receivable" },
   { code: "1-2100", name: "Peralatan Dapur", accountType: "asset", normalBalance: "debit", cashFlowCategory: "investing", isCash: false, systemRole: null },
   { code: "1-2190", name: "Akumulasi Penyusutan Peralatan", accountType: "asset", normalBalance: "credit", cashFlowCategory: "investing", isCash: false, systemRole: null },
   // Liabilitas
+  { code: "2-1100", name: "Utang Usaha", accountType: "liability", normalBalance: "credit", cashFlowCategory: "operating", isCash: false, systemRole: "accounts_payable" },
+  { code: "2-1200", name: "Utang PB1", accountType: "liability", normalBalance: "credit", cashFlowCategory: "operating", isCash: false, systemRole: "sales_tax_payable" },
   { code: "2-2100", name: "Utang Bank", accountType: "liability", normalBalance: "credit", cashFlowCategory: "financing", isCash: false, systemRole: null },
   // Ekuitas
   { code: "3-1000", name: "Modal Pemilik", accountType: "equity", normalBalance: "credit", cashFlowCategory: "financing", isCash: false, systemRole: "owner_capital" },

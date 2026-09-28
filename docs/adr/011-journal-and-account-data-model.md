@@ -6,7 +6,7 @@ Engine akuntansi, mock repository, laporan, dan skema database Fase 2 harus mema
 ## Keputusan
 Nama kolom ditulis `snake_case` (DB); di TypeScript memakai padanan `camelCase`. Semua tabel memiliki `id`, `workspace_id` (kecuali `workspaces`), `created_at`, `updated_at`.
 
-1. **`workspaces`**: `owner_id`, `name`, `template_type` (immutable), `currency` (default `IDR`), `books_start_date`, `deleted_at`.
+1. **`workspaces`**: `owner_id`, `name`, `template_type` (immutable), `currency` (default `IDR`), `books_start_date`, `sales_tax_rate_bps` (integer basis poin, default 1000 = 10%), `sales_tax_inclusive` (boolean, default false), `deleted_at`. Kolom pajak dipakai mulai Sub-fase 1C (ADR 012).
 
 2. **`accounts`**:
    - `code` (unik per workspace), `name`.
@@ -14,7 +14,7 @@ Nama kolom ditulis `snake_case` (DB); di TypeScript memakai padanan `camelCase`.
    - `normal_balance`: `debit` | `credit` (disimpan eksplisit agar akun kontra seperti Prive dan Akumulasi Penyusutan didukung).
    - `cash_flow_category`: `operating` | `investing` | `financing` | `none` (wajib untuk semua akun).
    - `is_cash`: boolean (akun kas/bank).
-   - `system_role` (nullable, unik per workspace): penanda akun yang dicari oleh sistem, mis. `opening_balance_equity`, `retained_earnings`, `owner_capital`, `drawings`, `raw_material_inventory`, `cogs`.
+   - `system_role` (nullable, unik per workspace): penanda akun yang dicari oleh sistem, mis. `opening_balance_equity`, `retained_earnings`, `owner_capital`, `drawings`, `raw_material_inventory`, `cogs`, `accounts_receivable`, `accounts_payable`, `sales_tax_payable`.
    - `is_active`, `deleted_at`.
 
 3. **`periods`**: `start_date`, `end_date`, `status` (`open` | `closed`). Tidak boleh tumpang tindih dalam satu workspace (ADR 006).
@@ -22,7 +22,9 @@ Nama kolom ditulis `snake_case` (DB); di TypeScript memakai padanan `camelCase`.
 4. **`journal_entries`** (header):
    - `entry_number` (nullable; diisi saat posting, unik per workspace), `entry_date`, `description`.
    - `status`: `draft` | `posted`.
-   - `source`: `manual` | `revenue` | `expense` | `purchase` | `adjustment` | `opening_balance` | `reversal` | `closing`.
+   - `source`: `manual` | `revenue` | `expense` | `purchase` | `adjustment` | `opening_balance` | `settlement` | `tax_payment` | `reversal` | `closing`.
+   - `counterparty` (nullable): nama pelanggan/pemasok untuk transaksi kredit dan pelunasan (ADR 012).
+   - `settlement_of` (nullable): jurnal transaksi kredit yang dilunasi oleh jurnal ini (ADR 012).
    - `reversal_of` (nullable, unik): jurnal asal yang dibalik.
    - `correction_of` (nullable): jurnal asal yang dikoreksi (untuk draft hasil koreksi).
    - `posted_at`, `deleted_at` (hanya untuk draft).
@@ -34,7 +36,7 @@ Nama kolom ditulis `snake_case` (DB); di TypeScript memakai padanan `camelCase`.
 
 6. **`audit_logs`** (Fase 2): `entity_type`, `entity_id`, `action`, `before`, `after`, `actor_id`, `created_at`. Di Fase 1 cukup disimulasikan di mock bila diperlukan.
 
-7. Template (`src/modules/<template>/`) menyediakan seed CoA lengkap dengan `account_type`, `normal_balance`, `cash_flow_category`, `is_cash`, dan `system_role`. Akun yang bergantung pada Keputusan Tertunda (pajak, piutang/utang) belum dimasukkan ke seed sebelum dijawab user.
+7. Template (`src/modules/<template>/`) menyediakan seed CoA lengkap dengan `account_type`, `normal_balance`, `cash_flow_category`, `is_cash`, dan `system_role`. Template F&B menyertakan Piutang Usaha, Utang Usaha, dan Utang PB1 (ADR 012).
 
 ## Konsekuensi
 ### Positif:

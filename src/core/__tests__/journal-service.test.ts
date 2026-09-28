@@ -3,6 +3,7 @@ import { AccountingError, type ValidationCode } from "@/core/errors";
 import { accountTotals, normalBalance } from "@/core/ledger";
 import { monthlyPeriodsForYear } from "@/core/periods";
 import { reversedEntryIds } from "@/core/reversal";
+import { outstandingAmount } from "@/core/settlement";
 import { FNB_TEMPLATE } from "@/modules/fnb/template";
 import { createFnbWorkspace, createTestEnv, entry, line } from "./helpers";
 
@@ -254,5 +255,128 @@ describe("JournalService", () => {
       const totals = accountTotals(await env.repos.journals.listByWorkspace(ws.workspace.id));
       expect(normalBalance(ws.byCode("6-9000"), totals.get(beban))).toBe(700_000);
     });
+  });
+});
+
+describe("JournalService: transaksi kredit & pelunasan (ADR 012)", () => {
+  let env: ReturnType<typeof createTestEnv>;
+  let ws: Awaited<ReturnType<typeof createFnbWorkspace>>;
+  let id: (code: string) => string;
+
+  beforeEach(async () => {
+    env = createTestEnv();
+    ws = await createFnbWorkspace(env);
+    id = (code) => ws.byCode(code).id;
+  });
+
+  const creditSale = () =>
+    env.journalService.postJournal(
+      entry(
+        ws.workspace.id,
+        [line(id("1-1400"), 5_500_000, 0), line(id("4-1000"), 0, 5_000_000), line(id("2-1200"), 0, 500_000)],
+        { source: "revenue", counterparty: "PT Maju", description: "Katering kredit" },
+      ),
+    );
+
+  const receipt = (targetId: string, amount: number, date = "2026-03-20") =>
+    env.journalService.postJournal(
+      entry(ws.workspace.id, [line(id("1-1200"), amount, 0), line(id("1-1400"), 0, amount)], {
+        source: "settlement",
+        settlementOf: targetId,
+        counterparty: "PT Maju",
+        entryDate: date,
+        description: "Pelunasan",
+      }),
+    );
+
+  const outstanding = async (targetId: string) => {
+    const target = (await env.repos.journals.getById(targetId))!;
+    const settlements = await env.repos.journals.listActiveSettlementsOf(targetId);
+    return outstandingAmount(target, settlements, new Map(ws.accounts.map((a) => [a.id, a])));
+  };
+
+  it("pelunasan sebagian lalu penuh mengurangi sisa tagihan sampai nol", async () => {
+    const sale = await creditSale();
+    expect(sale.counterparty).toBe("PT Maju");
+    expect(await outstanding(sale.id)).toBe(5_500_000);
+
+    const first = await receipt(sale.id, 3_000_000);
+    expect(first).toMatchObject({ source: "settlement", settlementOf: sale.id });
+    expect(await outstanding(sale.id)).toBe(2_500_000);
+
+    await receipt(sale.id, 2_500_000, "2026-04-20");
+    expect(await outstanding(sale.id)).toBe(0);
+  });
+
+  it("menolak pelunasan melebihi sisa tagihan", async () => {
+    const sale = await creditSale();
+    await receipt(sale.id, 5_000_000);
+    await expectCode(receipt(sale.id, 600_000), "INVALID_SETTLEMENT");
+  });
+
+  it("menolak pelunasan atas transaksi tunai, target tidak ada, atau yang sudah di-void", async () => {
+    const cashSale = await env.journalService.postJournal(
+      entry(ws.workspace.id, [line(id("1-1100"), 1000, 0), line(id("4-1000"), 0, 1000)]),
+    );
+    await expectCode(receipt(cashSale.id, 1000), "INVALID_SETTLEMENT");
+    await expectCode(receipt("tidak-ada", 1000), "INVALID_SETTLEMENT");
+
+    const sale = await creditSale();
+    await env.journalService.voidJournal(sale.id, "2026-03-15");
+    await expectCode(receipt(sale.id, 1000), "INVALID_SETTLEMENT");
+  });
+
+  it("menolak jurnal settlement tanpa target dan jurnal yang tidak mengurangi piutang", async () => {
+    const sale = await creditSale();
+    await expectCode(
+      env.journalService.postJournal(
+        entry(ws.workspace.id, [line(id("1-1200"), 1000, 0), line(id("1-1400"), 0, 1000)], {
+          source: "settlement",
+        }),
+      ),
+      "INVALID_SETTLEMENT",
+    );
+    await expectCode(
+      env.journalService.postJournal(
+        entry(ws.workspace.id, [line(id("1-1200"), 1000, 0), line(id("4-1000"), 0, 1000)], {
+          source: "settlement",
+          settlementOf: sale.id,
+        }),
+      ),
+      "INVALID_SETTLEMENT",
+    );
+  });
+
+  it("transaksi kredit dengan pelunasan aktif tidak bisa di-void sampai pelunasannya di-void", async () => {
+    const sale = await creditSale();
+    const paid = await receipt(sale.id, 1_000_000);
+    await expectCode(env.journalService.voidJournal(sale.id, "2026-03-25"), "HAS_SETTLEMENTS");
+    await expectCode(env.journalService.correctJournal(sale.id, "2026-03-25"), "HAS_SETTLEMENTS");
+
+    await env.journalService.voidJournal(paid.id, "2026-03-25");
+    expect(await outstanding(sale.id)).toBe(5_500_000);
+    await expect(env.journalService.voidJournal(sale.id, "2026-03-26")).resolves.toMatchObject({
+      reversalOf: sale.id,
+    });
+  });
+
+  it("utang pemasok: pembayaran sebagian dan batas sisa utang", async () => {
+    const purchase = await env.journalService.postJournal(
+      entry(ws.workspace.id, [line(id("1-1300"), 2_000_000, 0), line(id("2-1100"), 0, 2_000_000)], {
+        source: "purchase",
+        counterparty: "CV Sumber Pangan",
+      }),
+    );
+    const pay = (amount: number) =>
+      env.journalService.postJournal(
+        entry(ws.workspace.id, [line(id("2-1100"), amount, 0), line(id("1-1200"), 0, amount)], {
+          source: "settlement",
+          settlementOf: purchase.id,
+          entryDate: "2026-03-30",
+        }),
+      );
+    await pay(1_200_000);
+    expect(await outstanding(purchase.id)).toBe(800_000);
+    await expectCode(pay(900_000), "INVALID_SETTLEMENT");
   });
 });

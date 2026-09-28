@@ -81,6 +81,8 @@ export interface IJournalRepository {
   getById(id: string): Promise<JournalEntry | null>;
   /** Jurnal pembalik yang merujuk `id`, atau null. */
   findReversalOf(id: string): Promise<JournalEntry | null>;
+  /** Jurnal pelunasan posted atas `id` yang belum di-void (ADR 012). */
+  listActiveSettlementsOf(id: string): Promise<JournalEntry[]>;
   /**
    * Membuat draft baru (tanpa `draftId`) atau mengganti draft yang ada,
    * header + baris sekaligus. Tidak memvalidasi balance maupun periode.

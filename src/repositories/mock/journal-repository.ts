@@ -3,6 +3,7 @@ import { validateForPosting, validateLineAmounts } from "@/core/journal-validati
 import { nextEntryNumber } from "@/core/numbering";
 import type { IJournalRepository, JournalFilter } from "@/core/ports";
 import { validateReversal } from "@/core/reversal";
+import { validateSettlement } from "@/core/settlement";
 import type { JournalEntry, JournalEntryInput, JournalLine } from "@/core/types";
 import type { MockDatabase, MockState } from "./mock-database";
 
@@ -15,6 +16,16 @@ function findReversal(state: MockState, id: string): JournalEntry | null {
     state.journals.find(
       (j) => j.reversalOf === id && j.status === "posted" && j.deletedAt === null,
     ) ?? null
+  );
+}
+
+function activeSettlements(state: MockState, id: string): JournalEntry[] {
+  return state.journals.filter(
+    (j) =>
+      j.settlementOf === id &&
+      j.status === "posted" &&
+      j.deletedAt === null &&
+      findReversal(state, j.id) === null,
   );
 }
 
@@ -53,6 +64,10 @@ export class MockJournalRepository implements IJournalRepository {
     return findReversal(this.db.read(), id);
   }
 
+  async listActiveSettlementsOf(id: string): Promise<JournalEntry[]> {
+    return activeSettlements(this.db.read(), id);
+  }
+
   async saveDraft(input: JournalEntryInput, draftId?: string): Promise<JournalEntry> {
     assertNoIssues(validateLineAmounts(input.lines));
     return this.db.write((state) => {
@@ -78,19 +93,36 @@ export class MockJournalRepository implements IJournalRepository {
   async postJournal(input: JournalEntryInput, draftId?: string): Promise<JournalEntry> {
     return this.db.write((state) => {
       // Lapisan pertahanan terakhir, meniru RPC post_journal (ADR 008).
+      const accounts = state.accounts.filter((a) => a.workspaceId === input.workspaceId);
       assertNoIssues(
         validateForPosting(input, {
-          accounts: state.accounts.filter((a) => a.workspaceId === input.workspaceId),
+          accounts,
           periods: state.periods.filter((p) => p.workspaceId === input.workspaceId),
         }),
       );
+      if (input.source === "settlement" || input.settlementOf) {
+        const targetId = input.settlementOf ?? null;
+        assertNoIssues(
+          validateSettlement(input, {
+            target: targetId ? findActive(state, targetId) ?? null : null,
+            targetReversed: targetId ? findReversal(state, targetId) !== null : false,
+            activeSettlements: targetId ? activeSettlements(state, targetId) : [],
+            accounts,
+          }),
+        );
+      }
       if (input.reversalOf) {
         const original = findActive(state, input.reversalOf);
         if (!original || original.workspaceId !== input.workspaceId) {
           fail("NOT_FOUND", "Jurnal asal tidak ditemukan");
         }
         assertNoIssues(
-          validateReversal(original, findReversal(state, original.id), input.entryDate),
+          validateReversal(
+            original,
+            findReversal(state, original.id),
+            input.entryDate,
+            activeSettlements(state, original.id),
+          ),
         );
       }
 
@@ -135,6 +167,8 @@ export class MockJournalRepository implements IJournalRepository {
       description: input.description.trim(),
       status,
       source: input.source,
+      counterparty: input.counterparty?.trim() || null,
+      settlementOf: input.settlementOf ?? null,
       reversalOf: input.reversalOf ?? null,
       correctionOf: input.correctionOf ?? null,
       postedAt: null,

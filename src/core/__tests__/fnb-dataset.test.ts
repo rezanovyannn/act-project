@@ -10,6 +10,7 @@ import { describe, expect, it } from "vitest";
 import { validateBalancedLines } from "@/core/journal-validation";
 import { accountTotals, isLedgerEntry, normalBalance } from "@/core/ledger";
 import { findPeriodForDate } from "@/core/periods";
+import { outstandingAmount, validateSettlement } from "@/core/settlement";
 import type { Account, AccountType, CashFlowCategory, JournalEntry } from "@/core/types";
 import { buildFnbMockState } from "@/mocks/fnb/dataset";
 import { EXPECTED_REPORTS, type ExpectedYear } from "@/mocks/fnb/expected-reports";
@@ -204,5 +205,38 @@ describe.each([2025, 2026] as const)("fixture hitung manual %i", (year) => {
       .filter((a) => a.isCash)
       .reduce((sum, a) => sum + balance(a), 0);
     expect(cashInBalanceSheet).toBe(expected.cashFlow.closing);
+  });
+});
+
+describe("dataset mock F&B: pelunasan (ADR 012)", () => {
+  it("setiap pelunasan valid dan sisa tagihan sesuai hitung manual", () => {
+    const settlements = posted.filter((e) => e.source === "settlement");
+    expect(settlements).toHaveLength(3);
+
+    const outstandingOf = (targetId: string) =>
+      outstandingAmount(
+        posted.find((e) => e.id === targetId)!,
+        settlements.filter((s) => s.settlementOf === targetId),
+        accountsById,
+      );
+    expect(outstandingOf("je-catering-2026-06")).toBe(0);
+    expect(outstandingOf("je-supplier-2026-07")).toBe(0);
+    expect(outstandingOf("je-supplier-2026-08")).toBe(2_000_000);
+
+    // Setiap pelunasan valid terhadap pelunasan yang tercatat sebelumnya.
+    for (const settlement of settlements) {
+      const earlier = settlements.filter(
+        (s) => s.settlementOf === settlement.settlementOf && s.entryDate < settlement.entryDate,
+      );
+      expect(
+        validateSettlement(settlement, {
+          target: posted.find((e) => e.id === settlement.settlementOf)!,
+          targetReversed: false,
+          activeSettlements: earlier,
+          accounts: state.accounts,
+        }),
+        settlement.id,
+      ).toEqual([]);
+    }
   });
 });

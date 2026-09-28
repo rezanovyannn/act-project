@@ -11,7 +11,7 @@ Dalam akuntansi, catatan pada periode yang sudah ditutup atau dilaporkan tidak b
 5. Posting jurnal yang tanggalnya berada pada periode `closed`, **atau tidak berada di periode mana pun**, ditolak oleh validasi aplikasi dan database. Jurnal draft boleh bertanggal apa saja; validasi dilakukan saat posting.
 6. Koreksi atas kesalahan pada periode tertutup wajib dilakukan melalui jurnal penyesuaian (*adjusting entry*) atau jurnal pembalik (*reversing entry*) pada periode yang sedang `open`.
 7. Setiap perubahan status periode dicatat di audit log.
-8. Apakah periode `closed` boleh dibuka kembali: **tertunda**, menunggu keputusan user (ROADMAP, Keputusan Tertunda 3).
+8. Periode `closed` **boleh dibuka kembali** (keputusan user, 28 September 2026). Pembukaan kembali wajib disertai alasan tertulis, dicatat di audit log (siapa, kapan, alasan), dan UI menampilkan peringatan bahwa laporan periode tersebut yang pernah diterbitkan dapat berubah.
 9. Penguncian periode (bulanan) berbeda dengan tutup buku akhir tahun (jurnal penutup, Fase 3, ADR 010).
 
 ## Konsekuensi
@@ -22,3 +22,4 @@ Dalam akuntansi, catatan pada periode yang sudah ditutup atau dilaporkan tidak b
 ### Negatif:
 - Pengguna harus berhati-hati dalam menutup periode karena jika ada koreksi, prosesnya memerlukan jurnal khusus, bukan langsung mengedit data lama.
 - Pengguna harus membuat periode tahun baru sebelum bisa memposting transaksi di tahun tersebut.
+- Karena periode bisa dibuka kembali, penguncian bersifat kontrol proses (dengan jejak audit), bukan jaminan mutlak bahwa angka historis tidak berubah.

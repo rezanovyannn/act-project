@@ -15,6 +15,8 @@ export type ValidationCode =
   | "PERIOD_CLOSED"
   | "INVALID_REVERSAL"
   | "ALREADY_REVERSED"
+  | "HAS_SETTLEMENTS"
+  | "INVALID_SETTLEMENT"
   | "NOT_FOUND"
   | "NOT_DRAFT"
   | "NOT_POSTED"

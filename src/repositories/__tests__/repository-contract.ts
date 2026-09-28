@@ -175,6 +175,46 @@ export function describeRepositoryContract(
         expect(await repos.journals.getById(posted.id)).toEqual(posted);
       });
 
+      it("pelunasan: tercatat sebagai aktif, ditolak bila berlebih, dan memblokir void transaksi asal", async () => {
+        const accounts = await repos.accounts.listByWorkspace(workspace.id);
+        const acc = (code: string) => accounts.find((a) => a.code === code)!.id;
+        const creditSale = await repos.journals.postJournal({
+          ...sale(1000),
+          counterparty: "PT Maju",
+          lines: [
+            { accountId: acc("1-1400"), debit: 1100, credit: 0 },
+            { accountId: jualId, debit: 0, credit: 1000 },
+            { accountId: acc("2-1200"), debit: 0, credit: 100 },
+          ],
+        });
+        const receipt = (amount: number): JournalEntryInput => ({
+          ...sale(amount),
+          source: "settlement",
+          settlementOf: creditSale.id,
+          lines: [
+            { accountId: kasId, debit: amount, credit: 0 },
+            { accountId: acc("1-1400"), debit: 0, credit: amount },
+          ],
+        });
+        const paid = await repos.journals.postJournal(receipt(600));
+        expect(paid).toMatchObject({ settlementOf: creditSale.id, counterparty: null });
+        expect((await repos.journals.listActiveSettlementsOf(creditSale.id)).map((j) => j.id)).toEqual([paid.id]);
+        await expectCode(repos.journals.postJournal(receipt(501)), "INVALID_SETTLEMENT");
+
+        const reverse = (entry: typeof paid): JournalEntryInput => ({
+          ...sale(0),
+          source: "reversal",
+          reversalOf: entry.id,
+          lines: entry.lines.map((l) => ({ accountId: l.accountId, debit: l.credit, credit: l.debit })),
+        });
+        await expectCode(repos.journals.postJournal(reverse(creditSale)), "HAS_SETTLEMENTS");
+        await repos.journals.postJournal(reverse(paid));
+        expect(await repos.journals.listActiveSettlementsOf(creditSale.id)).toEqual([]);
+        await expect(repos.journals.postJournal(reverse(creditSale))).resolves.toMatchObject({
+          reversalOf: creditSale.id,
+        });
+      });
+
       it("satu jurnal hanya bisa dibalik sekali", async () => {
         const posted = await repos.journals.postJournal(sale(1000));
         const reversalInput: JournalEntryInput = {

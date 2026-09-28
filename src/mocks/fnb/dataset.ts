@@ -4,7 +4,8 @@
  * Angka dibuat bulat dan berpola bulanan agar laporan bisa dihitung manual;
  * hasil hitung manual ada di ./expected-reports.ts.
  *
- * Belum memuat pajak maupun transaksi kredit (Keputusan Tertunda 1 & 2).
+ * Mulai 2026 kedai memungut PB1 10% (harga belum termasuk PB1) dan ada
+ * transaksi kredit beserta pelunasan (ADR 012).
  */
 import { endOfMonth, toIsoDate, yearOf } from "@/core/dates";
 import { formatEntryNumber } from "@/core/numbering";
@@ -36,6 +37,8 @@ interface EntrySpec {
   source: JournalSource;
   lines: LineSpec[];
   draft?: boolean;
+  counterparty?: string;
+  settlementOf?: string;
   reversalOf?: string;
   correctionOf?: string;
 }
@@ -49,6 +52,10 @@ function monthlyEntries(year: number, months: number, spec: {
   salesBank: number;
   salesFood: number;
   salesDrink: number;
+  /** PB1 yang dipungut pada rekap penjualan (0 = belum wajib pungut). */
+  salesTax: number;
+  /** Setoran PB1 bulan sebelumnya, tanggal 10 (0 = tidak ada). */
+  taxRemittance: (month: number) => number;
   cashToBank: number;
   loanMonths: number[];
   cogs: (month: number) => number;
@@ -63,6 +70,11 @@ function monthlyEntries(year: number, months: number, spec: {
       { key: `purchase-${tag}`, date: d(5), description: "Pembelian bahan baku bulanan", source: "purchase",
         lines: [["1-1300", spec.purchase, 0], ["1-1200", 0, spec.purchase]] },
     );
+    const remittance = spec.taxRemittance(m);
+    if (remittance > 0) {
+      entries.push({ key: `pb1-${tag}`, date: d(10), description: "Setoran PB1 bulan lalu", source: "tax_payment",
+        lines: [["2-1200", remittance, 0], ["1-1200", 0, remittance]] });
+    }
     if (spec.loanMonths.includes(m)) {
       entries.push({ key: `loan-${tag}`, date: d(15), description: "Cicilan pokok & bunga pinjaman bank", source: "manual",
         lines: [["2-2100", 1_000_000, 0], ["6-5000", 150_000, 0], ["1-1200", 0, 1_150_000]] });
@@ -78,6 +90,7 @@ function monthlyEntries(year: number, months: number, spec: {
           ["1-1200", spec.salesBank, 0],
           ["4-1000", 0, spec.salesFood],
           ["4-2000", 0, spec.salesDrink],
+          ...(spec.salesTax > 0 ? [["2-1200", 0, spec.salesTax] as LineSpec] : []),
         ] },
       { key: `transfer-${tag}`, date: d(28), description: "Setor kas ke bank", source: "manual",
         lines: [["1-1200", spec.cashToBank, 0], ["1-1100", 0, spec.cashToBank]] },
@@ -107,7 +120,7 @@ const ENTRY_SPECS: EntrySpec[] = [
   ...monthlyEntries(2025, 12, {
     rent: 3_000_000, purchase: 11_000_000, utilities: 1_000_000, salary: 6_000_000,
     salesCash: 8_000_000, salesBank: 22_000_000, salesFood: 24_000_000, salesDrink: 6_000_000,
-    cashToBank: 6_000_000, loanMonths: [3, 4, 5, 6, 7, 8, 9, 10, 11, 12],
+    salesTax: 0, taxRemittance: () => 0, cashToBank: 6_000_000, loanMonths: [3, 4, 5, 6, 7, 8, 9, 10, 11, 12],
     cogs: (m) => (m === 12 ? 10_500_000 : 11_000_000),
   }),
   { key: "drawings-2025-06", date: "2025-06-30", description: "Prive pemilik", source: "manual",
@@ -135,10 +148,35 @@ const ENTRY_SPECS: EntrySpec[] = [
   // ---- 2026 (s.d. Agustus) ----
   ...monthlyEntries(2026, 8, {
     rent: 3_000_000, purchase: 13_000_000, utilities: 1_200_000, salary: 7_000_000,
-    salesCash: 9_000_000, salesBank: 27_000_000, salesFood: 28_000_000, salesDrink: 8_000_000,
-    cashToBank: 7_000_000, loanMonths: [1, 2, 3, 4, 5],
-    cogs: (m) => (m === 8 ? 12_300_000 : 13_000_000),
+    // Penjualan 36.000.000 + PB1 10% 3.600.000 = 39.600.000 diterima.
+    salesCash: 9_900_000, salesBank: 29_700_000, salesFood: 28_000_000, salesDrink: 8_000_000,
+    salesTax: 3_600_000,
+    // Juli menyetor PB1 Juni termasuk PB1 katering (3.600.000 + 500.000).
+    taxRemittance: (m) => (m === 1 ? 0 : m === 7 ? 4_100_000 : 3_600_000),
+    cashToBank: 7_900_000, loanMonths: [1, 2, 3, 4, 5],
+    // Juli & Agustus termasuk pembelian bahan kredit (1.500.000 dan 2.000.000).
+    cogs: (m) => (m === 7 ? 14_500_000 : m === 8 ? 14_300_000 : 13_000_000),
   }),
+  // Penjualan kredit katering + PB1, dilunasi dua kali.
+  { key: "catering-2026-06", date: "2026-06-10", description: "Katering acara kantor (tempo 60 hari)", source: "revenue",
+    counterparty: "PT Maju Bersama",
+    lines: [["1-1400", 5_500_000, 0], ["4-1000", 0, 5_000_000], ["2-1200", 0, 500_000]] },
+  { key: "catering-receipt-1", date: "2026-07-10", description: "Pelunasan sebagian katering", source: "settlement",
+    counterparty: "PT Maju Bersama", settlementOf: "catering-2026-06",
+    lines: [["1-1200", 3_000_000, 0], ["1-1400", 0, 3_000_000]] },
+  { key: "catering-receipt-2", date: "2026-08-10", description: "Pelunasan akhir katering", source: "settlement",
+    counterparty: "PT Maju Bersama", settlementOf: "catering-2026-06",
+    lines: [["1-1200", 2_500_000, 0], ["1-1400", 0, 2_500_000]] },
+  // Pembelian bahan baku kredit: satu lunas, satu masih terutang per 31 Agustus.
+  { key: "supplier-2026-07", date: "2026-07-02", description: "Pembelian daging (kredit)", source: "purchase",
+    counterparty: "CV Sumber Pangan",
+    lines: [["1-1300", 1_500_000, 0], ["2-1100", 0, 1_500_000]] },
+  { key: "supplier-2026-07-paid", date: "2026-07-20", description: "Pembayaran utang pembelian daging", source: "settlement",
+    counterparty: "CV Sumber Pangan", settlementOf: "supplier-2026-07",
+    lines: [["2-1100", 1_500_000, 0], ["1-1200", 0, 1_500_000]] },
+  { key: "supplier-2026-08", date: "2026-08-03", description: "Pembelian sayur & bumbu (kredit)", source: "purchase",
+    counterparty: "CV Sumber Pangan",
+    lines: [["1-1300", 2_000_000, 0], ["2-1100", 0, 2_000_000]] },
   { key: "drawings-2026-04", date: "2026-04-30", description: "Prive pemilik", source: "manual",
     lines: [["3-2000", 3_000_000, 0], ["1-1200", 0, 3_000_000]] },
   { key: "equipment-2026", date: "2026-05-15", description: "Pembelian freezer", source: "manual",
@@ -174,6 +212,8 @@ function buildJournals(): JournalEntry[] {
       description: spec.description,
       status: posted ? "posted" : "draft",
       source: spec.source,
+      counterparty: spec.counterparty ?? null,
+      settlementOf: spec.settlementOf ? entryId(spec.settlementOf) : null,
       reversalOf: spec.reversalOf ? entryId(spec.reversalOf) : null,
       correctionOf: spec.correctionOf ? entryId(spec.correctionOf) : null,
       postedAt: posted ? timestamp : null,

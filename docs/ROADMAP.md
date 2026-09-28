@@ -1,6 +1,6 @@
 # ROADMAP.md
 
-Aturan umum agen: Kerjakan sub-fase secara berurutan, **berhenti dan minta review user setelah menyelesaikan setiap sub-fase** sebelum melanjutkan ke sub-fase berikutnya. Bagian yang bergantung pada **Keputusan Tertunda** (lihat bagian akhir) tidak boleh dikerjakan sebelum dijawab user.
+Aturan umum agen: Kerjakan sub-fase secara berurutan, **berhenti dan minta review user setelah menyelesaikan setiap sub-fase** sebelum melanjutkan ke sub-fase berikutnya. Keputusan produk yang sudah dijawab user tercatat di bagian **Catatan Keputusan** (akhir dokumen).
 
 ---
 
@@ -22,14 +22,15 @@ Aturan umum agen: Kerjakan sub-fase secara berurutan, **berhenti dan minta revie
   - Interface repository di `src/core/ports/` (semua method Promise).
   - Mock repository di `src/repositories/mock/` dengan `localStorage` (key bernamespace + `schemaVersion`, plus fungsi reset ke data seed).
   - `src/lib/container.ts` sebagai titik DI.
-  - Dataset F&B di `src/mocks/` mencakup **dua tahun buku** (2025 dan 2026): jurnal saldo awal, penjualan, beban, pembelian bahan baku, stok opname, setoran modal, prive, pembelian aset, transfer kas-bank, dan satu contoh void/koreksi.
+  - Dataset F&B di `src/mocks/` mencakup **dua tahun buku** (2025 dan 2026): jurnal saldo awal, penjualan (dengan PB1 di 2026), beban, pembelian bahan baku, stok opname, setoran modal, prive, pembelian aset, transfer kas-bank, penjualan & pembelian kredit beserta pelunasan (sebagian dan penuh), setoran PB1, dan satu contoh void/koreksi.
   - Fixture `src/mocks/fnb/expected-reports.ts`: hasil Neraca Saldo, Laba Rugi, Neraca, Perubahan Modal, dan Arus Kas per tahun **yang dihitung manual** sebagai acuan test.
   - Unit test di `src/core/__tests__/`; contract test repository di `src/repositories/__tests__/` (dijalankan terhadap mock).
 - **Kriteria Selesai (Stop & Review):** Seluruh unit test engine akuntansi dan contract test mock repository lulus 100%; dataset mock seimbang.
 
 ### Sub-fase 1B: Workspace Management, Shell Layout & Jurnal Umum
 - **Pekerjaan:**
-  - Layout aplikasi dasar (UI bahasa Indonesia, format mata uang Rp 1.234.567 dan tanggal lokal).
+  - Inisialisasi shadcn/ui (dependency dikonfirmasi user lebih dulu) dan penerapan `docs/DESIGN_SYSTEM.md` (token warna, font Inter, radius, tabel angka).
+  - Layout aplikasi dasar (UI bahasa Indonesia, format mata uang Rp 1.234.567, angka negatif dalam kurung, tanggal lokal).
   - Halaman Daftar & Pembuatan Workspace: pilihan `template_type` (F&B) dan **tanggal mulai pembukuan**. Saat dibuat, otomatis menyemai CoA sesuai template dan periode bulanan `open` dari bulan mulai pembukuan sampai Desember tahun tersebut.
   - Workspace Switcher di header/sidebar.
   - Halaman Dashboard ringkasan metrik keuangan (termasuk penanda "HPP belum disesuaikan" bila belum ada stok opname pada periode berjalan, lihat ADR 007).
@@ -39,9 +40,11 @@ Aturan umum agen: Kerjakan sub-fase secara berurutan, **berhenti dan minta revie
 ### Sub-fase 1C: Buku Besar, Transaksi Pendapatan/Beban & Modul F&B
 - **Pekerjaan:**
   - Halaman Buku Besar (General Ledger): filter per akun dan rentang tanggal dengan saldo awal, mutasi, dan saldo berjalan.
-  - Halaman Input Cepat: Form Revenue (penjualan) & Expense (operasional) yang otomatis men-generate jurnal terkait (`source` = `revenue`/`expense`). *Perlakuan pajak dan transaksi kredit menunggu Keputusan Tertunda 1 & 2; sebelum dijawab, form hanya mendukung transaksi tunai tanpa pajak.*
-  - Modul F&B (`src/modules/fnb/`): Form Pembelian Bahan Baku (Dr Persediaan Bahan Baku, `source` = `purchase`) dan Form Stok Opname (menghitung selisih saldo buku vs nilai fisik ke HPP dua arah, `source` = `adjustment`, ADR 007).
-- **Kriteria Selesai (Stop & Review):** Seluruh form input transaksi bisnis menghasilkan mutasi jurnal yang tepat dan tercermin di Buku Besar.
+  - Pengaturan PB1 per workspace: tarif (basis poin, default 10%) dan mode harga termasuk/belum termasuk PB1 (ADR 012).
+  - Halaman Input Cepat: Form Revenue (penjualan tunai/kredit, dengan PB1 otomatis) & Expense (operasional tunai/kredit) yang otomatis men-generate jurnal terkait (`source` = `revenue`/`expense`), termasuk nama pelanggan/pemasok untuk transaksi kredit.
+  - Pelunasan: form penerimaan piutang dan pembayaran utang (sebagian atau penuh, `source = settlement`), form setoran PB1 (`source = tax_payment`), serta daftar piutang/utang yang belum lunas per pihak dan per transaksi (ADR 012).
+  - Modul F&B (`src/modules/fnb/`): Form Pembelian Bahan Baku tunai/kredit (Dr Persediaan Bahan Baku, `source` = `purchase`) dan Form Stok Opname (menghitung selisih saldo buku vs nilai fisik ke HPP dua arah, `source` = `adjustment`, ADR 007).
+- **Kriteria Selesai (Stop & Review):** Seluruh form input transaksi bisnis menghasilkan mutasi jurnal yang tepat dan tercermin di Buku Besar; perhitungan PB1 dan sisa piutang/utang teruji unit test; pelunasan melebihi sisa tagihan ditolak.
 
 ### Sub-fase 1D: Laporan Keuangan Formal
 - **Pekerjaan:**
@@ -62,9 +65,9 @@ Aturan umum agen: Kerjakan sub-fase secara berurutan, **berhenti dan minta revie
 ### Sub-fase 1E: Pengaturan Akun, Periode & Saldo Awal
 - **Pekerjaan:**
   - Halaman Chart of Accounts (CoA): tambah/edit akun (termasuk `cash_flow_category`, `is_cash`, `normal_balance`), hapus akun tanpa mutasi (soft delete), penonaktifan akun (`is_active = false`) bagi yang memiliki mutasi.
-  - Halaman Periode Akuntansi: kunci periode, dan tambah periode untuk tahun buku berikutnya (12 periode bulanan). *Membuka kembali periode `closed` menunggu Keputusan Tertunda 3.*
+  - Halaman Periode Akuntansi: kunci periode, buka kembali periode `closed` (wajib alasan, tercatat di audit log mock, dengan peringatan), dan tambah periode untuk tahun buku berikutnya (12 periode bulanan). ADR 006.
   - Halaman Saldo Awal: form input saldo awal per akun neraca yang mengenerate satu jurnal pembukaan atomik (`source = opening_balance`) bertanggal awal pembukuan, dengan selisih ke akun Ekuitas Saldo Awal. Hanya satu jurnal saldo awal posted per workspace (perubahan lewat void lalu buat ulang).
-- **Kriteria Selesai (Stop & Review):** Saldo awal berhasil diposting, akun ber-jurnal tidak dapat dihapus (hanya nonaktif), dan periode terkunci menolak posting jurnal baru.
+- **Kriteria Selesai (Stop & Review):** Saldo awal berhasil diposting, akun ber-jurnal tidak dapat dihapus (hanya nonaktif), periode terkunci menolak posting jurnal baru, dan pembukaan kembali periode tercatat beserta alasannya.
 
 ---
 
@@ -104,10 +107,10 @@ Aturan umum agen: Kerjakan sub-fase secara berurutan, **berhenti dan minta revie
 
 ---
 
-## Keputusan Tertunda (menunggu jawaban user)
-| # | Pertanyaan | Memblokir |
-|---|---|---|
-| 1 | Apakah transaksi F&B mencatat pajak (PB1/PBJT pajak restoran, atau PPN)? Jika ya, bagaimana perlakuannya? | Akun pajak di seed CoA (1A), Form Revenue/Pembelian (1C) |
-| 2 | Apakah form revenue/expense/pembelian mendukung transaksi kredit (piutang/utang) beserta pelunasannya, atau tunai saja? | Akun piutang/utang di seed CoA (1A), form di 1C |
-| 3 | Apakah periode `closed` boleh dibuka kembali (dengan audit log), atau permanen? | Halaman Periode (1E), trigger/RPC periode (Fase 2) |
-| 4 | Apakah referensi desain UI (gaya Pinterest dari sesi sebelumnya) dipakai sebagai design system? | Layout & styling (1B) |
+## Catatan Keputusan (dijawab user, 28 September 2026)
+| # | Pertanyaan | Keputusan | Rujukan |
+|---|---|---|---|
+| 1 | Pajak pada transaksi F&B | PB1 dicatat (utang PB1, bukan pendapatan) | ADR 012 |
+| 2 | Transaksi kredit | Didukung beserta pelunasan (sebagian/penuh) | ADR 012 |
+| 3 | Membuka kembali periode `closed` | Boleh, wajib alasan + audit log | ADR 006 |
+| 4 | Referensi desain gaya Pinterest | Dipakai sebagai inspirasi design system | docs/DESIGN_SYSTEM.md |
