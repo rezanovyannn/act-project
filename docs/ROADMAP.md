@@ -74,7 +74,7 @@ Aturan umum agen: Kerjakan sub-fase secara berurutan, **berhenti dan minta revie
 ## Fase 2: Autentikasi, Integrasi Supabase & Persistence Layer
 *Keputusan arsitektur Supabase dicatat di ADR sebelum implementasi.*
 - **Pekerjaan:**
-  - ADR: repository Supabase berjalan di browser dengan Anon Key + RLS aktif, atau via Server Actions.
+  - ~~ADR: repository Supabase berjalan di browser dengan Anon Key + RLS aktif, atau via Server Actions.~~ Diputuskan: browser + Anon Key + RLS, penulisan jurnal hanya lewat RPC (ADR 013).
   - Autentikasi Supabase Auth: halaman login/logout, proteksi route, `owner_id` diambil dari user yang login.
   - Skema PostgreSQL di `supabase/migrations/` mencakup tabel `workspaces`, `accounts`, `periods`, `journal_entries`, `journal_lines`, `audit_logs`, kolom `deleted_at`, dan constraint dari ADR 011 sejak awal.
   - Index minimal: `journal_entries (workspace_id, entry_date)`, `journal_lines (workspace_id, account_id)`, `journal_entries (reversal_of)` unik.
@@ -114,3 +114,4 @@ Aturan umum agen: Kerjakan sub-fase secara berurutan, **berhenti dan minta revie
 | 2 | Transaksi kredit | Didukung beserta pelunasan (sebagian/penuh) | ADR 012 |
 | 3 | Membuka kembali periode `closed` | Boleh, wajib alasan + audit log | ADR 006 |
 | 4 | Referensi desain gaya Pinterest | Dipakai sebagai inspirasi design system | docs/DESIGN_SYSTEM.md |
+| 5 | Tempat repository Supabase berjalan | Browser + Anon Key + RLS; Supabase region Singapura | ADR 013 |
