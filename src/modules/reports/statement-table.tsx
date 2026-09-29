@@ -77,7 +77,7 @@ export function InvariantCheck({ ok, label, detail }: { ok: boolean; label: stri
     <p
       role="status"
       className={cn(
-        "flex flex-wrap items-center gap-2 rounded-lg px-4 py-3 text-sm",
+        "flex flex-wrap items-center gap-2 rounded-lg px-4 py-3 text-sm print:hidden",
         ok ? "bg-success-pale text-success-deep" : "border border-destructive/40 text-destructive",
       )}
     >

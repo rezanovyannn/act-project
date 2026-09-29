@@ -7,6 +7,7 @@ import {
   BookOpenIcon,
   ClipboardCheckIcon,
   FileTextIcon,
+  HistoryIcon,
   HandCoinsIcon,
   LandmarkIcon,
   LayoutDashboardIcon,
@@ -64,6 +65,7 @@ function navGroups(workspaceId: string, templateType: TemplateType): NavGroup[] 
   }
   groups.push({
     items: [
+      { label: "Riwayat Audit", href: routes.audit(workspaceId), icon: HistoryIcon },
       { label: "Pengaturan", href: routes.settings(workspaceId), icon: SettingsIcon },
     ],
   })
@@ -163,11 +165,11 @@ export function AppShell({
   const [mobileOpen, setMobileOpen] = useState(false)
   return (
     <div className="flex min-h-full flex-1">
-      <aside className="sticky top-0 hidden h-dvh w-72 shrink-0 overflow-y-auto border-r bg-sidebar p-4 lg:block">
+      <aside className="sticky top-0 hidden h-dvh w-72 shrink-0 overflow-y-auto border-r bg-sidebar p-4 lg:block print:hidden">
         <Navigation services={services} workspaceId={workspaceId} templateType={templateType} />
       </aside>
       <div className="flex min-w-0 flex-1 flex-col">
-        <header className="sticky top-0 z-30 flex h-14 items-center gap-3 border-b bg-canvas px-4 lg:hidden">
+        <header className="sticky top-0 z-30 flex h-14 items-center gap-3 border-b bg-canvas px-4 lg:hidden print:hidden">
           <Sheet open={mobileOpen} onOpenChange={setMobileOpen}>
             <SheetTrigger asChild>
               <Button variant="ghost" size="icon" aria-label="Buka menu">
@@ -186,7 +188,7 @@ export function AppShell({
           </Sheet>
           <span className="font-bold text-ink">Pembukuan</span>
         </header>
-        <main className="mx-auto w-full max-w-6xl flex-1 px-4 py-6 sm:px-6 lg:px-8 lg:py-8">
+        <main className="mx-auto w-full max-w-6xl flex-1 px-4 py-6 sm:px-6 lg:px-8 lg:py-8 print:max-w-none print:p-0">
           {children}
         </main>
       </div>

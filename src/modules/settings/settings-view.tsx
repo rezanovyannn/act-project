@@ -5,6 +5,8 @@ import { LoadingState, PageHeader } from "@/components/ui/page-header"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { errorMessage, useLoader } from "@/lib/utils"
 import { AccountsTab } from "./accounts-tab"
+import { BackupTab } from "./backup-tab"
+import { ClosingTab } from "./closing-tab"
 import { OpeningBalanceTab } from "./opening-balance-tab"
 import { PeriodsTab } from "./periods-tab"
 
@@ -35,12 +37,14 @@ export function SettingsView({
 
   return (
     <div className="grid grid-cols-1 gap-6">
-      <PageHeader title="Pengaturan" description="Daftar akun (CoA), periode akuntansi, dan saldo awal." />
+      <PageHeader title="Pengaturan" description="Daftar akun (CoA), periode akuntansi, saldo awal, tutup buku, dan backup data." />
       <Tabs defaultValue="accounts" className="grid grid-cols-1 gap-4">
         <TabsList className="h-auto w-fit max-w-full flex-wrap">
           <TabsTrigger value="accounts">Daftar Akun</TabsTrigger>
           <TabsTrigger value="periods">Periode</TabsTrigger>
           <TabsTrigger value="opening">Saldo Awal</TabsTrigger>
+          <TabsTrigger value="closing">Tutup Buku</TabsTrigger>
+          <TabsTrigger value="backup">Backup</TabsTrigger>
         </TabsList>
         <TabsContent value="accounts">
           <AccountsTab services={services} workspaceId={workspaceId} accounts={accounts} journals={journals} onChanged={data.reload} />
@@ -57,6 +61,19 @@ export function SettingsView({
             journalHref={journalHref}
             onPosted={data.reload}
           />
+        </TabsContent>
+        <TabsContent value="closing">
+          <ClosingTab
+            services={services}
+            workspaceId={workspaceId}
+            accounts={accounts}
+            periods={periods}
+            journalHref={journalHref}
+            onChanged={data.reload}
+          />
+        </TabsContent>
+        <TabsContent value="backup">
+          <BackupTab services={services} workspace={workspace} />
         </TabsContent>
       </Tabs>
     </div>

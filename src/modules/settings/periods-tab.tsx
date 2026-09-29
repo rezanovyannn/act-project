@@ -3,6 +3,7 @@
 import { useState } from "react"
 import { LockIcon, LockOpenIcon, PlusIcon, TriangleAlertIcon } from "lucide-react"
 import { toast } from "sonner"
+import { actorLabel } from "@/core/audit"
 import { formatDate, formatMonth } from "@/core/format"
 import type { AppServices } from "@/core/services"
 import type { AuditLog, Period } from "@/core/types"
@@ -126,7 +127,7 @@ export function PeriodsTab({
                     {period ? formatMonth(period.startDate) : log.entityId}
                   </span>
                   <span className="text-muted-foreground">
-                    {new Date(log.createdAt).toLocaleString("id-ID")} · oleh {log.actorId}
+                    {new Date(log.createdAt).toLocaleString("id-ID")} · oleh {actorLabel(log.actorId, services.ownerId)}
                   </span>
                   {log.reason && <span className="w-full text-ink">Alasan: {log.reason}</span>}
                 </li>

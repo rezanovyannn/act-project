@@ -92,9 +92,9 @@ Aturan umum agen: Kerjakan sub-fase secara berurutan, **berhenti dan minta revie
 ## Fase 3: Tutup Buku, Ekspor & Hardening
 - **Pekerjaan:**
   - UI dan logika Tutup Buku Akhir Tahun (ADR 014): jurnal penutup lewat Ikhtisar Laba Rugi ke Laba Ditahan, Prive ke Laba Ditahan, kunci periode otomatis, batalkan tutup buku sebagai paket. Laporan Laba Rugi mengecualikan jurnal penutup dan pembaliknya.
-  - Ekspor/Cetak Laporan Keuangan ke format PDF/Print-friendly view.
-  - Backup data workspace (ekspor JSON/CSV).
-  - Audit log UI viewer untuk melacak riwayat mutasi jurnal, akun, dan periode.
+  - Ekspor/Cetak Laporan Keuangan ke format PDF/Print-friendly view. Tombol "Cetak / Simpan PDF" (laporan aktif) dan "Cetak semua laporan" (lima laporan, masing-masing halaman baru, A4) memakai dialog cetak browser.
+  - Backup data workspace (ekspor JSON/CSV): JSON lengkap (`act-project/workspace-backup` versi 1: workspace, akun, periode, jurnal + baris, audit log, ringkasan jumlah) dan CSV satu baris per baris jurnal (BOM UTF-8, nominal integer). Logika di `src/core/backup.ts`; menu Pengaturan → Backup.
+  - Audit log UI viewer untuk melacak riwayat mutasi jurnal, akun, dan periode (menu Riwayat Audit, filter jenis data; snapshot DB snake_case dan mock camelCase dinormalkan di `src/core/audit.ts`).
 - **Kriteria Selesai (Stop & Review):** Laporan dapat diekspor rapi, tutup buku menghasilkan jurnal penutup yang valid (laporan tetap memenuhi kelima invarian 1D), dan sistem stabil.
 
 ---

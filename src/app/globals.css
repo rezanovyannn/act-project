@@ -110,3 +110,14 @@
     @apply text-ink;
   }
 }
+/* Cetak / Simpan PDF laporan (ROADMAP Fase 3): A4, latar putih, warna dipertahankan. */
+@media print {
+  @page {
+    size: A4;
+    margin: 14mm;
+  }
+  body {
+    background: #fff;
+    print-color-adjust: exact;
+  }
+}

@@ -1,7 +1,8 @@
 "use client"
 
 import { useState } from "react"
-import { InfoIcon } from "lucide-react"
+import { flushSync } from "react-dom"
+import { InfoIcon, PrinterIcon } from "lucide-react"
 import { computeDashboardSummary } from "@/core/dashboard"
 import { endOfMonth, toIsoDate } from "@/core/dates"
 import { formatAccounting, formatDate, formatMonth, todayIsoDate } from "@/core/format"
@@ -65,6 +66,14 @@ export function ReportsView({ services, workspaceId }: { services: AppServices; 
 
   const today = todayIsoDate()
   const [range, setRange] = useState<DateRange>(() => presets(today)[0].range)
+  const [printAll, setPrintAll] = useState(false)
+
+  // Cetak lewat dialog browser (bisa "Simpan sebagai PDF"); mode "semua" merender kelima laporan.
+  function print(all: boolean) {
+    flushSync(() => setPrintAll(all))
+    window.addEventListener("afterprint", () => setPrintAll(false), { once: true })
+    window.print()
+  }
 
   if (data.loading) return <LoadingState />
   if (data.error) return <p role="alert" className="text-sm text-destructive">{errorMessage(data.error)}</p>
@@ -74,11 +83,12 @@ export function ReportsView({ services, workspaceId }: { services: AppServices; 
   return (
     <div className="grid grid-cols-1 gap-6">
       <PageHeader
+        className="print:hidden"
         title="Laporan Keuangan"
         description="Dihitung langsung dari jurnal posted. Laporan posisi (Neraca Saldo, Neraca) memakai tanggal akhir."
       />
 
-      <div className="grid gap-4 rounded-lg bg-card p-4 sm:p-6">
+      <div className="grid gap-4 rounded-lg bg-card p-4 sm:p-6 print:hidden">
         <div className="flex flex-wrap gap-2" role="group" aria-label="Pilihan cepat periode">
           {presets(today).map((preset) => (
             <Button
@@ -102,12 +112,22 @@ export function ReportsView({ services, workspaceId }: { services: AppServices; 
             <Input id="report-to" type="date" value={range.toDate} onChange={(e) => setRange({ ...range, toDate: e.target.value })} />
           </div>
         </div>
+        <div className="flex flex-wrap gap-2 border-t pt-4">
+          <Button type="button" variant="secondary" disabled={!validRange} onClick={() => print(false)}>
+            <PrinterIcon data-icon="inline-start" />
+            Cetak / Simpan PDF
+          </Button>
+          <Button type="button" variant="secondary" disabled={!validRange} onClick={() => print(true)}>
+            <PrinterIcon data-icon="inline-start" />
+            Cetak semua laporan
+          </Button>
+        </div>
       </div>
 
       {!validRange ? (
         <p role="alert" className="text-sm text-destructive">Tanggal awal harus sebelum atau sama dengan tanggal akhir.</p>
       ) : (
-        <Reports workspaceName={workspaceName} accounts={accounts} journals={journals} periods={periods} range={range} />
+        <Reports workspaceName={workspaceName} accounts={accounts} journals={journals} periods={periods} range={range} printAll={printAll} />
       )}
     </div>
   )
@@ -119,13 +139,16 @@ function Reports({
   journals,
   periods,
   range,
+  printAll,
 }: {
   workspaceName: string
   accounts: Account[]
   journals: JournalEntry[]
   periods: Period[]
   range: DateRange
+  printAll: boolean
 }) {
+  const [tab, setTab] = useState("income")
   const tb = trialBalance(accounts, journals, range.toDate)
   const is = incomeStatement(accounts, journals, range)
   const bs = balanceSheet(accounts, journals, range.toDate)
@@ -206,9 +229,50 @@ function Reports({
     .filter((l) => accounts.find((a) => a.id === l.accountId)?.isCash)
     .reduce((sum, l) => sum + l.amount, 0)
 
+  const trialTable = (
+  <section className="overflow-hidden rounded-lg border bg-canvas" aria-label="Neraca Saldo">
+    <header className="border-b bg-card px-4 py-3 text-center">
+      <h2 className="text-lg font-bold">Neraca Saldo</h2>
+      <p className="text-sm text-muted-foreground">{asOfLabel}</p>
+    </header>
+    <Table>
+      <TableHeader>
+        <TableRow>
+          <TableHead className="w-24">Kode</TableHead>
+          <TableHead>Akun</TableHead>
+          <TableHead className="w-40 text-right">Debit</TableHead>
+          <TableHead className="w-40 text-right">Kredit</TableHead>
+        </TableRow>
+      </TableHeader>
+      <TableBody>
+        {tb.rows.map((row) => (
+          <TableRow key={row.accountId}>
+            <TableCell className="text-muted-foreground tabular-nums">{row.code}</TableCell>
+            <TableCell>{row.name}</TableCell>
+            <TableCell className="text-right"><Amount value={row.debit} hideZero /></TableCell>
+            <TableCell className="text-right"><Amount value={row.credit} hideZero /></TableCell>
+          </TableRow>
+        ))}
+      </TableBody>
+      <TableFooter className="border-t-2 border-ink bg-canvas font-bold text-ink">
+        <TableRow>
+          <TableCell colSpan={2}>Total</TableCell>
+          <TableCell className="text-right"><Amount value={tb.totalDebit} /></TableCell>
+          <TableCell className="text-right"><Amount value={tb.totalCredit} /></TableCell>
+        </TableRow>
+      </TableFooter>
+    </Table>
+  </section>
+  )
+  const incomeTable = <StatementTable title="Laporan Laba Rugi" subtitle={periodLabel} rows={incomeRows} />
+  const balanceTable = <StatementTable title="Laporan Posisi Keuangan (Neraca)" subtitle={asOfLabel} rows={balanceRows} />
+  const equityTable = <StatementTable title="Laporan Perubahan Modal" subtitle={periodLabel} rows={equityRows} />
+  const cashTable = <StatementTable title="Laporan Arus Kas (metode langsung)" subtitle={periodLabel} rows={cashRows} />
+
   return (
-    <Tabs defaultValue="income" className="grid grid-cols-1 gap-4">
-      <TabsList className="h-auto w-fit max-w-full flex-wrap">
+    <>
+    <Tabs value={tab} onValueChange={setTab} className={printAll ? "grid grid-cols-1 gap-4 print:hidden" : "grid grid-cols-1 gap-4"}>
+      <TabsList className="h-auto w-fit max-w-full flex-wrap print:hidden">
         <TabsTrigger value="trial">Neraca Saldo</TabsTrigger>
         <TabsTrigger value="income">Laba Rugi</TabsTrigger>
         <TabsTrigger value="balance">Neraca</TabsTrigger>
@@ -222,44 +286,12 @@ function Reports({
           label={tb.balanced ? "Debit = Kredit" : "Neraca saldo tidak seimbang"}
           detail={`${formatAccounting(tb.totalDebit)} / ${formatAccounting(tb.totalCredit)}`}
         />
-        <section className="overflow-hidden rounded-lg border bg-canvas" aria-label="Neraca Saldo">
-          <header className="border-b bg-card px-4 py-3 text-center">
-            <h2 className="text-lg font-bold">Neraca Saldo</h2>
-            <p className="text-sm text-muted-foreground">{asOfLabel}</p>
-          </header>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead className="w-24">Kode</TableHead>
-                <TableHead>Akun</TableHead>
-                <TableHead className="w-40 text-right">Debit</TableHead>
-                <TableHead className="w-40 text-right">Kredit</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {tb.rows.map((row) => (
-                <TableRow key={row.accountId}>
-                  <TableCell className="text-muted-foreground tabular-nums">{row.code}</TableCell>
-                  <TableCell>{row.name}</TableCell>
-                  <TableCell className="text-right"><Amount value={row.debit} hideZero /></TableCell>
-                  <TableCell className="text-right"><Amount value={row.credit} hideZero /></TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-            <TableFooter className="border-t-2 border-ink bg-canvas font-bold text-ink">
-              <TableRow>
-                <TableCell colSpan={2}>Total</TableCell>
-                <TableCell className="text-right"><Amount value={tb.totalDebit} /></TableCell>
-                <TableCell className="text-right"><Amount value={tb.totalCredit} /></TableCell>
-              </TableRow>
-            </TableFooter>
-          </Table>
-        </section>
+        {trialTable}
       </TabsContent>
 
       <TabsContent value="income" className="grid gap-4">
         {pendingMonths.length > 0 && (
-          <p role="note" className="flex gap-2 rounded-lg bg-card px-4 py-3 text-sm text-ink">
+          <p role="note" className="flex gap-2 rounded-lg bg-card px-4 py-3 text-sm text-ink print:hidden">
             <InfoIcon className="mt-0.5 size-4 shrink-0" />
             <span>
               <strong>HPP belum disesuaikan</strong> untuk {pendingMonths.join(", ")}. Lakukan stok
@@ -267,7 +299,7 @@ function Reports({
             </span>
           </p>
         )}
-        <StatementTable title="Laporan Laba Rugi" subtitle={periodLabel} rows={incomeRows} />
+        {incomeTable}
       </TabsContent>
 
       <TabsContent value="balance" className="grid gap-4">
@@ -276,7 +308,7 @@ function Reports({
           label={bs.balanced ? "Aset = Liabilitas + Ekuitas" : "Neraca tidak seimbang"}
           detail={`${formatAccounting(bs.assets.total)} = ${formatAccounting(bs.totalLiabilitiesAndEquity)}`}
         />
-        <StatementTable title="Laporan Posisi Keuangan (Neraca)" subtitle={asOfLabel} rows={balanceRows} />
+        {balanceTable}
       </TabsContent>
 
       <TabsContent value="equity" className="grid gap-4">
@@ -285,7 +317,7 @@ function Reports({
           label="Sinkron dengan Laba Rugi dan Neraca"
           detail={`laba ${formatAccounting(is.netIncome)}, ekuitas akhir ${formatAccounting(bs.totalEquity)}`}
         />
-        <StatementTable title="Laporan Perubahan Modal" subtitle={periodLabel} rows={equityRows} />
+        {equityTable}
       </TabsContent>
 
       <TabsContent value="cash" className="grid gap-4">
@@ -294,12 +326,22 @@ function Reports({
           label={cf.reconciled ? "Kas akhir = saldo kas & bank di Neraca" : "Arus kas tidak rekonsiliasi"}
           detail={formatAccounting(cf.closing)}
         />
-        <StatementTable title="Laporan Arus Kas (metode langsung)" subtitle={periodLabel} rows={cashRows} />
-        <p className="text-xs text-muted-foreground">
+        {cashTable}
+        <p className="text-xs text-muted-foreground print:hidden">
           Setiap baris menunjukkan kas bersih yang berkaitan dengan akun lawan tersebut. Transfer antar
           akun kas/bank tidak dihitung sebagai aktivitas; jurnal saldo awal menjadi bagian saldo kas awal.
         </p>
       </TabsContent>
     </Tabs>
+    {printAll && (
+      <div className="hidden print:grid print:gap-6" data-testid="print-all">
+        {[trialTable, incomeTable, balanceTable, equityTable, cashTable].map((table, index) => (
+          <div key={index} className={index > 0 ? "break-before-page" : undefined}>
+            {table}
+          </div>
+        ))}
+      </div>
+    )}
+    </>
   )
 }
