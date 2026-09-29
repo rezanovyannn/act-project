@@ -20,6 +20,7 @@ export const FNB_ACCOUNTS: AccountSeed[] = [
   { code: "3-1000", name: "Modal Pemilik", accountType: "equity", normalBalance: "credit", cashFlowCategory: "financing", isCash: false, systemRole: "owner_capital" },
   { code: "3-2000", name: "Prive", accountType: "equity", normalBalance: "debit", cashFlowCategory: "financing", isCash: false, systemRole: "drawings" },
   { code: "3-3000", name: "Laba Ditahan", accountType: "equity", normalBalance: "credit", cashFlowCategory: "none", isCash: false, systemRole: "retained_earnings" },
+  { code: "3-8000", name: "Ikhtisar Laba Rugi", accountType: "equity", normalBalance: "credit", cashFlowCategory: "none", isCash: false, systemRole: "income_summary" },
   { code: "3-9000", name: "Ekuitas Saldo Awal", accountType: "equity", normalBalance: "credit", cashFlowCategory: "none", isCash: false, systemRole: "opening_balance_equity" },
   // Pendapatan
   { code: "4-1000", name: "Penjualan Makanan", accountType: "revenue", normalBalance: "credit", cashFlowCategory: "operating", isCash: false, systemRole: null },

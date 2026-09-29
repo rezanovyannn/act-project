@@ -4,6 +4,7 @@
  */
 import { beforeEach, describe, expect, it } from "vitest";
 import { AccountingError, type ValidationCode } from "@/core/errors";
+import { buildClosingPlan } from "@/core/closing";
 import { monthlyPeriodsForYear } from "@/core/periods";
 import type {
   IAccountRepository,
@@ -276,6 +277,91 @@ export function describeRepositoryContract(
         const reversal = await repos.journals.postJournal(reversalInput);
         expect(await repos.journals.findReversalOf(posted.id)).toEqual(reversal);
         await expectCode(repos.journals.postJournal(reversalInput), "ALREADY_REVERSED");
+      });
+    });
+
+    describe("tutup buku (ADR 014)", () => {
+      async function postYear2026() {
+        const accounts = await repos.accounts.listByWorkspace(workspace.id);
+        const id = (code: string) => accounts.find((a) => a.code === code)!.id;
+        await repos.journals.postJournal(sale(1_000));
+        await repos.journals.postJournal({
+          ...sale(400),
+          source: "expense",
+          lines: [
+            { accountId: id("6-2000"), debit: 400, credit: 0 },
+            { accountId: kasId, debit: 0, credit: 400 },
+          ],
+        });
+        await repos.journals.postJournal({
+          ...sale(100),
+          source: "manual",
+          lines: [
+            { accountId: id("3-2000"), debit: 100, credit: 0 },
+            { accountId: kasId, debit: 0, credit: 100 },
+          ],
+        });
+        return buildClosingPlan(workspace.id, 2026, accounts, await repos.journals.listByWorkspace(workspace.id));
+      }
+
+      it("posting jurnal penutup, mengunci periode, dan menolak tutup buku kedua", async () => {
+        const plan = await postYear2026();
+        expect(plan.entries).toHaveLength(4);
+        const closing = await repos.journals.closeFiscalYear(workspace.id, 2026, plan.entries);
+        expect(closing.map((e) => [e.source, e.status, e.entryDate])).toEqual(Array(4).fill(["closing", "posted", "2026-12-31"]));
+        expect(closing[0].entryNumber).toMatch(/^JU-2026-\d{4}$/);
+
+        const periods = await repos.periods.listByWorkspace(workspace.id);
+        expect(periods.every((p) => p.status === "closed")).toBe(true);
+        const december = periods.find((p) => p.startDate === "2026-12-01")!;
+        const [log] = await repos.auditLogs.listByWorkspace(workspace.id, { entityType: "period", entityId: december.id });
+        expect(log).toMatchObject({ action: "close", reason: "Tutup buku 2026" });
+
+        await expectCode(repos.journals.closeFiscalYear(workspace.id, 2026, plan.entries), "DUPLICATE_CLOSING");
+      });
+
+      it("menolak tutup buku yang tidak lengkap secara atomik", async () => {
+        const plan = await postYear2026();
+        await expectCode(repos.journals.closeFiscalYear(workspace.id, 2026, plan.entries.slice(0, 2)), "INVALID_CLOSING");
+        const journals = await repos.journals.listByWorkspace(workspace.id);
+        expect(journals.some((e) => e.source === "closing")).toBe(false);
+        expect((await repos.periods.listByWorkspace(workspace.id)).every((p) => p.status === "open")).toBe(true);
+      });
+
+      it("jurnal penutup tidak bisa diposting atau dibalik lewat jalur biasa", async () => {
+        const plan = await postYear2026();
+        await expectCode(repos.journals.postJournal(plan.entries[0]), "INVALID_CLOSING");
+        const [first] = await repos.journals.closeFiscalYear(workspace.id, 2026, plan.entries);
+        const december = (await repos.periods.listByWorkspace(workspace.id)).find((p) => p.startDate === "2026-12-01")!;
+        await repos.periods.setStatus(december.id, "open", "Uji pembalik jurnal penutup");
+        await expectCode(
+          repos.journals.postJournal({
+            ...sale(0),
+            entryDate: "2026-12-31",
+            source: "reversal",
+            reversalOf: first.id,
+            lines: first.lines.map((l) => ({ accountId: l.accountId, debit: l.credit, credit: l.debit })),
+          }),
+          "INVALID_CLOSING",
+        );
+      });
+
+      it("batalkan tutup buku: butuh Desember terbuka, membalik semua jurnal penutup", async () => {
+        const plan = await postYear2026();
+        const closing = await repos.journals.closeFiscalYear(workspace.id, 2026, plan.entries);
+        await expectCode(repos.journals.cancelFiscalYearClosing(workspace.id, 2026), "PERIOD_CLOSED");
+
+        const december = (await repos.periods.listByWorkspace(workspace.id)).find((p) => p.startDate === "2026-12-01")!;
+        await repos.periods.setStatus(december.id, "open", "Salah tutup buku");
+        const reversals = await repos.journals.cancelFiscalYearClosing(workspace.id, 2026);
+        expect(reversals).toHaveLength(closing.length);
+        expect(reversals.every((r) => r.source === "reversal" && r.entryDate === "2026-12-31")).toBe(true);
+        expect(new Set(reversals.map((r) => r.reversalOf))).toEqual(new Set(closing.map((c) => c.id)));
+        await expectCode(repos.journals.cancelFiscalYearClosing(workspace.id, 2026), "CLOSING_NOT_FOUND");
+
+        // Dapat ditutup ulang.
+        const again = await repos.journals.closeFiscalYear(workspace.id, 2026, plan.entries);
+        expect(again).toHaveLength(4);
       });
     });
   });

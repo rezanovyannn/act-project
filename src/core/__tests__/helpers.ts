@@ -1,4 +1,5 @@
 import { AccountService } from "@/core/services/account-service";
+import { ClosingService } from "@/core/services/closing-service";
 import { JournalService } from "@/core/services/journal-service";
 import { PeriodService } from "@/core/services/period-service";
 import { WorkspaceService } from "@/core/services/workspace-service";
@@ -32,6 +33,7 @@ export function createTestEnv(seed: () => MockState = emptyMockState) {
     journalService: new JournalService(repos),
     accountService: new AccountService(repos),
     periodService: new PeriodService(repos),
+    closingService: new ClosingService(repos),
     workspaceService: new WorkspaceService({
       workspaces: repos.workspaces,
       templates: { fnb: FNB_TEMPLATE },

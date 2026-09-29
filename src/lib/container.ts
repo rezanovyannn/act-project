@@ -6,6 +6,7 @@
 import type { AuthUser, IAuthService } from "@/core/ports";
 import type { AppServices } from "@/core/services";
 import { AccountService } from "@/core/services/account-service";
+import { ClosingService } from "@/core/services/closing-service";
 import { JournalService } from "@/core/services/journal-service";
 import { PeriodService } from "@/core/services/period-service";
 import { WorkspaceService } from "@/core/services/workspace-service";
@@ -28,7 +29,7 @@ export interface Container extends AppServices {
   resetMockData?: () => void;
 }
 
-type Repositories = Omit<AppServices, "ownerId" | "workspaceService" | "journalService" | "accountService" | "periodService">;
+type Repositories = Omit<AppServices, "ownerId" | "workspaceService" | "journalService" | "accountService" | "periodService" | "closingService">;
 
 function buildServices(repositories: Repositories, ownerId: string): AppServices {
   return {
@@ -38,6 +39,7 @@ function buildServices(repositories: Repositories, ownerId: string): AppServices
     journalService: new JournalService(repositories),
     accountService: new AccountService(repositories),
     periodService: new PeriodService(repositories),
+    closingService: new ClosingService(repositories),
   };
 }
 

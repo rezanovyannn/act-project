@@ -100,6 +100,14 @@ export interface IJournalRepository {
    * Dengan `draftId`, draft tersebut yang diposting.
    */
   postJournal(entry: JournalEntryInput, draftId?: string): Promise<JournalEntry>;
+  /**
+   * Tutup buku atomik (ADR 014): posting semua jurnal penutup, validasi hasil
+   * (akun nominal & Prive tahun itu serta Ikhtisar Laba Rugi bersaldo nol),
+   * lalu mengunci seluruh periode tahun tersebut.
+   */
+  closeFiscalYear(workspaceId: string, year: number, entries: JournalEntryInput[]): Promise<JournalEntry[]>;
+  /** Membalik seluruh jurnal penutup tahun itu secara atomik, bertanggal 31 Desember. */
+  cancelFiscalYearClosing(workspaceId: string, year: number): Promise<JournalEntry[]>;
 }
 
 export interface AuditLogFilter {

@@ -3,7 +3,9 @@ import { validateForPosting, validateLineAmounts } from "@/core/journal-validati
 import { nextEntryNumber } from "@/core/numbering";
 import type { IJournalRepository, JournalFilter } from "@/core/ports";
 import { activeOpeningBalance } from "@/core/opening-balance";
-import { validateReversal } from "@/core/reversal";
+import { activeClosingEntries, closingDate, validateClosingResult } from "@/core/closing";
+import { yearOf } from "@/core/dates";
+import { buildReversalInput, validateReversal } from "@/core/reversal";
 import { validateSettlement } from "@/core/settlement";
 import type { JournalEntry, JournalEntryInput, JournalLine } from "@/core/types";
 import type { MockDatabase, MockState } from "./mock-database";
@@ -102,7 +104,72 @@ export class MockJournalRepository implements IJournalRepository {
 
   async postJournal(input: JournalEntryInput, draftId?: string): Promise<JournalEntry> {
     return this.db.write((state) => {
-      // Lapisan pertahanan terakhir, meniru RPC post_journal (ADR 008).
+      if (input.source === "closing") {
+        fail("INVALID_CLOSING", "Jurnal penutup dibuat lewat fitur Tutup Buku");
+      }
+      return this.postInState(state, input, draftId);
+    });
+  }
+
+  async closeFiscalYear(workspaceId: string, year: number, entries: JournalEntryInput[]): Promise<JournalEntry[]> {
+    return this.db.write((state) => {
+      // Meniru RPC close_fiscal_year (ADR 014): posting + validasi + kunci periode, atomik.
+      const journals = () => state.journals.filter((j) => j.workspaceId === workspaceId);
+      if (entries.length === 0) fail("INVALID_CLOSING", "Tidak ada mutasi yang perlu ditutup");
+      if (activeClosingEntries(journals(), year).length > 0) {
+        fail("DUPLICATE_CLOSING", `Tahun buku ${year} sudah ditutup`);
+      }
+      for (const entry of entries) {
+        if (entry.workspaceId !== workspaceId || entry.source !== "closing" || entry.entryDate !== closingDate(year)) {
+          fail("INVALID_CLOSING", "Jurnal penutup harus bersumber closing dan bertanggal 31 Desember tahun buku");
+        }
+      }
+      const posted = entries.map((entry) => this.postInState(state, entry));
+      assertNoIssues(
+        validateClosingResult(year, state.accounts.filter((a) => a.workspaceId === workspaceId), journals()),
+      );
+      for (const period of state.periods) {
+        if (period.workspaceId !== workspaceId || yearOf(period.startDate) !== year || period.status !== "open") continue;
+        const before = { ...period };
+        period.status = "closed";
+        period.updatedAt = this.db.now();
+        this.db.audit(state, {
+          workspaceId,
+          entityType: "period",
+          entityId: period.id,
+          action: "close",
+          before,
+          after: period,
+          reason: `Tutup buku ${year}`,
+        });
+      }
+      return posted;
+    });
+  }
+
+  async cancelFiscalYearClosing(workspaceId: string, year: number): Promise<JournalEntry[]> {
+    return this.db.write((state) => {
+      const active = activeClosingEntries(state.journals.filter((j) => j.workspaceId === workspaceId), year);
+      if (active.length === 0) fail("CLOSING_NOT_FOUND", `Belum ada tutup buku aktif untuk tahun ${year}`);
+      return [...active].reverse().map((original) =>
+        this.postInState(
+          state,
+          buildReversalInput(original, closingDate(year), `Pembatalan tutup buku ${year}: ${original.description}`),
+          undefined,
+          { closingReversal: true },
+        ),
+      );
+    });
+  }
+
+  /** Posting di dalam write() yang sedang berjalan (lapisan pertahanan terakhir, ADR 008). */
+  private postInState(
+    state: MockState,
+    input: JournalEntryInput,
+    draftId?: string,
+    options: { closingReversal?: boolean } = {},
+  ): JournalEntry {
+    {
       const accounts = state.accounts.filter((a) => a.workspaceId === input.workspaceId);
       assertNoIssues(
         validateForPosting(input, {
@@ -127,7 +194,7 @@ export class MockJournalRepository implements IJournalRepository {
       ) {
         fail("DUPLICATE_OPENING_BALANCE", "Saldo awal sudah diposting untuk workspace ini");
       }
-      if (input.reversalOf) {
+      if (input.reversalOf && !options.closingReversal) {
         const original = findActive(state, input.reversalOf);
         if (!original || original.workspaceId !== input.workspaceId) {
           fail("NOT_FOUND", "Jurnal asal tidak ditemukan");
@@ -166,7 +233,7 @@ export class MockJournalRepository implements IJournalRepository {
       }
       state.journals.push(entry);
       return entry;
-    });
+    }
   }
 
   private buildEntry(

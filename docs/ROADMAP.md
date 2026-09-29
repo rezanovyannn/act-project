@@ -91,7 +91,7 @@ Aturan umum agen: Kerjakan sub-fase secara berurutan, **berhenti dan minta revie
 
 ## Fase 3: Tutup Buku, Ekspor & Hardening
 - **Pekerjaan:**
-  - UI dan logika Tutup Buku Akhir Tahun: jurnal penutup (`source = closing`) memindahkan saldo akun pendapatan, HPP, dan beban ke Laba Ditahan. Laporan Laba Rugi mengecualikan jurnal `closing` (ADR 010).
+  - UI dan logika Tutup Buku Akhir Tahun (ADR 014): jurnal penutup lewat Ikhtisar Laba Rugi ke Laba Ditahan, Prive ke Laba Ditahan, kunci periode otomatis, batalkan tutup buku sebagai paket. Laporan Laba Rugi mengecualikan jurnal penutup dan pembaliknya.
   - Ekspor/Cetak Laporan Keuangan ke format PDF/Print-friendly view.
   - Backup data workspace (ekspor JSON/CSV).
   - Audit log UI viewer untuk melacak riwayat mutasi jurnal, akun, dan periode.
@@ -117,3 +117,7 @@ Aturan umum agen: Kerjakan sub-fase secara berurutan, **berhenti dan minta revie
 | 5 | Tempat repository Supabase berjalan | Browser + Anon Key + RLS; Supabase region Singapura | ADR 013 |
 | 6 | Lingkungan test Supabase (Docker tidak bisa berjalan di laptop) | Proyek Supabase online khusus dev menggantikan Supabase lokal; Supabase lokal via Docker boleh ditambahkan kelak | ADR 013 |
 | 7 | Metode login | Email + kata sandi (Supabase Auth) | ADR 013 |
+| 8 | Prive saat tutup buku | Ditutup ke Laba Ditahan | ADR 014 |
+| 9 | Cara penutupan akun nominal | Lewat akun Ikhtisar Laba Rugi | ADR 014 |
+| 10 | Periode setelah tutup buku | Seluruh periode tahun itu dikunci otomatis | ADR 014 |
+| 11 | Ekspor laporan PDF | Tampilan cetak + fitur cetak/simpan PDF browser (tanpa dependency) | ROADMAP Fase 3 |

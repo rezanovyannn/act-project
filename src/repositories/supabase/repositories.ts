@@ -243,6 +243,30 @@ export class SupabaseJournalRepository implements IJournalRepository {
     const id = await unwrap(this.client.rpc("post_journal", { p_input: entry, p_draft_id: draftId ?? null }));
     return required(await this.getById(id as string), "Jurnal");
   }
+
+  async closeFiscalYear(workspaceId: string, year: number, entries: JournalEntryInput[]): Promise<JournalEntry[]> {
+    const ids = (await unwrap(
+      this.client.rpc("close_fiscal_year", { p_workspace_id: workspaceId, p_year: year, p_entries: entries }),
+    )) as string[];
+    return this.getMany(ids);
+  }
+
+  async cancelFiscalYearClosing(workspaceId: string, year: number): Promise<JournalEntry[]> {
+    const ids = (await unwrap(
+      this.client.rpc("cancel_fiscal_year_closing", { p_workspace_id: workspaceId, p_year: year }),
+    )) as string[];
+    return this.getMany(ids);
+  }
+
+  /** Jurnal berdasarkan id, dengan urutan sesuai `ids`. */
+  private async getMany(ids: string[]): Promise<JournalEntry[]> {
+    if (ids.length === 0) return [];
+    const rows = (
+      await unwrapRows(this.client.from("journal_entries").select(JOURNAL_SELECT).in("id", ids))
+    ).map(toJournal);
+    const byId = new Map(rows.map((r) => [r.id, r]));
+    return ids.map((id) => required(byId.get(id) ?? null, "Jurnal"));
+  }
 }
 
 export class SupabaseAuditLogRepository implements IAuditLogRepository {

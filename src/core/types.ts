@@ -32,7 +32,8 @@ export type SystemRole =
   | "cogs"
   | "accounts_receivable"
   | "accounts_payable"
-  | "sales_tax_payable";
+  | "sales_tax_payable"
+  | "income_summary";
 
 export type PeriodStatus = "open" | "closed";
 

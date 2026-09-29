@@ -2,6 +2,7 @@
  * Ringkasan dashboard per periode (bulan). Dihitung langsung dari jurnal
  * posted (AGENTS.md prinsip 5). Laporan formal lengkap dibuat di Sub-fase 1D.
  */
+import { withoutClosing } from "./closing";
 import { accountTotals, isLedgerEntry, normalBalance } from "./ledger";
 import { findPeriodForDate, type PeriodRange } from "./periods";
 import type { Account, IsoDate, JournalEntry, SystemRole } from "./types";
@@ -35,7 +36,8 @@ export function computeDashboardSummary(
   entries: readonly JournalEntry[],
   period: PeriodRange,
 ): DashboardSummary {
-  const inPeriod = accountTotals(entries, { fromDate: period.startDate, toDate: period.endDate });
+  // Laba rugi periode tanpa jurnal penutup & pembaliknya (ADR 014).
+  const inPeriod = accountTotals(withoutClosing(entries), { fromDate: period.startDate, toDate: period.endDate });
   const toEnd = accountTotals(entries, { toDate: period.endDate });
 
   const sumBalances = (

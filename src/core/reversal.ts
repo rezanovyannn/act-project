@@ -53,6 +53,12 @@ export function validateReversal(
       message: "Hanya jurnal posted yang dapat di-void atau dikoreksi",
     });
   }
+  if (original.source === "closing") {
+    issues.push({
+      code: "INVALID_CLOSING",
+      message: "Jurnal penutup hanya dapat dibatalkan lewat fitur Batalkan tutup buku",
+    });
+  }
   if (original.source === "reversal") {
     issues.push({
       code: "INVALID_REVERSAL",

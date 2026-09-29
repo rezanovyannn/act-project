@@ -2,6 +2,7 @@
  * Mesin laporan keuangan dinamis (AGENTS.md prinsip 5, ADR 010).
  * Semua laporan dihitung langsung dari jurnal posted; tidak ada tabel agregat.
  */
+import { withoutClosing } from "./closing";
 import { toIsoDate, yearOf } from "./dates";
 import { isLedgerEntry } from "./ledger";
 import type { Account, AccountType, IsoDate, JournalEntry, SystemRole } from "./types";
@@ -144,7 +145,8 @@ export function incomeStatement(
   range: DateRange,
 ): IncomeStatement {
   const inRange = within(range);
-  const net = debitNetByAccount(entries, (e) => inRange(e) && e.source !== "closing");
+  // Tanpa jurnal penutup & pembaliknya (ADR 010 & 014).
+  const net = debitNetByAccount(withoutClosing(entries), inRange);
   const revenue = section(accounts, net, ofType("revenue"), -1);
   const cogs = section(accounts, net, ofType("cogs"), 1);
   const expenses = section(accounts, net, ofType("expense"), 1);
@@ -242,7 +244,7 @@ export function equityChanges(
 
   const opening = equityTotal((e) => e.entryDate < range.fromDate || (inRange(e) && isOpeningBalance(e)));
   const closing = equityTotal(upTo(range.toDate));
-  const periodNet = debitNetByAccount(entries, (e) => inRange(e) && !isOpeningBalance(e));
+  const periodNet = debitNetByAccount(withoutClosing(entries), (e) => inRange(e) && !isOpeningBalance(e));
   const contributions = section(accounts, periodNet, withRole("owner_capital"), -1).total;
   const drawings = section(accounts, periodNet, withRole("drawings"), 1).total;
   const netIncome = incomeStatement(accounts, entries, range).netIncome;

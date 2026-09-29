@@ -44,6 +44,9 @@ export class JournalService {
    * Jurnal pembalik hanya dibuat lewat `voidJournal`/`correctJournal`.
    */
   async postJournal(input: JournalEntryInput, draftId?: string): Promise<JournalEntry> {
+    if (input.source === "closing") {
+      fail("INVALID_CLOSING", "Jurnal penutup dibuat lewat fitur Tutup Buku");
+    }
     if (input.source === "reversal" || input.reversalOf) {
       fail("INVALID_REVERSAL", "Jurnal pembalik dibuat lewat fitur Void atau Koreksi");
     }
