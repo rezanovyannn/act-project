@@ -75,7 +75,7 @@ Aturan umum agen: Kerjakan sub-fase secara berurutan, **berhenti dan minta revie
 *Keputusan arsitektur Supabase dicatat di ADR sebelum implementasi.*
 - **Pekerjaan:**
   - ~~ADR: repository Supabase berjalan di browser dengan Anon Key + RLS aktif, atau via Server Actions.~~ Diputuskan: browser + Anon Key + RLS, penulisan jurnal hanya lewat RPC (ADR 013).
-  - Autentikasi Supabase Auth: halaman login/logout, proteksi route, `owner_id` diambil dari user yang login.
+  - Autentikasi Supabase Auth dengan **email + kata sandi**: halaman daftar/login/logout, proteksi route, `owner_id` diambil dari user yang login.
   - Skema PostgreSQL di `supabase/migrations/` mencakup tabel `workspaces`, `accounts`, `periods`, `journal_entries`, `journal_lines`, `audit_logs`, kolom `deleted_at`, dan constraint dari ADR 011 sejak awal.
   - Index minimal: `journal_entries (workspace_id, entry_date)`, `journal_lines (workspace_id, account_id)`, `journal_entries (reversal_of)` unik.
   - Trigger Database untuk menolak UPDATE/DELETE pada jurnal berstatus posted beserta barisnya.
@@ -83,8 +83,8 @@ Aturan umum agen: Kerjakan sub-fase secara berurutan, **berhenti dan minta revie
   - Trigger Database otomatis pengisi `audit_logs` (viewer UI di Fase 3).
   - RLS Policies berbasis `workspace_id` dan `owner_id`.
   - Implementasi `src/repositories/supabase/` yang mengimplementasikan port interface.
-  - Contract test **yang sama** (`src/repositories/__tests__/`) dijalankan terhadap mock dan Supabase lokal (Supabase CLI), ditambah test RLS dua user (User B tidak bisa membaca/menulis data User A).
-- **Kriteria Selesai (Stop & Review):** UI berjalan tanpa perubahan kode komponen setelah repository ditukar ke Supabase lokal; contract test lulus di kedua implementasi; terverifikasi aman dengan RLS.
+  - Contract test **yang sama** (`src/repositories/__tests__/`) dijalankan terhadap mock dan **proyek Supabase dev** (online, terpisah dari production), ditambah test RLS dua user (User B tidak bisa membaca/menulis data User A).
+- **Kriteria Selesai (Stop & Review):** UI berjalan tanpa perubahan kode komponen setelah repository ditukar ke Supabase (proyek dev); contract test lulus di kedua implementasi; terverifikasi aman dengan RLS.
 - **Catatan optimasi (bukan pekerjaan fase ini):** Jika laporan melambat pada volume besar, evaluasi index tambahan atau fungsi agregasi di database. Tidak menggunakan tabel agregat tersimpan.
 
 ---
@@ -115,3 +115,5 @@ Aturan umum agen: Kerjakan sub-fase secara berurutan, **berhenti dan minta revie
 | 3 | Membuka kembali periode `closed` | Boleh, wajib alasan + audit log | ADR 006 |
 | 4 | Referensi desain gaya Pinterest | Dipakai sebagai inspirasi design system | docs/DESIGN_SYSTEM.md |
 | 5 | Tempat repository Supabase berjalan | Browser + Anon Key + RLS; Supabase region Singapura | ADR 013 |
+| 6 | Lingkungan test Supabase (Docker tidak bisa berjalan di laptop) | Proyek Supabase online khusus dev menggantikan Supabase lokal; Supabase lokal via Docker boleh ditambahkan kelak | ADR 013 |
+| 7 | Metode login | Email + kata sandi (Supabase Auth) | ADR 013 |
