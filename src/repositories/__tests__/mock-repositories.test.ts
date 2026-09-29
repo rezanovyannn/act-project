@@ -13,7 +13,11 @@ let counter = 0;
 const newDb = (storage = new MemoryStorage(), seed = emptyMockState) =>
   new MockDatabase({ storage, seed, generateId: () => `id-${++counter}` });
 
-describeRepositoryContract("mock (localStorage)", () => createMockRepositories(newDb()));
+describeRepositoryContract("mock (localStorage)", () => {
+  // Dua pemilik berbagi satu penyimpanan, seperti dua user pada satu database.
+  const repos = createMockRepositories(newDb());
+  return { owner: { repos, ownerId: "owner-a" }, other: { repos, ownerId: "owner-b" } };
+});
 
 describe("mock database", () => {
   it("men-seed dataset saat storage kosong", async () => {

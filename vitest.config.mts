@@ -10,5 +10,7 @@ export default defineConfig({
   test: {
     environment: "node",
     include: ["src/**/*.test.ts"],
+    // Test Supabase dijalankan terpisah: pnpm test:supabase (vitest.supabase.config.mts).
+    exclude: ["**/node_modules/**", "src/**/*.supabase.test.ts"],
   },
 });

@@ -1,6 +1,6 @@
 /**
  * Contract test repository (ADR 003). Dijalankan terhadap setiap implementasi:
- * mock di Fase 1, Supabase lokal di Fase 2.
+ * mock (Fase 1) dan proyek Supabase dev (Fase 2, ADR 013).
  */
 import { beforeEach, describe, expect, it } from "vitest";
 import { AccountingError, type ValidationCode } from "@/core/errors";
@@ -32,11 +32,24 @@ async function expectCode(promise: Promise<unknown>, code: ValidationCode) {
   expect((error as AccountingError).hasCode(code)).toBe(true);
 }
 
+/** Satu pengguna: repository miliknya dan id pemiliknya. */
+export interface ContractActor {
+  repos: ContractRepositories;
+  ownerId: string;
+}
+
+/** Dua pengguna pada backend yang sama (untuk skenario kepemilikan). */
+export interface ContractSetup {
+  owner: ContractActor;
+  other: ContractActor;
+}
+
 export function describeRepositoryContract(
   name: string,
-  createRepositories: () => Promise<ContractRepositories> | ContractRepositories,
+  setup: () => Promise<ContractSetup> | ContractSetup,
 ) {
   describe(`kontrak repository: ${name}`, () => {
+    let actors: ContractSetup;
     let repos: ContractRepositories;
     let workspace: Workspace;
     let kasId: string;
@@ -55,9 +68,10 @@ export function describeRepositoryContract(
     });
 
     beforeEach(async () => {
-      repos = await createRepositories();
+      actors = await setup();
+      repos = actors.owner.repos;
       workspace = await repos.workspaces.createWithSeed(
-        { ownerId: "owner-a", name: "Kedai A", templateType: "fnb", booksStartDate: "2026-01-01" },
+        { ownerId: actors.owner.ownerId, name: "Kedai A", templateType: "fnb", booksStartDate: "2026-01-01" },
         FNB_TEMPLATE.accounts,
         monthlyPeriodsForYear(2026),
       );
@@ -87,14 +101,17 @@ export function describeRepositoryContract(
       });
 
       it("hanya menampilkan workspace milik owner dan menyembunyikan yang dihapus", async () => {
-        await repos.workspaces.createWithSeed(
-          { ownerId: "owner-b", name: "Kedai B", templateType: "fnb", booksStartDate: "2026-01-01" },
+        const { owner, other } = actors;
+        const otherWorkspace = await other.repos.workspaces.createWithSeed(
+          { ownerId: other.ownerId, name: "Kedai B", templateType: "fnb", booksStartDate: "2026-01-01" },
           FNB_TEMPLATE.accounts,
           [],
         );
-        expect((await repos.workspaces.listByOwner("owner-a")).map((w) => w.name)).toEqual(["Kedai A"]);
+        const ownIds = async () => (await repos.workspaces.listByOwner(owner.ownerId)).map((w) => w.id);
+        expect(await ownIds()).toContain(workspace.id);
+        expect(await ownIds()).not.toContain(otherWorkspace.id);
         await repos.workspaces.softDelete(workspace.id);
-        expect(await repos.workspaces.listByOwner("owner-a")).toEqual([]);
+        expect(await ownIds()).not.toContain(workspace.id);
         expect(await repos.workspaces.getById(workspace.id)).toBeNull();
       });
     });
