@@ -16,7 +16,8 @@ import {
   SettingsIcon,
   type LucideIcon,
 } from "lucide-react"
-import type { AppServices } from "@/core/services"
+import type { Container } from "@/lib/container"
+import { AccountBar } from "@/app/_components/account-bar"
 import type { TemplateType } from "@/core/types"
 import { Button } from "@/components/ui/button"
 import { Sheet, SheetContent, SheetTitle, SheetTrigger } from "@/components/ui/sheet"
@@ -75,7 +76,7 @@ function Navigation({
   templateType,
   onNavigate,
 }: {
-  services: AppServices
+  services: Container
   workspaceId: string
   templateType: TemplateType
   onNavigate?: () => void
@@ -143,9 +144,7 @@ function Navigation({
         </div>
         ))}
       </nav>
-      <p className="mt-auto px-2 text-xs text-muted-foreground">
-        Fase 1 · data contoh tersimpan di browser ini
-      </p>
+      <AccountBar services={services} className="mt-auto px-2" />
     </div>
   )
 }
@@ -156,7 +155,7 @@ export function AppShell({
   templateType,
   children,
 }: {
-  services: AppServices
+  services: Container
   workspaceId: string
   templateType: TemplateType
   children: React.ReactNode

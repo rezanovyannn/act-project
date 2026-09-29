@@ -18,6 +18,7 @@ import { LoadingState } from "@/components/ui/page-header"
 import { WorkspaceList } from "@/modules/workspace/workspace-list"
 import { routes } from "@/app/_components/routes"
 import { useServices } from "@/app/_components/use-services"
+import { AccountBar } from "@/app/_components/account-bar"
 
 export default function WorkspacesPage() {
   const services = useServices()
@@ -25,9 +26,12 @@ export default function WorkspacesPage() {
 
   return (
     <main className="mx-auto w-full max-w-6xl flex-1 px-4 py-8 sm:px-6 lg:px-8 lg:py-12">
-      <p className="mb-8 text-lg font-bold text-ink">
-        <span className="text-primary">●</span> Pembukuan
-      </p>
+      <div className="mb-8 flex flex-wrap items-center justify-between gap-3">
+        <p className="text-lg font-bold text-ink">
+          <span className="text-primary">●</span> Pembukuan
+        </p>
+        {services && <AccountBar services={services} />}
+      </div>
       {services ? (
         <>
           <WorkspaceList
@@ -35,6 +39,7 @@ export default function WorkspacesPage() {
             workspaceHref={(w) => routes.dashboard(w.id)}
             onCreated={(w) => router.push(routes.dashboard(w.id))}
           />
+          {services.resetMockData && (
           <footer className="mt-16 flex flex-wrap items-center justify-between gap-3 border-t pt-6 text-xs text-muted-foreground">
             <span>Fase 1: data contoh disimpan di browser ini (localStorage).</span>
             <Dialog>
@@ -59,7 +64,7 @@ export default function WorkspacesPage() {
                   <Button
                     variant="destructive"
                     onClick={() => {
-                      services.resetMockData()
+                      services.resetMockData?.()
                       toast.success("Data contoh dikembalikan")
                       window.location.reload()
                     }}
@@ -70,6 +75,7 @@ export default function WorkspacesPage() {
               </DialogContent>
             </Dialog>
           </footer>
+          )}
         </>
       ) : (
         <LoadingState />

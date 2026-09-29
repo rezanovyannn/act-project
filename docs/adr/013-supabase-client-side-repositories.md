@@ -13,7 +13,7 @@ Arsitektur Fase 1 (semua halaman client component, container DI di browser, port
 3. **Database adalah penjaga terakhir.** Validasi di `src/core/` tetap berjalan untuk pengalaman pengguna, tetapi karena kode browser bisa dilewati, semua aturan akuntansi diulang di database:
    - Penulisan jurnal **hanya lewat RPC** (`post_journal`, `save_journal_draft`, `delete_journal_draft`). Hak `INSERT`/`UPDATE`/`DELETE` langsung pada `journal_entries` dan `journal_lines` dicabut dari role `authenticated`.
    - Operasi multi-tabel lain juga lewat RPC atomik: pembuatan workspace beserta seed CoA & periode, dan perubahan status periode (menerima alasan untuk audit log).
-   - RPC memakai `SECURITY INVOKER` sehingga RLS tetap berlaku, dan memvalidasi: Debit = Kredit, baris valid, periode terbuka, akun aktif & satu workspace, aturan void/koreksi, pelunasan (ADR 012), satu saldo awal aktif.
+   - Karena hak tulis tabel dicabut, RPC tulis memakai `SECURITY DEFINER` dengan `search_path` kosong dan **cek kepemilikan eksplisit** (`app.require_owner`: workspace milik `auth.uid()`) di setiap fungsi (revisi saat implementasi, 29 September 2026). Role `anon` tidak dapat memanggil RPC. RPC memvalidasi: Debit = Kredit, baris valid, periode terbuka, akun aktif & satu workspace, aturan void/koreksi, pelunasan (ADR 012), satu saldo awal aktif.
    - Trigger menolak `UPDATE`/`DELETE` pada jurnal posted dan barisnya.
    - Trigger mengisi `audit_logs` untuk mutasi workspace, akun, periode, dan jurnal; `audit_logs` hanya bisa dibaca oleh user.
 4. **RLS aktif di semua tabel.** `workspaces.owner_id = auth.uid()`; tabel lain hanya dapat diakses bila `workspace_id` milik user tersebut. Dibuktikan dengan test dua user (User B tidak bisa membaca/menulis data User A).
@@ -24,6 +24,8 @@ Arsitektur Fase 1 (semua halaman client component, container DI di browser, port
    - Contract test yang sama (`src/repositories/__tests__/`) dijalankan terhadap mock dan proyek dev. Setiap test memakai workspace/akun uji unik agar data antar-run tidak bertabrakan.
    - Test RLS dua user mendaftarkan akun uji lewat Anon Key (konfirmasi email dimatikan **hanya di proyek dev**); service role key tetap tidak dipakai.
    - Kredensial dev disimpan di `.env.local` (diabaikan git). Supabase lokal via Docker boleh ditambahkan kelak tanpa mengubah kode, karena migrasinya sama.
+   - Dari jaringan pengembang hanya sebagian IP pooler Supabase yang terjangkau; perintah CLI database dijalankan lewat `pnpm db <perintah>` (`scripts/supabase-db.mjs`) yang memilih IP pooler yang terjangkau dan menyembunyikan password.
+   - Sumber data dipilih `src/lib/container.ts`: Supabase bila URL & anon key terisi; `NEXT_PUBLIC_DATA_SOURCE=mock` memaksa data contoh Fase 1 (untuk regresi/demo).
 8. Bila kelak dibutuhkan fitur yang harus di server (mis. ekspor PDF/backup di Fase 3), ditambahkan route handler yang tetap memakai sesi user dan RLS, tanpa mengubah keputusan ini.
 
 ## Konsekuensi

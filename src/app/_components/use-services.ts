@@ -1,18 +1,28 @@
 "use client";
 
-import { useSyncExternalStore } from "react";
+import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import { getContainer, type Container } from "@/lib/container";
 
-const subscribe = () => () => {};
-
 /**
- * Mengambil container DI di browser. Mengembalikan `null` saat render server
- * (localStorage belum tersedia), sehingga halaman menampilkan status memuat.
+ * Container DI di browser. `null` selama memuat; bila belum login (mode
+ * Supabase) pengguna diarahkan ke halaman login.
  */
 export function useServices(): Container | null {
-  return useSyncExternalStore(
-    subscribe,
-    () => getContainer(),
-    () => null,
-  );
+  const [container, setContainer] = useState<Container | null>(null);
+  const router = useRouter();
+
+  useEffect(() => {
+    let cancelled = false;
+    getContainer().then((result) => {
+      if (cancelled) return;
+      if (result) setContainer(result);
+      else router.replace(`/login?next=${encodeURIComponent(window.location.pathname)}`);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [router]);
+
+  return container;
 }

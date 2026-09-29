@@ -111,3 +111,22 @@ export interface IAuditLogRepository {
   /** Terbaru lebih dulu. Hanya baca: log ditulis oleh repository lain / trigger DB. */
   listByWorkspace(workspaceId: string, filter?: AuditLogFilter): Promise<AuditLog[]>;
 }
+
+export interface AuthUser {
+  id: string;
+  email: string | null;
+}
+
+export interface SignUpResult {
+  user: AuthUser | null;
+  /** `true` bila proyek mewajibkan konfirmasi email sebelum bisa login. */
+  needsEmailConfirmation: boolean;
+}
+
+/** Autentikasi pengguna (ADR 013: email + kata sandi). */
+export interface IAuthService {
+  currentUser(): Promise<AuthUser | null>;
+  signIn(email: string, password: string): Promise<AuthUser>;
+  signUp(email: string, password: string): Promise<SignUpResult>;
+  signOut(): Promise<void>;
+}
