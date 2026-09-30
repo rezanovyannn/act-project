@@ -2,10 +2,11 @@
 
 import { useState } from "react"
 import { todayIsoDate } from "@/core/format"
-import { formatTaxRate } from "@/core/sales-tax"
+import { effectiveTaxSettings, formatTaxSettings } from "@/core/sales-tax"
 import type { AppServices } from "@/core/services"
 import { buildSale, type SalePreview } from "@/core/transactions"
 import type { JournalEntry } from "@/core/types"
+import { workspaceTaxSettings } from "@/core/vat"
 import { Amount } from "@/components/ui/amount"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -31,7 +32,8 @@ export function SaleForm({
   const { workspace, accounts, journals } = data
   const cashAccounts = activeAccounts(accounts, (a) => a.isCash)
   const revenueAccounts = activeAccounts(accounts, (a) => a.accountType === "revenue")
-  const taxSettings = { rateBps: workspace.salesTaxRateBps, inclusive: workspace.salesTaxInclusive }
+  const workspaceTax = workspaceTaxSettings(workspace)
+  const taxSettings = effectiveTaxSettings(workspaceTax)
 
   const [entryDate, setEntryDate] = useState(todayIsoDate)
   const [description, setDescription] = useState("Penjualan")
@@ -111,7 +113,7 @@ export function SaleForm({
         <label className="flex items-center gap-3 text-sm">
           <Switch checked={applyTax} onCheckedChange={setApplyTax} disabled={workspace.salesTaxRateBps === 0} />
           <span>
-            Kenakan {workspace.salesTaxLabel} {formatTaxRate(workspace.salesTaxRateBps)} ·{" "}
+            Kenakan {formatTaxSettings(workspaceTax)} ·{" "}
             <span className="text-muted-foreground">
               harga {workspace.salesTaxInclusive ? "sudah" : "belum"} termasuk {workspace.salesTaxLabel}
             </span>

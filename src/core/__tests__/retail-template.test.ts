@@ -65,12 +65,10 @@ describe("template Retail", () => {
   });
 
   it("pengaturan pajak: label PB1/PPN, label lain ditolak", async () => {
-    const updated = await env.workspaceService.updateSalesTaxSettings(workspaceId, { label: "PPN", rateBps: 1100, inclusive: true });
+    const simple = { ...RETAIL_TEMPLATE.salesTaxDefaults, rateBps: 1100, inclusive: true };
+    const { workspace: updated } = await env.taxService.updateSettings(workspaceId, simple);
     expect(updated).toMatchObject({ salesTaxLabel: "PPN", salesTaxRateBps: 1100, salesTaxInclusive: true });
-    await expectCode(
-      env.workspaceService.updateSalesTaxSettings(workspaceId, { label: "VAT" as never, rateBps: 1100, inclusive: false }),
-      "INVALID_TAX_LABEL",
-    );
+    await expectCode(env.taxService.updateSettings(workspaceId, { ...simple, label: "VAT" as never }), "INVALID_TAX_LABEL");
   });
 
   it("penjualan & setoran memakai label pajak workspace", () => {

@@ -1,14 +1,19 @@
 "use client"
 
+import Link from "next/link"
+import { SettingsIcon } from "lucide-react"
+import { formatTaxSettings } from "@/core/sales-tax"
 import type { AppServices } from "@/core/services"
+import { workspaceTaxSettings } from "@/core/vat"
+import { Button } from "@/components/ui/button"
 import { LoadingState, PageHeader } from "@/components/ui/page-header"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { errorMessage } from "@/lib/utils"
 import { ExpenseForm } from "./expense-form"
 import { SaleForm } from "./sale-form"
 import { TaxPaymentForm } from "./tax-payment-form"
-import { TaxSettingsDialog } from "./tax-settings-dialog"
 import { useWorkspaceData } from "./use-workspace-data"
+import { VatSettlementForm } from "./vat-settlement-form"
 
 export type TransactionTab = "sale" | "expense" | "tax"
 
@@ -17,11 +22,14 @@ export function TransactionsView({
   services,
   workspaceId,
   journalHref,
+  taxSettingsHref,
   initialTab = "sale",
 }: {
   services: AppServices
   workspaceId: string
   journalHref: (entryId: string) => string
+  /** Pengaturan → Pajak. */
+  taxSettingsHref: string
   initialTab?: TransactionTab
 }) {
   const data = useWorkspaceData(services, workspaceId)
@@ -38,7 +46,14 @@ export function TransactionsView({
       <PageHeader
         title="Input Transaksi"
         description="Isi form sederhana; jurnal debit/kredit dibuat otomatis dan langsung diposting."
-        actions={<TaxSettingsDialog services={services} workspace={current.workspace} onSaved={data.reload} />}
+        actions={
+          <Button variant="secondary" asChild>
+            <Link href={taxSettingsHref}>
+              <SettingsIcon data-icon="inline-start" />
+              {formatTaxSettings(workspaceTaxSettings(current.workspace))}
+            </Link>
+          </Button>
+        }
       />
       <Tabs defaultValue={initialTab} className="grid grid-cols-1 gap-4">
         <TabsList className="w-fit max-w-full flex-wrap">
@@ -49,7 +64,7 @@ export function TransactionsView({
         {/* key: form di-reset saat pengaturan pajak berubah */}
         <TabsContent value="sale">
           <SaleForm
-            key={`${current.workspace.salesTaxLabel}-${current.workspace.salesTaxRateBps}-${current.workspace.salesTaxInclusive}`}
+            key={`${current.workspace.salesTaxMode}-${current.workspace.salesTaxLabel}-${current.workspace.salesTaxRateBps}-${current.workspace.salesTaxInclusive}-${current.workspace.vatDppNumerator}/${current.workspace.vatDppDenominator}`}
             {...formProps}
           />
         </TabsContent>
@@ -57,7 +72,11 @@ export function TransactionsView({
           <ExpenseForm {...formProps} />
         </TabsContent>
         <TabsContent value="tax">
-          <TaxPaymentForm {...formProps} />
+          {current.workspace.salesTaxMode === "full_vat" ? (
+            <VatSettlementForm {...formProps} />
+          ) : (
+            <TaxPaymentForm {...formProps} />
+          )}
         </TabsContent>
       </Tabs>
     </div>

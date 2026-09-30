@@ -3,11 +3,14 @@
 import { useState } from "react"
 import { todayIsoDate } from "@/core/format"
 import type { AppServices } from "@/core/services"
+import { formatTaxSettings } from "@/core/sales-tax"
 import { buildExpense } from "@/core/transactions"
+import { computeInputVat, workspaceTaxSettings } from "@/core/vat"
 import type { JournalEntry, JournalEntryInput } from "@/core/types"
 import { Amount } from "@/components/ui/amount"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
+import { InputVatField } from "@/components/ui/input-vat-field"
 import { JournalPreview, PostedNotice } from "@/components/ui/journal-preview"
 import { Label } from "@/components/ui/label"
 import { PaymentField, initialPayment, toPayment, type PaymentState } from "@/components/ui/payment-field"
@@ -34,13 +37,21 @@ export function ExpenseForm({
   const [description, setDescription] = useState("")
   const [payment, setPayment] = useState<PaymentState>(() => initialPayment(cashAccounts))
   const [items, setItems] = useState<ItemState[]>(() => [newItem()])
+  const [vatEnabled, setVatEnabled] = useState(false)
+  const [vatOverride, setVatOverride] = useState<number | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [posted, setPosted] = useState<JournalEntry | null>(null)
   const [saving, setSaving] = useState(false)
 
+  const taxSettings = workspaceTaxSettings(workspace)
+  const fullVat = taxSettings.mode === "full_vat"
+  const subtotal = items.reduce((sum, i) => sum + (i.amount ?? 0), 0)
+  const suggestedVat = fullVat ? computeInputVat(subtotal, taxSettings) : 0
+  const inputVat = fullVat && vatEnabled ? (vatOverride ?? suggestedVat) : 0
+
   const build = (): JournalEntryInput =>
     buildExpense(
-      { workspaceId: workspace.id, entryDate, description, payment: toPayment(payment), items: toAmountItems(items) },
+      { workspaceId: workspace.id, entryDate, description, payment: toPayment(payment), items: toAmountItems(items), inputVat },
       accounts,
     )
 
@@ -50,7 +61,7 @@ export function ExpenseForm({
   } catch {
     preview = null
   }
-  const total = items.reduce((sum, i) => sum + (i.amount ?? 0), 0)
+  const total = subtotal + inputVat
 
   async function submit(event: React.FormEvent) {
     event.preventDefault()
@@ -60,6 +71,7 @@ export function ExpenseForm({
       const entry = await services.journalService.postJournal(build())
       setPosted(entry)
       setItems([newItem()])
+      setVatOverride(null)
       setDescription("")
       setPayment((p) => ({ ...p, counterparty: "" }))
       onPosted()
@@ -97,7 +109,23 @@ export function ExpenseForm({
           counterpartyLabel="Pemasok"
           counterpartySuggestions={counterpartyNames(journals)}
         />
-        <AmountItemsField label="Rincian beban" accounts={expenseAccounts} items={items} onChange={setItems} />
+        <AmountItemsField
+          label={fullVat ? "Rincian beban (harga sebelum PPN)" : "Rincian beban"}
+          accounts={expenseAccounts}
+          items={items}
+          onChange={setItems}
+        />
+        {fullVat && (
+          <InputVatField
+            id="expense-vat"
+            enabled={vatEnabled}
+            onEnabledChange={setVatEnabled}
+            suggested={suggestedVat}
+            override={vatOverride}
+            onOverrideChange={setVatOverride}
+            rateLabel={formatTaxSettings(taxSettings)}
+          />
+        )}
       </div>
 
       <div className="grid content-start gap-4">

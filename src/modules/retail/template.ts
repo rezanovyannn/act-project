@@ -44,5 +44,5 @@ export const RETAIL_TEMPLATE: WorkspaceTemplate = {
   label: "Retail (Toko)",
   accounts: RETAIL_ACCOUNTS,
   inventoryNoun: "barang dagang",
-  salesTaxDefaults: { label: "PPN", rateBps: 0, inclusive: false },
+  salesTaxDefaults: { mode: "simple", label: "PPN", rateBps: 0, inclusive: false, dppNumerator: 1, dppDenominator: 1 },
 };

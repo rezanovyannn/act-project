@@ -137,16 +137,27 @@ export interface ExpenseInput {
   items: AmountItem[];
   /** `expense` (default) atau `purchase` (mis. pembelian bahan baku). */
   source?: "expense" | "purchase";
+  /** PPN Masukan sesuai faktur (mode PPN lengkap, ADR 016); 0/kosong = tanpa PPN. */
+  inputVat?: number;
 }
 
-/** Beban/pembelian: Dr akun rincian, Cr Kas/Bank atau Utang Usaha. */
+/**
+ * Beban/pembelian: Dr akun rincian (harga sebelum PPN), Dr PPN Masukan
+ * (bila ada), Cr Kas/Bank atau Utang Usaha sebesar total.
+ */
 export function buildExpense(input: ExpenseInput, accounts: readonly Account[]): JournalEntryInput {
   const items = requireItems(input.items);
   const counterparty = requireCounterparty(input.payment);
+  const inputVat = input.inputVat ?? 0;
+  if (!Number.isSafeInteger(inputVat) || inputVat < 0) {
+    fail("INVALID_AMOUNT", "PPN Masukan harus bilangan bulat Rupiah tidak negatif");
+  }
   const creditAccountId =
     input.payment.kind === "cash"
       ? input.payment.accountId
       : accountByRole(accounts, "accounts_payable").id;
+  const vatLines: JournalLineInput[] =
+    inputVat > 0 ? [{ accountId: accountByRole(accounts, "input_vat").id, description: "PPN Masukan", debit: inputVat, credit: 0 }] : [];
   return {
     workspaceId: input.workspaceId,
     entryDate: input.entryDate,
@@ -160,7 +171,8 @@ export function buildExpense(input: ExpenseInput, accounts: readonly Account[]):
         debit: item.amount,
         credit: 0,
       })),
-      { accountId: creditAccountId, debit: 0, credit: sum(items.map((i) => i.amount)) },
+      ...vatLines,
+      { accountId: creditAccountId, debit: 0, credit: sum(items.map((i) => i.amount)) + inputVat },
     ],
   };
 }

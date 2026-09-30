@@ -10,7 +10,7 @@ export const routes = {
   ledger: (workspaceId: string) => `/w/${workspaceId}/ledger`,
   reports: (workspaceId: string) => `/w/${workspaceId}/reports`,
   audit: (workspaceId: string) => `/w/${workspaceId}/audit`,
-  settings: (workspaceId: string) => `/w/${workspaceId}/settings`,
+  settings: (workspaceId: string, tab?: string) => `/w/${workspaceId}/settings${tab ? `?tab=${tab}` : ""}`,
   transactions: (workspaceId: string) => `/w/${workspaceId}/transactions`,
   credits: (workspaceId: string) => `/w/${workspaceId}/credits`,
   inventoryPurchases: (workspaceId: string) => `/w/${workspaceId}/inventory/purchases`,

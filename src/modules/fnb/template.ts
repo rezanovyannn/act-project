@@ -41,5 +41,5 @@ export const FNB_TEMPLATE: WorkspaceTemplate = {
   label: "Food & Beverage (F&B)",
   accounts: FNB_ACCOUNTS,
   inventoryNoun: "bahan baku",
-  salesTaxDefaults: { label: "PB1", rateBps: 1000, inclusive: false },
+  salesTaxDefaults: { mode: "simple", label: "PB1", rateBps: 1000, inclusive: false, dppNumerator: 1, dppDenominator: 1 },
 };

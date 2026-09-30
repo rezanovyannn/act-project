@@ -9,15 +9,22 @@ import { BackupTab } from "./backup-tab"
 import { ClosingTab } from "./closing-tab"
 import { OpeningBalanceTab } from "./opening-balance-tab"
 import { PeriodsTab } from "./periods-tab"
+import { TaxTab } from "./tax-tab"
+
+export type SettingsTab = "accounts" | "periods" | "opening" | "tax" | "closing" | "backup"
+const SETTINGS_TABS: readonly SettingsTab[] = ["accounts", "periods", "opening", "tax", "closing", "backup"]
 
 export function SettingsView({
   services,
   workspaceId,
   journalHref,
+  initialTab,
 }: {
   services: AppServices
   workspaceId: string
   journalHref: (entryId: string) => string
+  /** Tab awal, mis. dari `?tab=tax`. */
+  initialTab?: string | null
 }) {
   const data = useLoader(async () => {
     const [workspace, accounts, journals, periods, auditLogs] = await Promise.all([
@@ -37,12 +44,13 @@ export function SettingsView({
 
   return (
     <div className="grid grid-cols-1 gap-6">
-      <PageHeader title="Pengaturan" description="Daftar akun (CoA), periode akuntansi, saldo awal, tutup buku, dan backup data." />
-      <Tabs defaultValue="accounts" className="grid grid-cols-1 gap-4">
+      <PageHeader title="Pengaturan" description="Daftar akun (CoA), periode akuntansi, saldo awal, pajak, tutup buku, dan backup data." />
+      <Tabs defaultValue={SETTINGS_TABS.includes(initialTab as SettingsTab) ? (initialTab as SettingsTab) : "accounts"} className="grid grid-cols-1 gap-4">
         <TabsList className="h-auto w-fit max-w-full flex-wrap">
           <TabsTrigger value="accounts">Daftar Akun</TabsTrigger>
           <TabsTrigger value="periods">Periode</TabsTrigger>
           <TabsTrigger value="opening">Saldo Awal</TabsTrigger>
+          <TabsTrigger value="tax">Pajak</TabsTrigger>
           <TabsTrigger value="closing">Tutup Buku</TabsTrigger>
           <TabsTrigger value="backup">Backup</TabsTrigger>
         </TabsList>
@@ -61,6 +69,9 @@ export function SettingsView({
             journalHref={journalHref}
             onPosted={data.reload}
           />
+        </TabsContent>
+        <TabsContent value="tax">
+          <TaxTab services={services} workspace={workspace} journalHref={journalHref} onSaved={data.reload} />
         </TabsContent>
         <TabsContent value="closing">
           <ClosingTab

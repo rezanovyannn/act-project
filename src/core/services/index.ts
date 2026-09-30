@@ -9,12 +9,14 @@ import type { AccountService } from "./account-service";
 import type { ClosingService } from "./closing-service";
 import type { JournalService } from "./journal-service";
 import type { PeriodService } from "./period-service";
+import type { TaxService } from "./tax-service";
 import type { WorkspaceService } from "./workspace-service";
 
 export { AccountService } from "./account-service";
 export { ClosingService } from "./closing-service";
 export { JournalService } from "./journal-service";
 export { PeriodService } from "./period-service";
+export { TaxService } from "./tax-service";
 export { WorkspaceService } from "./workspace-service";
 
 /**
@@ -29,6 +31,7 @@ export interface AppServices {
   accountService: AccountService;
   periodService: PeriodService;
   closingService: ClosingService;
+  taxService: TaxService;
   auditLogs: IAuditLogRepository;
   workspaces: IWorkspaceRepository;
   accounts: IAccountRepository;

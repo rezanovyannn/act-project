@@ -15,6 +15,7 @@ export default function TransactionsPage() {
       services={services}
       workspaceId={workspaceId}
       journalHref={(entryId) => routes.journal(workspaceId, entryId)}
+      taxSettingsHref={routes.settings(workspaceId, "tax")}
     />
   )
 }

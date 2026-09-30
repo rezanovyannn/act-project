@@ -162,6 +162,9 @@ export function DashboardView({
             <Row label="Piutang usaha" value={summary.receivables} />
             <Row label="Utang usaha" value={summary.payables} />
             <Row label={`${accounts.find((a) => a.systemRole === "sales_tax_payable")?.name ?? "Utang pajak"} (belum disetor)`} value={summary.salesTaxPayable} />
+            {accounts.some((a) => a.systemRole === "input_vat") && (
+              <Row label={`${accounts.find((a) => a.systemRole === "input_vat")!.name} (belum dikreditkan)`} value={summary.inputVat} />
+            )}
           </ul>
         </div>
         <div className="rounded-lg bg-card p-6">

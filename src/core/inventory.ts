@@ -13,9 +13,11 @@ export interface InventoryPurchaseInput {
   description: string
   payment: Payment
   amount: number
+  /** PPN Masukan sesuai faktur (mode PPN lengkap, ADR 016). */
+  inputVat?: number
 }
 
-/** Pembelian persediaan: Dr Persediaan, Cr Kas/Bank atau Utang Usaha. */
+/** Pembelian persediaan: Dr Persediaan (+ Dr PPN Masukan), Cr Kas/Bank atau Utang Usaha. */
 export function buildInventoryPurchase(
   input: InventoryPurchaseInput,
   accounts: readonly Account[],
@@ -27,6 +29,7 @@ export function buildInventoryPurchase(
       description: input.description,
       payment: input.payment,
       source: "purchase",
+      inputVat: input.inputVat,
       items: [
         { accountId: accountByRole(accounts, "inventory").id, amount: input.amount },
       ],

@@ -16,6 +16,7 @@ import type {
 import type { JournalEntryInput, Workspace } from "@/core/types";
 import { FNB_TEMPLATE } from "@/modules/fnb/template";
 import { RETAIL_TEMPLATE } from "@/modules/retail/template";
+import { VAT_ACCOUNT_SEEDS } from "@/core/vat";
 
 export interface ContractRepositories {
   workspaces: IWorkspaceRepository;
@@ -93,12 +94,27 @@ export function describeRepositoryContract(
           deletedAt: null,
         });
         const updated = await repos.workspaces.updateSalesTaxSettings(workspace.id, {
+          mode: "full_vat",
           label: "PPN",
-          rateBps: 500,
+          rateBps: 1200,
           inclusive: true,
+          dppNumerator: 11,
+          dppDenominator: 12,
         });
-        expect(updated).toMatchObject({ salesTaxLabel: "PPN", salesTaxRateBps: 500, salesTaxInclusive: true });
-        expect(await repos.accounts.listByWorkspace(workspace.id)).toHaveLength(FNB_TEMPLATE.accounts.length);
+        expect(updated).toMatchObject({
+          salesTaxMode: "full_vat",
+          salesTaxLabel: "PPN",
+          salesTaxRateBps: 1200,
+          salesTaxInclusive: true,
+          vatDppNumerator: 11,
+          vatDppDenominator: 12,
+        });
+        const full = { mode: "full_vat" as const, label: "PPN" as const, rateBps: 1200, inclusive: false, dppNumerator: 11, dppDenominator: 12 };
+        await expectCode(repos.workspaces.updateSalesTaxSettings(workspace.id, { ...full, label: "PB1" }), "INVALID_TAX_LABEL");
+        await expectCode(repos.workspaces.updateSalesTaxSettings(workspace.id, { ...full, dppNumerator: 13 }), "INVALID_AMOUNT");
+        const inputVat = await repos.accounts.create(workspace.id, VAT_ACCOUNT_SEEDS[0]);
+        expect(inputVat).toMatchObject({ code: "1-1500", systemRole: "input_vat", accountType: "asset" });
+        expect(await repos.accounts.listByWorkspace(workspace.id)).toHaveLength(FNB_TEMPLATE.accounts.length + 1);
         const periods = await repos.periods.listByWorkspace(workspace.id);
         expect(periods).toHaveLength(12);
         expect(periods.every((p) => p.status === "open")).toBe(true);

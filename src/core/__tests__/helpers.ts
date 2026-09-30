@@ -2,6 +2,7 @@ import { AccountService } from "@/core/services/account-service";
 import { ClosingService } from "@/core/services/closing-service";
 import { JournalService } from "@/core/services/journal-service";
 import { PeriodService } from "@/core/services/period-service";
+import { TaxService } from "@/core/services/tax-service";
 import { WorkspaceService } from "@/core/services/workspace-service";
 import type { Account, JournalEntryInput, JournalLineInput } from "@/core/types";
 import { FNB_TEMPLATE } from "@/modules/fnb/template";
@@ -27,11 +28,13 @@ export function createTestEnv(seed: () => MockState = emptyMockState) {
     now: () => new Date(Date.UTC(2026, 0, 1) + ++tick * 1000).toISOString(),
   });
   const repos = createMockRepositories(db);
+  const journalService = new JournalService(repos);
   return {
     db,
     storage,
     repos,
-    journalService: new JournalService(repos),
+    journalService,
+    taxService: new TaxService({ ...repos, journalService }),
     accountService: new AccountService(repos),
     periodService: new PeriodService(repos),
     closingService: new ClosingService(repos),

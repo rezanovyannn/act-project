@@ -1,7 +1,6 @@
 import { isValidIsoDate } from "../dates";
 import { assertNoIssues, fail } from "../errors";
 import { monthlyPeriodsUntilYearEnd } from "../periods";
-import { isValidTaxRate, SALES_TAX_LABELS, type WorkspaceTaxSettings } from "../sales-tax";
 import type { IWorkspaceRepository, NewWorkspace } from "../ports";
 import { validateTemplate } from "../templates";
 import type { TemplateRegistry, TemplateType, Workspace, WorkspaceTemplate } from "../types";
@@ -47,16 +46,5 @@ export class WorkspaceService {
       template.accounts,
       monthlyPeriodsUntilYearEnd(input.booksStartDate),
     );
-  }
-
-  /** Nama, tarif & mode harga pajak penjualan per workspace (ADR 012 & 015). */
-  async updateSalesTaxSettings(workspaceId: string, settings: WorkspaceTaxSettings): Promise<Workspace> {
-    if (!isValidTaxRate(settings.rateBps)) {
-      fail("INVALID_AMOUNT", "Tarif pajak harus antara 0% dan 100%");
-    }
-    if (!SALES_TAX_LABELS.includes(settings.label)) {
-      fail("INVALID_TAX_LABEL", "Jenis pajak penjualan harus PB1 atau PPN");
-    }
-    return this.deps.workspaces.updateSalesTaxSettings(workspaceId, settings);
   }
 }

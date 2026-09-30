@@ -1,7 +1,7 @@
 import { fail } from "@/core/errors";
 import type { PeriodRange } from "@/core/periods";
 import type { IWorkspaceRepository, NewWorkspace } from "@/core/ports";
-import type { WorkspaceTaxSettings } from "@/core/sales-tax";
+import { assertValidTaxSettings, type WorkspaceTaxSettings } from "@/core/sales-tax";
 import type { AccountSeed, Workspace } from "@/core/types";
 import type { MockDatabase } from "./mock-database";
 
@@ -36,6 +36,9 @@ export class MockWorkspaceRepository implements IWorkspaceRepository {
         salesTaxLabel: input.salesTax.label,
         salesTaxRateBps: input.salesTax.rateBps,
         salesTaxInclusive: input.salesTax.inclusive,
+        salesTaxMode: input.salesTax.mode,
+        vatDppNumerator: input.salesTax.dppNumerator,
+        vatDppDenominator: input.salesTax.dppDenominator,
         createdAt: now,
         updatedAt: now,
         deletedAt: null,
@@ -89,8 +92,12 @@ export class MockWorkspaceRepository implements IWorkspaceRepository {
     return this.db.write((state) => {
       const workspace = state.workspaces.find((w) => w.id === id && w.deletedAt === null);
       if (!workspace) fail("NOT_FOUND", "Workspace tidak ditemukan");
+      assertValidTaxSettings(settings);
       const before = { ...workspace };
       workspace.salesTaxLabel = settings.label;
+      workspace.salesTaxMode = settings.mode;
+      workspace.vatDppNumerator = settings.dppNumerator;
+      workspace.vatDppDenominator = settings.dppDenominator;
       workspace.salesTaxRateBps = settings.rateBps;
       workspace.salesTaxInclusive = settings.inclusive;
       workspace.updatedAt = this.db.now();

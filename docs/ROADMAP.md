@@ -111,7 +111,7 @@ Dipecah menjadi tiga sub-fase (ADR 015); stop & review setelah tiap sub-fase.
 - **Kriteria Selesai (Stop & Review):** Workspace Retail berhasil dibuat dengan modul dan CoA yang terisolasi dari F&B.
 
 ### Sub-fase 4B: Mode PPN Lengkap
-- **Pekerjaan:** Pilihan mode pajak di Pengaturan (generik PB1/PPN atau PPN lengkap): PPN Keluaran pada penjualan, PPN Masukan pada pembelian, setoran = selisihnya. Berlaku untuk semua template, dapat diubah kapan saja. Aturan akuntansi rinci (tarif/DPP, lebih bayar, transisi mode) ditanyakan ke user sebelum dikerjakan lalu dicatat di ADR.
+- **Pekerjaan (ADR 016):** Tab Pengaturan → Pajak: mode sederhana (PB1/PPN) atau PPN lengkap dengan DPP pecahan (awal 11/12 × 12%). PPN Keluaran pada penjualan, PPN Masukan pada beban & pembelian persediaan (dihitung, bisa dikoreksi), setoran per masa otomatis dari saldo (lebih bayar dikompensasikan). Ganti mode: berlaku ke depan saja atau jurnal transisi (saldo PPN Masukan dibebankan).
 - **Kriteria Selesai (Stop & Review):** Transaksi PPN lengkap menghasilkan jurnal yang benar dan teruji unit test; laporan tetap memenuhi invarian 1D.
 
 ### Sub-fase 4C: Persediaan Perpetual per Barang
@@ -139,3 +139,8 @@ Dipecah menjadi tiga sub-fase (ADR 015); stop & review setelah tiap sub-fase.
 | 14 | Pajak penjualan Retail | Label generik PB1/PPN (4A, default Retail PPN 0%) dan mode PPN lengkap (4B) | ADR 015 |
 | 15 | Akun tambahan CoA Retail | Retur & Potongan Penjualan, Beban Angkut Pembelian, Beban Kemasan; akun template dapat ditambahkan dari Pengaturan | ADR 015 |
 | 16 | Tata letak kode persediaan | Logika umum di `src/core/inventory.ts`, UI modul `inventory` | ADR 015 |
+| 17 | DPP PPN | Diatur di Pengaturan (pecahan), awal 11/12 × tarif 12% | ADR 016 |
+| 18 | Lebih bayar PPN | Dikompensasikan ke masa berikutnya | ADR 016 |
+| 19 | Cakupan PPN Masukan | Semua pembelian & beban; nominal dihitung, bisa dikoreksi sesuai faktur | ADR 016 |
+| 20 | Ganti mode pajak | Pilihan di Pengaturan: berlaku ke depan saja, atau jurnal transisi yang membebankan saldo PPN Masukan | ADR 016 |
+| 21 | Setoran PPN | Otomatis dari saldo per akhir masa, bisa dikoreksi | ADR 016 |

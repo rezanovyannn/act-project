@@ -9,6 +9,7 @@ import { AccountService } from "@/core/services/account-service";
 import { ClosingService } from "@/core/services/closing-service";
 import { JournalService } from "@/core/services/journal-service";
 import { PeriodService } from "@/core/services/period-service";
+import { TaxService } from "@/core/services/tax-service";
 import { WorkspaceService } from "@/core/services/workspace-service";
 import type { TemplateRegistry } from "@/core/types";
 import { buildFnbMockState, MOCK_OWNER_ID } from "@/mocks/fnb/dataset";
@@ -30,17 +31,19 @@ export interface Container extends AppServices {
   resetMockData?: () => void;
 }
 
-type Repositories = Omit<AppServices, "ownerId" | "workspaceService" | "journalService" | "accountService" | "periodService" | "closingService">;
+type Repositories = Omit<AppServices, "ownerId" | "workspaceService" | "journalService" | "accountService" | "periodService" | "closingService" | "taxService">;
 
 function buildServices(repositories: Repositories, ownerId: string): AppServices {
+  const journalService = new JournalService(repositories);
   return {
     ...repositories,
     ownerId,
     workspaceService: new WorkspaceService({ workspaces: repositories.workspaces, templates: TEMPLATES }),
-    journalService: new JournalService(repositories),
+    journalService,
     accountService: new AccountService(repositories),
     periodService: new PeriodService(repositories),
     closingService: new ClosingService(repositories),
+    taxService: new TaxService({ ...repositories, journalService }),
   };
 }
 

@@ -21,6 +21,8 @@ export interface DashboardSummary {
   receivables: number;
   payables: number;
   salesTaxPayable: number;
+  /** Saldo PPN Masukan yang belum dikreditkan (mode PPN lengkap, ADR 016). */
+  inputVat: number;
   draftCount: number;
   postedCount: number;
   /**
@@ -94,6 +96,7 @@ export function computeDashboardSummary(
     receivables: byRole("accounts_receivable"),
     payables: byRole("accounts_payable"),
     salesTaxPayable: byRole("sales_tax_payable"),
+    inputVat: byRole("input_vat"),
     draftCount: entries.filter((e) => e.status === "draft" && e.deletedAt === null).length,
     postedCount: postedInPeriod.length,
     cogsPending: !hasOpname && (revenue > 0 || hasInventoryActivity),

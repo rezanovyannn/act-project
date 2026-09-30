@@ -2,11 +2,14 @@
 
 import { useState } from "react"
 import { capitalizeWords, todayIsoDate } from "@/core/format"
+import { formatTaxSettings, type WorkspaceTaxSettings } from "@/core/sales-tax"
 import type { AppServices } from "@/core/services"
+import { computeInputVat, workspaceTaxSettings } from "@/core/vat"
 import type { Account, JournalEntry, JournalEntryInput } from "@/core/types"
 import { AmountInput } from "@/components/ui/amount-input"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
+import { InputVatField } from "@/components/ui/input-vat-field"
 import { JournalPreview, PostedNotice } from "@/components/ui/journal-preview"
 import { Label } from "@/components/ui/label"
 import { LoadingState, PageHeader } from "@/components/ui/page-header"
@@ -32,12 +35,17 @@ export function PurchaseView({
       services.journals.listByWorkspace(workspaceId),
     ])
     if (!workspace) throw new Error("Workspace tidak ditemukan")
-    return { noun: services.workspaceService.templateOf(workspace.templateType).inventoryNoun, accounts, journals }
+    return {
+      noun: services.workspaceService.templateOf(workspace.templateType).inventoryNoun,
+      taxSettings: workspaceTaxSettings(workspace),
+      accounts,
+      journals,
+    }
   }, [services, workspaceId])
 
   if (data.loading && !data.data) return <LoadingState />
   if (data.error) return <p role="alert" className="text-sm text-destructive">{errorMessage(data.error)}</p>
-  const { noun, accounts, journals } = data.data!
+  const { noun, taxSettings, accounts, journals } = data.data!
   const inventoryName = accounts.find((a) => a.systemRole === "inventory")?.name ?? "Persediaan"
   const suppliers = [...new Set(journals.filter((j) => j.source === "purchase").map((j) => j.counterparty).filter(Boolean) as string[])]
 
@@ -52,6 +60,7 @@ export function PurchaseView({
         workspaceId={workspaceId}
         accounts={accounts}
         noun={noun}
+        taxSettings={taxSettings}
         suppliers={suppliers}
         journalHref={journalHref}
         onPosted={data.reload}
@@ -65,6 +74,7 @@ function PurchaseForm({
   workspaceId,
   accounts,
   noun,
+  taxSettings,
   suppliers,
   journalHref,
   onPosted,
@@ -73,6 +83,7 @@ function PurchaseForm({
   workspaceId: string
   accounts: Account[]
   noun: string
+  taxSettings: WorkspaceTaxSettings
   suppliers: string[]
   journalHref: (entryId: string) => string
   onPosted: () => void
@@ -82,13 +93,19 @@ function PurchaseForm({
   const [description, setDescription] = useState(`Pembelian ${noun}`)
   const [payment, setPayment] = useState<PaymentState>(() => initialPayment(cashAccounts))
   const [amount, setAmount] = useState<number | null>(0)
+  const [vatEnabled, setVatEnabled] = useState(false)
+  const [vatOverride, setVatOverride] = useState<number | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [posted, setPosted] = useState<JournalEntry | null>(null)
   const [saving, setSaving] = useState(false)
 
+  const fullVat = taxSettings.mode === "full_vat"
+  const suggestedVat = fullVat ? computeInputVat(amount ?? 0, taxSettings) : 0
+  const inputVat = fullVat && vatEnabled ? (vatOverride ?? suggestedVat) : 0
+
   const build = (): JournalEntryInput =>
     buildInventoryPurchase(
-      { workspaceId, entryDate, description, payment: toPayment(payment), amount: amount ?? 0 },
+      { workspaceId, entryDate, description, payment: toPayment(payment), amount: amount ?? 0, inputVat },
       accounts,
     )
   let preview: JournalEntryInput | null = null
@@ -106,6 +123,7 @@ function PurchaseForm({
       const entry = await services.journalService.postJournal(build())
       setPosted(entry)
       setAmount(0)
+      setVatOverride(null)
       setPayment((p) => ({ ...p, counterparty: "" }))
       onPosted()
     } catch (e) {
@@ -137,9 +155,20 @@ function PurchaseForm({
           counterpartySuggestions={suppliers}
         />
         <div className="grid gap-2 sm:max-w-xs">
-          <Label htmlFor="purchase-amount">Total pembelian</Label>
+          <Label htmlFor="purchase-amount">{fullVat ? "Total pembelian (sebelum PPN)" : "Total pembelian"}</Label>
           <AmountInput id="purchase-amount" value={amount} onValueChange={setAmount} />
         </div>
+        {fullVat && (
+          <InputVatField
+            id="purchase-vat"
+            enabled={vatEnabled}
+            onEnabledChange={setVatEnabled}
+            suggested={suggestedVat}
+            override={vatOverride}
+            onOverrideChange={setVatOverride}
+            rateLabel={formatTaxSettings(taxSettings)}
+          />
+        )}
       </div>
       <div className="grid content-start gap-4">
         <JournalPreview lines={preview?.lines ?? []} accounts={accounts} />

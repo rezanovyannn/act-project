@@ -8,7 +8,7 @@ export type IsoDate = string;
 /** Timestamp ISO 8601 lengkap. */
 export type IsoTimestamp = string;
 
-import type { SalesTaxLabel, WorkspaceTaxSettings } from "./sales-tax";
+import type { SalesTaxLabel, SalesTaxMode, WorkspaceTaxSettings } from "./sales-tax";
 
 export type TemplateType = "fnb" | "retail";
 export type Currency = "IDR";
@@ -35,7 +35,9 @@ export type SystemRole =
   | "accounts_receivable"
   | "accounts_payable"
   | "sales_tax_payable"
-  | "income_summary";
+  | "income_summary"
+  | "input_vat"
+  | "non_creditable_vat";
 
 export type PeriodStatus = "open" | "closed";
 
@@ -66,6 +68,11 @@ export interface Workspace {
   salesTaxRateBps: number;
   /** `true` bila harga jual sudah termasuk pajak. */
   salesTaxInclusive: boolean;
+  /** Mode pajak: sederhana atau PPN lengkap (ADR 016). */
+  salesTaxMode: SalesTaxMode;
+  /** DPP PPN sebagai pecahan (mis. 11/12), dipakai pada mode PPN lengkap. */
+  vatDppNumerator: number;
+  vatDppDenominator: number;
   createdAt: IsoTimestamp;
   updatedAt: IsoTimestamp;
   deletedAt: IsoTimestamp | null;

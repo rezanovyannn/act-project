@@ -1,22 +1,68 @@
 /**
- * Pajak penjualan (PB1/PPN sederhana) dengan aritmetika integer (ADR 005 & 012).
- * Tarif dalam basis poin: 1000 = 10%. Pembulatan ke Rupiah terdekat,
- * setengah ke atas, sekali per transaksi.
+ * Pajak penjualan (PB1/PPN) dengan aritmetika integer (ADR 005, 012, 015 & 016).
+ * Tarif dalam basis poin: 1000 = 10%. DPP berupa pecahan (mis. 11/12).
+ * Pembulatan ke Rupiah terdekat, setengah ke atas, sekali per transaksi.
  */
 import { fail } from "./errors";
 
 export interface SalesTaxSettings {
   rateBps: number;
   inclusive: boolean;
+  /** DPP = harga × pembilang / penyebut (ADR 016). Default 1/1. */
+  dppNumerator?: number;
+  dppDenominator?: number;
 }
 
 /** Nama pajak penjualan yang tampil di UI & akun (ADR 015). Mekanismenya sama. */
 export type SalesTaxLabel = "PB1" | "PPN";
 export const SALES_TAX_LABELS: readonly SalesTaxLabel[] = ["PB1", "PPN"];
 
+/** `simple`: pajak keluaran saja (PB1/PPN); `full_vat`: PPN Keluaran & Masukan (ADR 016). */
+export type SalesTaxMode = "simple" | "full_vat";
+
 /** Pengaturan pajak penjualan per workspace. */
-export interface WorkspaceTaxSettings extends SalesTaxSettings {
+export interface WorkspaceTaxSettings {
+  mode: SalesTaxMode;
   label: SalesTaxLabel;
+  rateBps: number;
+  inclusive: boolean;
+  /** DPP pecahan, hanya dipakai pada mode `full_vat`. */
+  dppNumerator: number;
+  dppDenominator: number;
+}
+
+/** Nilai awal saat mode PPN lengkap dipilih: DPP 11/12 × 12% (ADR 016). */
+export const FULL_VAT_DEFAULTS = { rateBps: 1200, dppNumerator: 11, dppDenominator: 12 } as const;
+
+export const MAX_DPP_DENOMINATOR = 1000;
+
+/** Memeriksa pengaturan pajak workspace; melempar AccountingError bila tidak valid. */
+export function assertValidTaxSettings(settings: WorkspaceTaxSettings): void {
+  if (!isValidTaxRate(settings.rateBps)) {
+    fail("INVALID_AMOUNT", "Tarif pajak harus antara 0% dan 100%");
+  }
+  if (!SALES_TAX_LABELS.includes(settings.label)) {
+    fail("INVALID_TAX_LABEL", "Jenis pajak penjualan harus PB1 atau PPN");
+  }
+  if (settings.mode !== "simple" && settings.mode !== "full_vat") {
+    fail("INVALID_TAX_LABEL", "Mode pajak tidak dikenal");
+  }
+  if (settings.mode === "full_vat" && settings.label !== "PPN") {
+    fail("INVALID_TAX_LABEL", "Mode PPN lengkap hanya untuk pajak berlabel PPN");
+  }
+  const { dppNumerator: num, dppDenominator: den } = settings;
+  if (!Number.isSafeInteger(num) || !Number.isSafeInteger(den) || num < 1 || den < 1 || num > den || den > MAX_DPP_DENOMINATOR) {
+    fail("INVALID_AMOUNT", `DPP harus pecahan bulat 1–${MAX_DPP_DENOMINATOR} dengan pembilang ≤ penyebut (mis. 11/12)`);
+  }
+}
+
+/** Pengaturan hitung pajak yang berlaku untuk workspace (DPP hanya pada mode PPN lengkap). */
+export function effectiveTaxSettings(settings: WorkspaceTaxSettings): SalesTaxSettings {
+  return {
+    rateBps: settings.rateBps,
+    inclusive: settings.inclusive,
+    ...(settings.mode === "full_vat" ? { dppNumerator: settings.dppNumerator, dppDenominator: settings.dppDenominator } : {}),
+  };
 }
 
 export interface SalesTaxResult {
@@ -58,9 +104,9 @@ function toSafeNumber(value: bigint): number {
 }
 
 /**
- * Menghitung PB1 dari `amount`:
- * - harga belum termasuk PB1: `amount` = dasar, pajak ditambahkan;
- * - harga sudah termasuk PB1: `amount` = total, dasar dihitung mundur.
+ * Menghitung pajak dari `amount` (ADR 012 & 016):
+ * - harga belum termasuk pajak: `amount` = dasar, pajak = dasar × DPP × tarif;
+ * - harga sudah termasuk pajak: `amount` = total, dasar dihitung mundur.
  */
 export function computeSalesTax(amount: number, settings: SalesTaxSettings): SalesTaxResult {
   if (!Number.isSafeInteger(amount) || amount < 0) {
@@ -69,14 +115,32 @@ export function computeSalesTax(amount: number, settings: SalesTaxSettings): Sal
   if (!isValidTaxRate(settings.rateBps)) {
     fail("INVALID_AMOUNT", "Tarif pajak harus 0–100% (0–10.000 basis poin)");
   }
+  const num = settings.dppNumerator ?? 1;
+  const den = settings.dppDenominator ?? 1;
+  if (!Number.isSafeInteger(num) || !Number.isSafeInteger(den) || num < 1 || den < 1 || num > den) {
+    fail("INVALID_AMOUNT", "DPP harus pecahan bulat dengan pembilang ≤ penyebut");
+  }
   const value = BigInt(amount);
-  const rate = BigInt(settings.rateBps);
+  // Pajak = dasar × (pembilang × tarif) / (penyebut × 10.000).
+  const taxNum = BigInt(num) * BigInt(settings.rateBps);
+  const taxDen = BigInt(den) * BPS;
   if (settings.inclusive) {
-    const base = toSafeNumber(divideRoundHalfUp(value * BPS, BPS + rate));
+    const base = toSafeNumber(divideRoundHalfUp(value * taxDen, taxDen + taxNum));
     return { base, tax: amount - base, total: amount };
   }
-  const tax = toSafeNumber(divideRoundHalfUp(value * rate, BPS));
+  const tax = toSafeNumber(divideRoundHalfUp(value * taxNum, taxDen));
   return { base: amount, tax, total: toSafeNumber(value + BigInt(tax)) };
+}
+
+/** `11/12` → `"DPP 11/12"`; DPP penuh → `""`. */
+export function formatDpp(numerator: number, denominator: number): string {
+  return numerator === denominator ? "" : `DPP ${numerator}/${denominator}`;
+}
+
+/** Ringkasan tarif pengaturan pajak: `"PB1 10%"`, `"PPN 12% × DPP 11/12"`. */
+export function formatTaxSettings(settings: WorkspaceTaxSettings): string {
+  const dpp = settings.mode === "full_vat" ? formatDpp(settings.dppNumerator, settings.dppDenominator) : "";
+  return `${settings.label} ${formatTaxRate(settings.rateBps)}${dpp ? ` × ${dpp}` : ""}`;
 }
 
 /** `1000` → `"10%"`, `1050` → `"10,5%"`. */

@@ -82,12 +82,7 @@ export class SupabaseWorkspaceRepository implements IWorkspaceRepository {
 
   async updateSalesTaxSettings(id: string, settings: WorkspaceTaxSettings): Promise<Workspace> {
     await unwrap(
-      this.client.rpc("update_workspace_tax_settings", {
-        p_id: id,
-        p_rate_bps: settings.rateBps,
-        p_inclusive: settings.inclusive,
-        p_label: settings.label,
-      }),
+      this.client.rpc("update_workspace_tax_settings", { p_id: id, p_settings: settings }),
     );
     return required(await this.getById(id), "Workspace");
   }
