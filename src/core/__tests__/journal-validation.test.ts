@@ -158,7 +158,7 @@ describe("validateTemplate", () => {
   it("menolak kode duplikat, peran ganda, dan peran wajib yang hilang", () => {
     const [kas, bank] = FNB_TEMPLATE.accounts;
     const issues = validateTemplate({
-      type: "fnb",
+      ...FNB_TEMPLATE,
       label: "Rusak",
       accounts: [kas, { ...bank, code: kas.code }, { ...bank, code: "x", systemRole: "cogs" }, { ...bank, code: "y", systemRole: "cogs" }],
     });

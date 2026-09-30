@@ -8,7 +8,7 @@ export const FNB_ACCOUNTS: AccountSeed[] = [
   // Aset
   { code: "1-1100", name: "Kas", accountType: "asset", normalBalance: "debit", cashFlowCategory: "none", isCash: true, systemRole: null },
   { code: "1-1200", name: "Bank", accountType: "asset", normalBalance: "debit", cashFlowCategory: "none", isCash: true, systemRole: null },
-  { code: "1-1300", name: "Persediaan Bahan Baku", accountType: "asset", normalBalance: "debit", cashFlowCategory: "operating", isCash: false, systemRole: "raw_material_inventory" },
+  { code: "1-1300", name: "Persediaan Bahan Baku", accountType: "asset", normalBalance: "debit", cashFlowCategory: "operating", isCash: false, systemRole: "inventory" },
   { code: "1-1400", name: "Piutang Usaha", accountType: "asset", normalBalance: "debit", cashFlowCategory: "operating", isCash: false, systemRole: "accounts_receivable" },
   { code: "1-2100", name: "Peralatan Dapur", accountType: "asset", normalBalance: "debit", cashFlowCategory: "investing", isCash: false, systemRole: null },
   { code: "1-2190", name: "Akumulasi Penyusutan Peralatan", accountType: "asset", normalBalance: "credit", cashFlowCategory: "investing", isCash: false, systemRole: null },
@@ -40,4 +40,6 @@ export const FNB_TEMPLATE: WorkspaceTemplate = {
   type: "fnb",
   label: "Food & Beverage (F&B)",
   accounts: FNB_ACCOUNTS,
+  inventoryNoun: "bahan baku",
+  salesTaxDefaults: { label: "PB1", rateBps: 1000, inclusive: false },
 };

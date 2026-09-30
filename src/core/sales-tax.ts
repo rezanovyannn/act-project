@@ -1,5 +1,5 @@
 /**
- * Pajak penjualan (PB1) dengan aritmetika integer (ADR 005 & 012).
+ * Pajak penjualan (PB1/PPN sederhana) dengan aritmetika integer (ADR 005 & 012).
  * Tarif dalam basis poin: 1000 = 10%. Pembulatan ke Rupiah terdekat,
  * setengah ke atas, sekali per transaksi.
  */
@@ -8,6 +8,15 @@ import { fail } from "./errors";
 export interface SalesTaxSettings {
   rateBps: number;
   inclusive: boolean;
+}
+
+/** Nama pajak penjualan yang tampil di UI & akun (ADR 015). Mekanismenya sama. */
+export type SalesTaxLabel = "PB1" | "PPN";
+export const SALES_TAX_LABELS: readonly SalesTaxLabel[] = ["PB1", "PPN"];
+
+/** Pengaturan pajak penjualan per workspace. */
+export interface WorkspaceTaxSettings extends SalesTaxSettings {
+  label: SalesTaxLabel;
 }
 
 export interface SalesTaxResult {

@@ -52,6 +52,7 @@ export function SaleForm({
         items: toAmountItems(items),
         applyTax,
         tax: taxSettings,
+        taxLabel: workspace.salesTaxLabel,
       },
       accounts,
     )
@@ -102,7 +103,7 @@ export function SaleForm({
           counterpartySuggestions={counterpartyNames(journals)}
         />
         <AmountItemsField
-          label={workspace.salesTaxInclusive && applyTax ? "Rincian penjualan (harga termasuk PB1)" : "Rincian penjualan"}
+          label={workspace.salesTaxInclusive && applyTax ? `Rincian penjualan (harga termasuk ${workspace.salesTaxLabel})` : "Rincian penjualan"}
           accounts={revenueAccounts}
           items={items}
           onChange={setItems}
@@ -110,9 +111,9 @@ export function SaleForm({
         <label className="flex items-center gap-3 text-sm">
           <Switch checked={applyTax} onCheckedChange={setApplyTax} disabled={workspace.salesTaxRateBps === 0} />
           <span>
-            Kenakan PB1 {formatTaxRate(workspace.salesTaxRateBps)} ·{" "}
+            Kenakan {workspace.salesTaxLabel} {formatTaxRate(workspace.salesTaxRateBps)} ·{" "}
             <span className="text-muted-foreground">
-              harga {workspace.salesTaxInclusive ? "sudah" : "belum"} termasuk PB1
+              harga {workspace.salesTaxInclusive ? "sudah" : "belum"} termasuk {workspace.salesTaxLabel}
             </span>
           </span>
         </label>
@@ -125,7 +126,7 @@ export function SaleForm({
             <dd><Amount value={preview?.base ?? 0} /></dd>
           </div>
           <div className="flex justify-between">
-            <dt className="text-muted-foreground">PB1</dt>
+            <dt className="text-muted-foreground">{workspace.salesTaxLabel}</dt>
             <dd><Amount value={preview?.tax ?? 0} /></dd>
           </div>
           <div className="flex justify-between border-t pt-2 font-bold text-ink">

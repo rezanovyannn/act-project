@@ -15,7 +15,7 @@ Web app akuntansi pribadi multi-workspace untuk freelance (fokus: F&B) berbasis 
   - `src/lib/container.ts`: Satu-satunya titik konfigurasi Dependency Injection (memilih mock atau Supabase).
   - `src/mocks/`: Data simulasi F&B dua tahun (termasuk akun Prive), seimbang, disertai fixture hasil laporan yang dihitung manual.
   - `supabase/migrations/`: Skrip skema DB, RLS, constraint, trigger, Postgres RPC.
-- Model data jurnal & akun: lihat `docs/adr/011-journal-and-account-data-model.md`. PB1 & transaksi kredit: `docs/adr/012-pb1-and-credit-transactions.md`.
+- Model data jurnal & akun: lihat `docs/adr/011-journal-and-account-data-model.md`. PB1 & transaksi kredit: `docs/adr/012-pb1-and-credit-transactions.md`. Template Retail & modularitas: `docs/adr/015-retail-template-and-modularity.md`.
 - Desain UI: ikuti `docs/DESIGN_SYSTEM.md`.
 
 ## Prinsip Akuntansi Inti

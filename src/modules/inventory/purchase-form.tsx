@@ -1,7 +1,7 @@
 "use client"
 
 import { useState } from "react"
-import { todayIsoDate } from "@/core/format"
+import { capitalizeWords, todayIsoDate } from "@/core/format"
 import type { AppServices } from "@/core/services"
 import type { Account, JournalEntry, JournalEntryInput } from "@/core/types"
 import { AmountInput } from "@/components/ui/amount-input"
@@ -12,9 +12,10 @@ import { Label } from "@/components/ui/label"
 import { LoadingState, PageHeader } from "@/components/ui/page-header"
 import { PaymentField, initialPayment, toPayment, type PaymentState } from "@/components/ui/payment-field"
 import { errorMessage, useLoader } from "@/lib/utils"
-import { buildRawMaterialPurchase } from "./transactions"
+import { buildInventoryPurchase } from "@/core/inventory"
 
-/** Pembelian bahan baku (tunai/kredit) ke Persediaan Bahan Baku (ADR 007). */
+
+/** Pembelian persediaan (tunai/kredit) ke akun persediaan, semua template (ADR 007 & 015). */
 export function PurchaseView({
   services,
   workspaceId,
@@ -25,28 +26,32 @@ export function PurchaseView({
   journalHref: (entryId: string) => string
 }) {
   const data = useLoader(async () => {
-    const [accounts, journals] = await Promise.all([
+    const [workspace, accounts, journals] = await Promise.all([
+      services.workspaces.getById(workspaceId),
       services.accounts.listByWorkspace(workspaceId),
       services.journals.listByWorkspace(workspaceId),
     ])
-    return { accounts, journals }
+    if (!workspace) throw new Error("Workspace tidak ditemukan")
+    return { noun: services.workspaceService.templateOf(workspace.templateType).inventoryNoun, accounts, journals }
   }, [services, workspaceId])
 
   if (data.loading && !data.data) return <LoadingState />
   if (data.error) return <p role="alert" className="text-sm text-destructive">{errorMessage(data.error)}</p>
-  const { accounts, journals } = data.data!
+  const { noun, accounts, journals } = data.data!
+  const inventoryName = accounts.find((a) => a.systemRole === "inventory")?.name ?? "Persediaan"
   const suppliers = [...new Set(journals.filter((j) => j.source === "purchase").map((j) => j.counterparty).filter(Boolean) as string[])]
 
   return (
     <div className="grid grid-cols-1 gap-6">
       <PageHeader
-        title="Pembelian Bahan Baku"
-        description="Dicatat sebagai Persediaan Bahan Baku (aset). HPP diakui saat stok opname akhir periode."
+        title={`Pembelian ${capitalizeWords(noun)}`}
+        description={`Dicatat sebagai ${inventoryName} (aset). HPP diakui saat stok opname akhir periode.`}
       />
       <PurchaseForm
         services={services}
         workspaceId={workspaceId}
         accounts={accounts}
+        noun={noun}
         suppliers={suppliers}
         journalHref={journalHref}
         onPosted={data.reload}
@@ -59,6 +64,7 @@ function PurchaseForm({
   services,
   workspaceId,
   accounts,
+  noun,
   suppliers,
   journalHref,
   onPosted,
@@ -66,13 +72,14 @@ function PurchaseForm({
   services: AppServices
   workspaceId: string
   accounts: Account[]
+  noun: string
   suppliers: string[]
   journalHref: (entryId: string) => string
   onPosted: () => void
 }) {
   const cashAccounts = accounts.filter((a) => a.isCash && a.isActive)
   const [entryDate, setEntryDate] = useState(todayIsoDate)
-  const [description, setDescription] = useState("Pembelian bahan baku")
+  const [description, setDescription] = useState(`Pembelian ${noun}`)
   const [payment, setPayment] = useState<PaymentState>(() => initialPayment(cashAccounts))
   const [amount, setAmount] = useState<number | null>(0)
   const [error, setError] = useState<string | null>(null)
@@ -80,7 +87,7 @@ function PurchaseForm({
   const [saving, setSaving] = useState(false)
 
   const build = (): JournalEntryInput =>
-    buildRawMaterialPurchase(
+    buildInventoryPurchase(
       { workspaceId, entryDate, description, payment: toPayment(payment), amount: amount ?? 0 },
       accounts,
     )

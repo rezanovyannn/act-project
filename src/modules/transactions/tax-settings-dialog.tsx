@@ -3,7 +3,7 @@
 import { useState } from "react"
 import { SettingsIcon } from "lucide-react"
 import { toast } from "sonner"
-import { formatTaxRate, parseTaxRatePercent } from "@/core/sales-tax"
+import { formatTaxRate, parseTaxRatePercent, SALES_TAX_LABELS, type SalesTaxLabel } from "@/core/sales-tax"
 import type { AppServices } from "@/core/services"
 import type { Workspace } from "@/core/types"
 import { Button } from "@/components/ui/button"
@@ -18,10 +18,22 @@ import {
 } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
 import { Switch } from "@/components/ui/switch"
 import { errorMessage } from "@/lib/utils"
 
-/** Tarif & mode harga PB1 workspace (ADR 012). */
+const LABEL_HINTS: Record<SalesTaxLabel, string> = {
+  PB1: "PB1/PBJT restoran; tarif ditetapkan per daerah, umumnya 10%.",
+  PPN: "PPN untuk pengusaha kena pajak (PKP); isi 0% bila belum PKP. PPN Masukan belum dicatat terpisah.",
+}
+
+/** Jenis, tarif & mode harga pajak penjualan workspace (ADR 012 & 015). */
 export function TaxSettingsDialog({
   services,
   workspace,
@@ -34,12 +46,14 @@ export function TaxSettingsDialog({
   const [open, setOpen] = useState(false)
   const [rateText, setRateText] = useState("")
   const [inclusive, setInclusive] = useState(workspace.salesTaxInclusive)
+  const [label, setLabel] = useState<SalesTaxLabel>(workspace.salesTaxLabel)
   const [error, setError] = useState<string | null>(null)
 
   function openChange(next: boolean) {
     if (next) {
       setRateText(formatTaxRate(workspace.salesTaxRateBps).replace("%", ""))
       setInclusive(workspace.salesTaxInclusive)
+      setLabel(workspace.salesTaxLabel)
       setError(null)
     }
     setOpen(next)
@@ -53,8 +67,8 @@ export function TaxSettingsDialog({
       return
     }
     try {
-      await services.workspaceService.updateSalesTaxSettings(workspace.id, { rateBps, inclusive })
-      toast.success(`Pengaturan PB1 disimpan: ${formatTaxRate(rateBps)}`)
+      await services.workspaceService.updateSalesTaxSettings(workspace.id, { label, rateBps, inclusive })
+      toast.success(`Pengaturan ${label} disimpan: ${formatTaxRate(rateBps)}`)
       setOpen(false)
       onSaved()
     } catch (e) {
@@ -67,18 +81,33 @@ export function TaxSettingsDialog({
       <DialogTrigger asChild>
         <Button variant="secondary">
           <SettingsIcon data-icon="inline-start" />
-          PB1 {formatTaxRate(workspace.salesTaxRateBps)}
+          {workspace.salesTaxLabel} {formatTaxRate(workspace.salesTaxRateBps)}
         </Button>
       </DialogTrigger>
       <DialogContent>
         <form onSubmit={submit} className="grid gap-5">
           <DialogHeader>
-            <DialogTitle>Pengaturan PB1</DialogTitle>
+            <DialogTitle>Pengaturan pajak penjualan</DialogTitle>
             <DialogDescription>
-              PB1 yang dipungut dicatat sebagai Utang PB1, bukan pendapatan. Perubahan hanya berlaku
+              Pajak yang dipungut dicatat sebagai utang pajak, bukan pendapatan. Perubahan hanya berlaku
               untuk transaksi baru.
             </DialogDescription>
           </DialogHeader>
+          <div className="grid gap-2">
+            <Label htmlFor="tax-label">Jenis pajak</Label>
+            <Select value={label} onValueChange={(value) => setLabel(value as SalesTaxLabel)}>
+              <SelectTrigger id="tax-label" className="w-40">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {SALES_TAX_LABELS.map((l) => (
+                  <SelectItem key={l} value={l}>
+                    {l}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
           <div className="grid gap-2">
             <Label htmlFor="tax-rate">Tarif (%)</Label>
             <Input
@@ -88,11 +117,11 @@ export function TaxSettingsDialog({
               onChange={(e) => setRateText(e.target.value)}
               className="w-32"
             />
-            <p className="text-xs text-muted-foreground">Tarif PBJT ditetapkan per daerah; umumnya 10%.</p>
+            <p className="text-xs text-muted-foreground">{LABEL_HINTS[label]}</p>
           </div>
           <label className="flex items-center gap-3 text-sm">
             <Switch checked={inclusive} onCheckedChange={setInclusive} />
-            Harga menu sudah termasuk PB1
+            Harga jual sudah termasuk {label}
           </label>
           {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
           <DialogFooter>

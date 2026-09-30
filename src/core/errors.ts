@@ -29,7 +29,8 @@ export type ValidationCode =
   | "NOT_DRAFT"
   | "NOT_POSTED"
   | "INVALID_TEMPLATE"
-  | "DUPLICATE_ACCOUNT_CODE";
+  | "DUPLICATE_ACCOUNT_CODE"
+  | "INVALID_TAX_LABEL";
 
 export interface ValidationIssue {
   code: ValidationCode;

@@ -24,15 +24,16 @@ const ACTION_LABELS: Record<string, string> = {
   reverse: "Jurnal pembalik diposting",
   close: "Dikunci",
   reopen: "Dibuka kembali",
-  update_tax_settings: "Pengaturan PB1 diubah",
+  update_tax_settings: "Pengaturan pajak diubah",
 };
 
 export function auditActionLabel(action: string): string {
   return ACTION_LABELS[action] ?? action;
 }
 
-/** "Anda" untuk pemilik sesi; pengguna lain disingkat agar tidak memenuhi layar. */
-export function actorLabel(actorId: string, ownerId: string): string {
+/** "Anda" untuk pemilik sesi, "Sistem" untuk migrasi; pengguna lain disingkat. */
+export function actorLabel(actorId: string | null, ownerId: string): string {
+  if (actorId === null) return "Sistem";
   return actorId === ownerId ? "Anda" : `Pengguna ${actorId.slice(0, 8)}`;
 }
 
@@ -71,8 +72,10 @@ const FIELD_LABELS: Record<string, string> = {
   description: "Keterangan",
   entryDate: "Tanggal",
   counterparty: "Pihak",
-  salesTaxRateBps: "Tarif PB1 (basis poin)",
-  salesTaxInclusive: "Harga termasuk PB1",
+  salesTaxLabel: "Jenis pajak",
+  systemRole: "Peran sistem",
+  salesTaxRateBps: "Tarif pajak (basis poin)",
+  salesTaxInclusive: "Harga termasuk pajak",
   deletedAt: "Dihapus",
 };
 

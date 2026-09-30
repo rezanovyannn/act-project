@@ -18,10 +18,10 @@ import {
 } from "@/core/transactions";
 import { buildFnbMockState } from "@/mocks/fnb/dataset";
 import {
-  buildRawMaterialPurchase,
+  buildInventoryPurchase,
   buildStockOpname,
   inventoryBookBalance,
-} from "@/modules/fnb/transactions";
+} from "@/core/inventory";
 import { createFnbWorkspace, createTestEnv } from "./helpers";
 
 function expectCode(fn: () => unknown, code: ValidationCode) {
@@ -268,7 +268,7 @@ describe("pembentuk jurnal transaksi (diposting lewat JournalService)", () => {
   });
 
   it("F&B: pembelian bahan baku tunai/kredit dan stok opname dua arah", async () => {
-    const purchase = buildRawMaterialPurchase(
+    const purchase = buildInventoryPurchase(
       { ...base, workspaceId: ws.workspace.id, payment: { kind: "credit", counterparty: "CV Sumber" }, amount: 2_000_000 },
       ws.accounts,
     );

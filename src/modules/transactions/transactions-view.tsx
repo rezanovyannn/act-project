@@ -44,12 +44,12 @@ export function TransactionsView({
         <TabsList className="w-fit max-w-full flex-wrap">
           <TabsTrigger value="sale">Penjualan</TabsTrigger>
           <TabsTrigger value="expense">Beban operasional</TabsTrigger>
-          <TabsTrigger value="tax">Setoran PB1</TabsTrigger>
+          <TabsTrigger value="tax">Setoran {current.workspace.salesTaxLabel}</TabsTrigger>
         </TabsList>
-        {/* key: form di-reset saat pengaturan PB1 berubah */}
+        {/* key: form di-reset saat pengaturan pajak berubah */}
         <TabsContent value="sale">
           <SaleForm
-            key={`${current.workspace.salesTaxRateBps}-${current.workspace.salesTaxInclusive}`}
+            key={`${current.workspace.salesTaxLabel}-${current.workspace.salesTaxRateBps}-${current.workspace.salesTaxInclusive}`}
             {...formProps}
           />
         </TabsContent>

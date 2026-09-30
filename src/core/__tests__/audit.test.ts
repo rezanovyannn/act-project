@@ -37,6 +37,7 @@ describe("audit", () => {
     expect(auditActionLabel("reopen")).toBe("Dibuka kembali");
     expect(auditActionLabel("unknown_action")).toBe("unknown_action");
     expect(actorLabel("u1", "u1")).toBe("Anda");
+    expect(actorLabel(null, "u1")).toBe("Sistem");
     expect(actorLabel("0123456789abcdef", "u1")).toBe("Pengguna 01234567");
   });
 });

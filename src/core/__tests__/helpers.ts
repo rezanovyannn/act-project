@@ -5,6 +5,7 @@ import { PeriodService } from "@/core/services/period-service";
 import { WorkspaceService } from "@/core/services/workspace-service";
 import type { Account, JournalEntryInput, JournalLineInput } from "@/core/types";
 import { FNB_TEMPLATE } from "@/modules/fnb/template";
+import { RETAIL_TEMPLATE } from "@/modules/retail/template";
 import {
   createMockRepositories,
   emptyMockState,
@@ -36,7 +37,7 @@ export function createTestEnv(seed: () => MockState = emptyMockState) {
     closingService: new ClosingService(repos),
     workspaceService: new WorkspaceService({
       workspaces: repos.workspaces,
-      templates: { fnb: FNB_TEMPLATE },
+      templates: { fnb: FNB_TEMPLATE, retail: RETAIL_TEMPLATE },
     }),
   };
 }

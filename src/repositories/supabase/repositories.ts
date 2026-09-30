@@ -14,7 +14,7 @@ import type {
   JournalFilter,
   NewWorkspace,
 } from "@/core/ports";
-import type { SalesTaxSettings } from "@/core/sales-tax";
+import type { WorkspaceTaxSettings } from "@/core/sales-tax";
 import type {
   Account,
   AccountSeed,
@@ -69,6 +69,7 @@ export class SupabaseWorkspaceRepository implements IWorkspaceRepository {
         p_books_start_date: input.booksStartDate,
         p_accounts: accounts,
         p_periods: periods,
+        p_sales_tax: input.salesTax,
       }),
     );
     return required(await this.getById(id as string), "Workspace");
@@ -79,12 +80,13 @@ export class SupabaseWorkspaceRepository implements IWorkspaceRepository {
     return required(await this.getById(id), "Workspace");
   }
 
-  async updateSalesTaxSettings(id: string, settings: SalesTaxSettings): Promise<Workspace> {
+  async updateSalesTaxSettings(id: string, settings: WorkspaceTaxSettings): Promise<Workspace> {
     await unwrap(
       this.client.rpc("update_workspace_tax_settings", {
         p_id: id,
         p_rate_bps: settings.rateBps,
         p_inclusive: settings.inclusive,
+        p_label: settings.label,
       }),
     );
     return required(await this.getById(id), "Workspace");

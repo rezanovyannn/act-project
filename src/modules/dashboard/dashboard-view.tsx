@@ -130,7 +130,7 @@ export function DashboardView({
           <InfoIcon className="mt-0.5 size-4 shrink-0" />
           <p>
             <strong>HPP belum disesuaikan.</strong> Belum ada stok opname di periode ini, sehingga
-            HPP dan laba belum mencerminkan pemakaian bahan baku. Laba di bawah kemungkinan terlalu
+            HPP dan laba belum mencerminkan persediaan yang terpakai atau terjual. Laba di bawah kemungkinan terlalu
             tinggi.
           </p>
         </div>
@@ -161,7 +161,7 @@ export function DashboardView({
           <ul className="mt-2 grid gap-2 text-sm">
             <Row label="Piutang usaha" value={summary.receivables} />
             <Row label="Utang usaha" value={summary.payables} />
-            <Row label="Utang PB1 (belum disetor)" value={summary.salesTaxPayable} />
+            <Row label={`${accounts.find((a) => a.systemRole === "sales_tax_payable")?.name ?? "Utang pajak"} (belum disetor)`} value={summary.salesTaxPayable} />
           </ul>
         </div>
         <div className="rounded-lg bg-card p-6">

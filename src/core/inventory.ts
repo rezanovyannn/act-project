@@ -1,12 +1,13 @@
 /**
- * Transaksi khusus F&B dengan metode persediaan periodik (ADR 007).
+ * Persediaan metode periodik untuk semua template (ADR 007 & 015): pembelian
+ * masuk ke akun ber-`systemRole` `inventory`, selisih stok opname ke HPP.
  */
-import { fail } from "@/core/errors"
-import { generalLedger } from "@/core/general-ledger"
-import { accountByRole, buildExpense, type Payment } from "@/core/transactions"
-import type { Account, IsoDate, JournalEntry, JournalEntryInput } from "@/core/types"
+import { fail } from "./errors"
+import { generalLedger } from "./general-ledger"
+import { accountByRole, buildExpense, type Payment } from "./transactions"
+import type { Account, IsoDate, JournalEntry, JournalEntryInput } from "./types"
 
-export interface RawMaterialPurchaseInput {
+export interface InventoryPurchaseInput {
   workspaceId: string
   entryDate: IsoDate
   description: string
@@ -14,9 +15,9 @@ export interface RawMaterialPurchaseInput {
   amount: number
 }
 
-/** Pembelian bahan baku: Dr Persediaan Bahan Baku, Cr Kas/Bank atau Utang Usaha. */
-export function buildRawMaterialPurchase(
-  input: RawMaterialPurchaseInput,
+/** Pembelian persediaan: Dr Persediaan, Cr Kas/Bank atau Utang Usaha. */
+export function buildInventoryPurchase(
+  input: InventoryPurchaseInput,
   accounts: readonly Account[],
 ): JournalEntryInput {
   return buildExpense(
@@ -27,20 +28,20 @@ export function buildRawMaterialPurchase(
       payment: input.payment,
       source: "purchase",
       items: [
-        { accountId: accountByRole(accounts, "raw_material_inventory").id, amount: input.amount },
+        { accountId: accountByRole(accounts, "inventory").id, amount: input.amount },
       ],
     },
     accounts,
   )
 }
 
-/** Saldo buku Persediaan Bahan Baku per akhir `asOf` (jurnal posted). */
+/** Saldo buku akun persediaan per akhir `asOf` (jurnal posted). */
 export function inventoryBookBalance(
   entries: readonly JournalEntry[],
   accounts: readonly Account[],
   asOf: IsoDate,
 ): number {
-  const inventory = accountByRole(accounts, "raw_material_inventory")
+  const inventory = accountByRole(accounts, "inventory")
   return generalLedger(entries, inventory, { toDate: asOf }).closingBalance
 }
 
@@ -75,7 +76,7 @@ export function buildStockOpname(
   const difference = input.bookBalance - input.physicalValue
   if (difference === 0) return { difference, entry: null }
 
-  const inventory = accountByRole(accounts, "raw_material_inventory").id
+  const inventory = accountByRole(accounts, "inventory").id
   const cogs = accountByRole(accounts, "cogs").id
   const amount = Math.abs(difference)
   const [debit, credit] = difference > 0 ? [cogs, inventory] : [inventory, cogs]

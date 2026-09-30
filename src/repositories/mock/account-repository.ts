@@ -44,6 +44,9 @@ export class MockAccountRepository implements IAccountRepository {
   async create(workspaceId: string, seed: AccountSeed): Promise<Account> {
     return this.db.write((state) => {
       assertUniqueCode(state, workspaceId, seed.code);
+      if (seed.systemRole && state.accounts.some((a) => a.workspaceId === workspaceId && a.deletedAt === null && a.systemRole === seed.systemRole)) {
+        fail("SYSTEM_ACCOUNT", "Peran sistem akun ini sudah dipakai akun lain");
+      }
       const now = this.db.now();
       const account: Account = {
         ...seed,
@@ -78,6 +81,7 @@ export class MockAccountRepository implements IAccountRepository {
     this.db.write((state) => {
       const account = state.accounts.find((a) => a.id === id && a.deletedAt === null);
       if (!account) fail("NOT_FOUND", "Akun tidak ditemukan");
+      if (account.systemRole) fail("SYSTEM_ACCOUNT", `${account.name} adalah akun sistem dan tidak dapat dihapus`);
       if (isUsedByJournal(state, id)) {
         fail("ACCOUNT_INACTIVE", "Akun sudah dipakai jurnal; nonaktifkan saja, tidak bisa dihapus");
       }

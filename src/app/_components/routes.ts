@@ -13,6 +13,6 @@ export const routes = {
   settings: (workspaceId: string) => `/w/${workspaceId}/settings`,
   transactions: (workspaceId: string) => `/w/${workspaceId}/transactions`,
   credits: (workspaceId: string) => `/w/${workspaceId}/credits`,
-  fnbPurchases: (workspaceId: string) => `/w/${workspaceId}/fnb/purchases`,
-  fnbStockOpname: (workspaceId: string) => `/w/${workspaceId}/fnb/stock-opname`,
+  inventoryPurchases: (workspaceId: string) => `/w/${workspaceId}/inventory/purchases`,
+  inventoryStockOpname: (workspaceId: string) => `/w/${workspaceId}/inventory/stock-opname`,
 }

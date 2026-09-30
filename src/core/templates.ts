@@ -1,5 +1,5 @@
 import type { ValidationIssue } from "./errors";
-import type { SystemRole, WorkspaceTemplate } from "./types";
+import type { Account, AccountSeed, SystemRole, WorkspaceTemplate } from "./types";
 
 /** Akun sistem yang wajib ada di setiap template CoA (ADR 010 & 011). */
 export const REQUIRED_SYSTEM_ROLES: readonly SystemRole[] = [
@@ -52,4 +52,16 @@ export function validateTemplate(template: WorkspaceTemplate): ValidationIssue[]
     });
   }
   return issues;
+}
+
+/**
+ * Akun template yang belum ada di workspace (ADR 015): kodenya belum dipakai
+ * dan, untuk akun sistem, perannya belum dimiliki akun lain. Akun yang
+ * sudah dihapus dianggap tidak ada sehingga bisa ditambahkan kembali.
+ */
+export function missingTemplateAccounts(template: WorkspaceTemplate, accounts: readonly Account[]): AccountSeed[] {
+  const active = accounts.filter((a) => a.deletedAt === null);
+  const codes = new Set(active.map((a) => a.code));
+  const roles = new Set(active.map((a) => a.systemRole).filter((r) => r !== null));
+  return template.accounts.filter((seed) => !codes.has(seed.code) && !(seed.systemRole && roles.has(seed.systemRole)));
 }

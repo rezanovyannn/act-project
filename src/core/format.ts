@@ -58,3 +58,8 @@ export function formatMonth(date: IsoDate): string {
 export function todayIsoDate(now: Date = new Date()): IsoDate {
   return toIsoDate(now.getFullYear(), now.getMonth() + 1, now.getDate());
 }
+
+/** `barang dagang` → `Barang Dagang` (judul menu/halaman). */
+export function capitalizeWords(text: string): string {
+  return text.replace(/(^|\s)\S/g, (c) => c.toUpperCase());
+}

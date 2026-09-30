@@ -217,7 +217,7 @@ describe("tutup buku: rugi, workspace lama tanpa akun Ikhtisar", () => {
   it("membuat akun Ikhtisar Laba Rugi otomatis untuk workspace lama", async () => {
     const env = createTestEnv();
     const workspace = await env.repos.workspaces.createWithSeed(
-      { ownerId: "owner-a", name: "Lama", templateType: "fnb", booksStartDate: "2026-01-01" },
+      { ownerId: "owner-a", name: "Lama", templateType: "fnb", booksStartDate: "2026-01-01", salesTax: FNB_TEMPLATE.salesTaxDefaults },
       FNB_TEMPLATE.accounts.filter((a) => a.systemRole !== "income_summary"),
       monthlyPeriodsForYear(2026),
     );

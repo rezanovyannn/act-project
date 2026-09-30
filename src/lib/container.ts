@@ -13,13 +13,14 @@ import { WorkspaceService } from "@/core/services/workspace-service";
 import type { TemplateRegistry } from "@/core/types";
 import { buildFnbMockState, MOCK_OWNER_ID } from "@/mocks/fnb/dataset";
 import { FNB_TEMPLATE } from "@/modules/fnb/template";
+import { RETAIL_TEMPLATE } from "@/modules/retail/template";
 import { createMockRepositories, MockDatabase } from "@/repositories/mock";
 import { createSupabaseRepositories } from "@/repositories/supabase/repositories";
 import { SupabaseAuthService } from "./supabase/auth";
 import { getSupabaseBrowserClient } from "./supabase/browser";
 import { dataSource, type DataSource } from "./supabase/config";
 
-const TEMPLATES: TemplateRegistry = { fnb: FNB_TEMPLATE };
+const TEMPLATES: TemplateRegistry = { fnb: FNB_TEMPLATE, retail: RETAIL_TEMPLATE };
 
 export interface Container extends AppServices {
   dataSource: DataSource;

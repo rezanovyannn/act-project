@@ -71,7 +71,7 @@ export function computeDashboardSummary(
   const expenses = byType("expense");
 
   const inventoryIds = new Set(
-    accounts.filter((a) => a.systemRole === "raw_material_inventory").map((a) => a.id),
+    accounts.filter((a) => a.systemRole === "inventory").map((a) => a.id),
   );
   const postedInPeriod = entries.filter(
     (e) =>

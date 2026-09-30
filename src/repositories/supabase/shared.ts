@@ -55,6 +55,7 @@ export const toWorkspace = (r: any): Workspace => ({
   templateType: r.template_type,
   currency: r.currency,
   booksStartDate: r.books_start_date,
+  salesTaxLabel: r.sales_tax_label,
   salesTaxRateBps: r.sales_tax_rate_bps,
   salesTaxInclusive: r.sales_tax_inclusive,
   createdAt: r.created_at,

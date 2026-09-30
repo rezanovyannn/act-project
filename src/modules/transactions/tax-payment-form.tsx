@@ -49,12 +49,12 @@ export function TaxPaymentForm({
     taxAccount,
     { toDate: entryDate },
   ).closingBalance
-  // Kosong = ikut saldo Utang PB1 per tanggal setoran.
+  // Kosong = ikut saldo utang pajak per tanggal setoran.
   const effectiveAmount = amount ?? payable
 
   const build = (): JournalEntryInput =>
     buildTaxPayment(
-      { workspaceId: workspace.id, entryDate, amount: effectiveAmount, cashAccountId, description },
+      { workspaceId: workspace.id, entryDate, amount: effectiveAmount, cashAccountId, description, taxLabel: workspace.salesTaxLabel },
       accounts,
     )
   let preview: JournalEntryInput | null = null
@@ -85,7 +85,7 @@ export function TaxPaymentForm({
     <form onSubmit={submit} className="grid grid-cols-1 gap-6 xl:grid-cols-[minmax(0,1fr)_26rem]">
       <div className="grid content-start gap-5 rounded-lg bg-card p-4 sm:p-6">
         <p className="flex flex-wrap items-center justify-between gap-2 rounded-lg bg-canvas px-4 py-3 text-sm">
-          <span className="text-muted-foreground">Utang PB1 belum disetor per tanggal setoran</span>
+          <span className="text-muted-foreground">{taxAccount.name} belum disetor per tanggal setoran</span>
           <Amount value={payable} className="font-bold text-ink" />
         </p>
         <div className="grid gap-4 sm:grid-cols-2">
@@ -116,7 +116,7 @@ export function TaxPaymentForm({
               id="tax-description"
               value={description}
               onChange={(e) => setDescription(e.target.value)}
-              placeholder="mis. Setoran PB1 Agustus"
+              placeholder={`mis. Setoran ${workspace.salesTaxLabel} Agustus`}
             />
           </div>
         </div>
@@ -125,13 +125,13 @@ export function TaxPaymentForm({
         <JournalPreview lines={preview?.lines ?? []} accounts={accounts} />
         {effectiveAmount > payable && (
           <p className="text-sm text-ink">
-            Nominal melebihi saldo Utang PB1. Pastikan penjualan sudah dicatat semua.
+            Nominal melebihi saldo {taxAccount.name}. Pastikan penjualan sudah dicatat semua.
           </p>
         )}
         {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
         {posted && <PostedNotice entry={posted} href={journalHref(posted.id)} />}
         <Button type="submit" size="lg" disabled={saving || !preview}>
-          {saving ? "Memposting…" : "Posting setoran PB1"}
+          {saving ? "Memposting…" : `Posting setoran ${workspace.salesTaxLabel}`}
         </Button>
       </div>
     </form>

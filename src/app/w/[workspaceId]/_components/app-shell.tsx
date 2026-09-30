@@ -19,7 +19,8 @@ import {
 } from "lucide-react"
 import type { Container } from "@/lib/container"
 import { AccountBar } from "@/app/_components/account-bar"
-import type { TemplateType } from "@/core/types"
+import { capitalizeWords } from "@/core/format"
+import type { TemplateType, WorkspaceTemplate } from "@/core/types"
 import { Button } from "@/components/ui/button"
 import { Sheet, SheetContent, SheetTitle, SheetTrigger } from "@/components/ui/sheet"
 import { cn } from "@/lib/utils"
@@ -40,7 +41,8 @@ interface NavGroup {
   items: NavItem[]
 }
 
-function navGroups(workspaceId: string, templateType: TemplateType): NavGroup[] {
+
+function navGroups(workspaceId: string, template: WorkspaceTemplate): NavGroup[] {
   const groups: NavGroup[] = [
     {
       items: [
@@ -53,16 +55,14 @@ function navGroups(workspaceId: string, templateType: TemplateType): NavGroup[] 
       ],
     },
   ]
-  // Modul aktif ditentukan template_type (ADR 002).
-  if (templateType === "fnb") {
-    groups.push({
-      label: "F&B",
-      items: [
-        { label: "Pembelian Bahan Baku", href: routes.fnbPurchases(workspaceId), icon: PackageIcon },
-        { label: "Stok Opname", href: routes.fnbStockOpname(workspaceId), icon: ClipboardCheckIcon },
-      ],
-    })
-  }
+  // Istilah modul persediaan mengikuti template_type (ADR 002 & 015).
+  groups.push({
+    label: "Persediaan",
+    items: [
+      { label: `Pembelian ${capitalizeWords(template.inventoryNoun)}`, href: routes.inventoryPurchases(workspaceId), icon: PackageIcon },
+      { label: "Stok Opname", href: routes.inventoryStockOpname(workspaceId), icon: ClipboardCheckIcon },
+    ],
+  })
   groups.push({
     items: [
       { label: "Riwayat Audit", href: routes.audit(workspaceId), icon: HistoryIcon },
@@ -96,7 +96,7 @@ function Navigation({
         allWorkspacesHref={routes.workspaces()}
       />
       <nav aria-label="Menu utama" className="grid gap-4">
-        {navGroups(workspaceId, templateType).map((group, groupIndex) => (
+        {navGroups(workspaceId, services.workspaceService.templateOf(templateType)).map((group, groupIndex) => (
         <div key={groupIndex} className="grid gap-1">
         {group.label && (
           <p className="px-3 text-xs font-semibold tracking-wide text-muted-foreground uppercase">{group.label}</p>

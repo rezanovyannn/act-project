@@ -4,7 +4,7 @@ import { useState } from "react"
 import { MoreHorizontalIcon, PlusIcon } from "lucide-react"
 import { toast } from "sonner"
 import type { AppServices } from "@/core/services"
-import type { Account, AccountType, JournalEntry } from "@/core/types"
+import type { Account, AccountType, JournalEntry, WorkspaceTemplate } from "@/core/types"
 import { ACCOUNT_TYPE_LABELS } from "@/components/ui/account-combobox"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -24,18 +24,21 @@ import {
 } from "@/components/ui/table"
 import { errorMessage } from "@/lib/utils"
 import { AccountDialog, CASH_FLOW_LABELS } from "./account-dialog"
+import { TemplateAccountsDialog } from "./template-accounts-dialog"
 
 const TYPE_ORDER: AccountType[] = ["asset", "liability", "equity", "revenue", "cogs", "expense"]
 
 export function AccountsTab({
   services,
   workspaceId,
+  template,
   accounts,
   journals,
   onChanged,
 }: {
   services: AppServices
   workspaceId: string
+  template: WorkspaceTemplate
   accounts: Account[]
   journals: JournalEntry[]
   onChanged: () => void
@@ -61,17 +64,26 @@ export function AccountsTab({
           Akun yang sudah dipakai jurnal tidak bisa dihapus, hanya dinonaktifkan. Akun nonaktif tidak
           muncul di form, tetapi tetap ada di laporan.
         </p>
-        <AccountDialog
-          services={services}
-          workspaceId={workspaceId}
-          onSaved={onChanged}
-          trigger={
-            <Button>
-              <PlusIcon data-icon="inline-start" />
-              Tambah akun
-            </Button>
-          }
-        />
+        <div className="flex flex-wrap gap-2">
+          <TemplateAccountsDialog
+            services={services}
+            workspaceId={workspaceId}
+            template={template}
+            accounts={accounts}
+            onSaved={onChanged}
+          />
+          <AccountDialog
+            services={services}
+            workspaceId={workspaceId}
+            onSaved={onChanged}
+            trigger={
+              <Button>
+                <PlusIcon data-icon="inline-start" />
+                Tambah akun
+              </Button>
+            }
+          />
+        </div>
       </div>
 
       {TYPE_ORDER.map((type) => {

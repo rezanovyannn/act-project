@@ -15,6 +15,7 @@ import type {
 } from "@/core/ports";
 import type { JournalEntryInput, Workspace } from "@/core/types";
 import { FNB_TEMPLATE } from "@/modules/fnb/template";
+import { RETAIL_TEMPLATE } from "@/modules/retail/template";
 
 export interface ContractRepositories {
   workspaces: IWorkspaceRepository;
@@ -72,7 +73,7 @@ export function describeRepositoryContract(
       actors = await setup();
       repos = actors.owner.repos;
       workspace = await repos.workspaces.createWithSeed(
-        { ownerId: actors.owner.ownerId, name: "Kedai A", templateType: "fnb", booksStartDate: "2026-01-01" },
+        { ownerId: actors.owner.ownerId, name: "Kedai A", templateType: "fnb", booksStartDate: "2026-01-01", salesTax: FNB_TEMPLATE.salesTaxDefaults },
         FNB_TEMPLATE.accounts,
         monthlyPeriodsForYear(2026),
       );
@@ -86,15 +87,17 @@ export function describeRepositoryContract(
         expect(workspace).toMatchObject({
           currency: "IDR",
           templateType: "fnb",
+          salesTaxLabel: "PB1",
           salesTaxRateBps: 1000,
           salesTaxInclusive: false,
           deletedAt: null,
         });
         const updated = await repos.workspaces.updateSalesTaxSettings(workspace.id, {
+          label: "PPN",
           rateBps: 500,
           inclusive: true,
         });
-        expect(updated).toMatchObject({ salesTaxRateBps: 500, salesTaxInclusive: true });
+        expect(updated).toMatchObject({ salesTaxLabel: "PPN", salesTaxRateBps: 500, salesTaxInclusive: true });
         expect(await repos.accounts.listByWorkspace(workspace.id)).toHaveLength(FNB_TEMPLATE.accounts.length);
         const periods = await repos.periods.listByWorkspace(workspace.id);
         expect(periods).toHaveLength(12);
@@ -104,7 +107,7 @@ export function describeRepositoryContract(
       it("hanya menampilkan workspace milik owner dan menyembunyikan yang dihapus", async () => {
         const { owner, other } = actors;
         const otherWorkspace = await other.repos.workspaces.createWithSeed(
-          { ownerId: other.ownerId, name: "Kedai B", templateType: "fnb", booksStartDate: "2026-01-01" },
+          { ownerId: other.ownerId, name: "Kedai B", templateType: "fnb", booksStartDate: "2026-01-01", salesTax: FNB_TEMPLATE.salesTaxDefaults },
           FNB_TEMPLATE.accounts,
           [],
         );
@@ -114,6 +117,36 @@ export function describeRepositoryContract(
         await repos.workspaces.softDelete(workspace.id);
         expect(await ownIds()).not.toContain(workspace.id);
         expect(await repos.workspaces.getById(workspace.id)).toBeNull();
+      });
+
+      it("workspace Retail (ADR 015): CoA & pajak awal sendiri, akun sistem dapat ditambah ulang", async () => {
+        const retail = await repos.workspaces.createWithSeed(
+          { ownerId: actors.owner.ownerId, name: "Toko A", templateType: "retail", booksStartDate: "2026-01-01", salesTax: RETAIL_TEMPLATE.salesTaxDefaults },
+          RETAIL_TEMPLATE.accounts,
+          [],
+        );
+        expect(retail).toMatchObject({ templateType: "retail", salesTaxLabel: "PPN", salesTaxRateBps: 0, salesTaxInclusive: false });
+        const accounts = await repos.accounts.listByWorkspace(retail.id);
+        expect(accounts.map((a) => a.code).sort()).toEqual(RETAIL_TEMPLATE.accounts.map((a) => a.code).sort());
+        expect(accounts.find((a) => a.systemRole === "inventory")?.name).toBe("Persediaan Barang Dagang");
+        expect(accounts.find((a) => a.code === "4-1900")).toMatchObject({ accountType: "revenue", normalBalance: "debit" });
+
+        const taxAccount = accounts.find((a) => a.systemRole === "sales_tax_payable")!;
+        await expectCode(repos.accounts.softDelete(taxAccount.id), "SYSTEM_ACCOUNT");
+        const packaging = accounts.find((a) => a.code === "6-7000")!;
+        await repos.accounts.softDelete(packaging.id);
+        const again = await repos.accounts.create(retail.id, RETAIL_TEMPLATE.accounts.find((a) => a.code === "6-7000")!);
+        expect(again).toMatchObject({ name: "Beban Kemasan", systemRole: null });
+
+        // Workspace lama tanpa akun berperan tertentu: akun template menambahkan perannya.
+        const seed = RETAIL_TEMPLATE.accounts.find((a) => a.systemRole === "sales_tax_payable")!;
+        const older = await repos.workspaces.createWithSeed(
+          { ownerId: actors.owner.ownerId, name: "Toko Lama", templateType: "retail", booksStartDate: "2026-01-01", salesTax: RETAIL_TEMPLATE.salesTaxDefaults },
+          RETAIL_TEMPLATE.accounts.filter((a) => a !== seed),
+          [],
+        );
+        expect(await repos.accounts.create(older.id, seed)).toMatchObject({ code: "2-1200", systemRole: "sales_tax_payable" });
+        await expectCode(repos.accounts.create(older.id, { ...seed, code: "2-1299" }), "SYSTEM_ACCOUNT");
       });
     });
 

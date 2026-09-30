@@ -14,7 +14,7 @@ Nama kolom ditulis `snake_case` (DB); di TypeScript memakai padanan `camelCase`.
    - `normal_balance`: `debit` | `credit` (disimpan eksplisit agar akun kontra seperti Prive dan Akumulasi Penyusutan didukung).
    - `cash_flow_category`: `operating` | `investing` | `financing` | `none` (wajib untuk semua akun).
    - `is_cash`: boolean (akun kas/bank).
-   - `system_role` (nullable, unik per workspace): penanda akun yang dicari oleh sistem, mis. `opening_balance_equity`, `retained_earnings`, `owner_capital`, `drawings`, `raw_material_inventory`, `cogs`, `accounts_receivable`, `accounts_payable`, `sales_tax_payable`.
+   - `system_role` (nullable, unik per workspace): penanda akun yang dicari oleh sistem, mis. `opening_balance_equity`, `retained_earnings`, `owner_capital`, `drawings`, `inventory` (sebelum ADR 015: `raw_material_inventory`), `cogs`, `accounts_receivable`, `accounts_payable`, `sales_tax_payable`.
    - `is_active`, `deleted_at`.
 
 3. **`periods`**: `start_date`, `end_date`, `status` (`open` | `closed`). Tidak boleh tumpang tindih dalam satu workspace (ADR 006).

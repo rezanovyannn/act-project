@@ -47,7 +47,7 @@ export function SettingsView({
           <TabsTrigger value="backup">Backup</TabsTrigger>
         </TabsList>
         <TabsContent value="accounts">
-          <AccountsTab services={services} workspaceId={workspaceId} accounts={accounts} journals={journals} onChanged={data.reload} />
+          <AccountsTab services={services} workspaceId={workspaceId} template={services.workspaceService.templateOf(workspace.templateType)} accounts={accounts} journals={journals} onChanged={data.reload} />
         </TabsContent>
         <TabsContent value="periods">
           <PeriodsTab services={services} workspaceId={workspaceId} periods={periods} auditLogs={auditLogs} onChanged={data.reload} />

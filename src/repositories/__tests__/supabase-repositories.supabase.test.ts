@@ -67,7 +67,7 @@ describe("RLS: user B tidak dapat membaca atau menulis data user A", () => {
 
   beforeAll(async () => {
     workspaceA = await userA.repos.workspaces.createWithSeed(
-      { ownerId: userA.ownerId, name: "Rahasia A", templateType: "fnb", booksStartDate: "2026-01-01" },
+      { ownerId: userA.ownerId, name: "Rahasia A", templateType: "fnb", booksStartDate: "2026-01-01", salesTax: FNB_TEMPLATE.salesTaxDefaults },
       FNB_TEMPLATE.accounts,
       monthlyPeriodsForYear(2026),
     );

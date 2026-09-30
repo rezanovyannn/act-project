@@ -66,6 +66,8 @@ export interface SaleInput {
   items: AmountItem[];
   applyTax: boolean;
   tax: SalesTaxSettings;
+  /** Nama pajak untuk keterangan baris, mis. "PB1" atau "PPN" (default PB1). */
+  taxLabel?: string;
 }
 
 export interface SalePreview extends SalesTaxResult {
@@ -73,8 +75,8 @@ export interface SalePreview extends SalesTaxResult {
 }
 
 /**
- * Penjualan: Dr Kas/Bank/Piutang (total), Cr Pendapatan (dasar), Cr Utang PB1.
- * Pada mode harga termasuk PB1, pajak dibagi ke tiap rincian secara
+ * Penjualan: Dr Kas/Bank/Piutang (total), Cr Pendapatan (dasar), Cr Utang PB1/PPN.
+ * Pada mode harga termasuk pajak, pajak dibagi ke tiap rincian secara
  * proporsional agar jumlahnya tepat.
  */
 export function buildSale(input: SaleInput, accounts: readonly Account[]): SalePreview {
@@ -108,7 +110,7 @@ export function buildSale(input: SaleInput, accounts: readonly Account[]): SaleP
   if (taxResult.tax > 0) {
     lines.push({
       accountId: accountByRole(accounts, "sales_tax_payable").id,
-      description: "PB1",
+      description: input.taxLabel ?? "PB1",
       debit: 0,
       credit: taxResult.tax,
     });
@@ -219,9 +221,11 @@ export interface TaxPaymentInput {
   amount: number;
   cashAccountId: string;
   description?: string;
+  /** Nama pajak untuk keterangan default, mis. "PB1" atau "PPN" (default PB1). */
+  taxLabel?: string;
 }
 
-/** Setoran PB1 ke pemerintah daerah: Dr Utang PB1, Cr Kas/Bank. */
+/** Setoran pajak penjualan (PB1/PPN): Dr Utang pajak, Cr Kas/Bank. */
 export function buildTaxPayment(
   input: TaxPaymentInput,
   accounts: readonly Account[],
@@ -232,7 +236,7 @@ export function buildTaxPayment(
   return {
     workspaceId: input.workspaceId,
     entryDate: input.entryDate,
-    description: input.description?.trim() || "Setoran PB1",
+    description: input.description?.trim() || `Setoran ${input.taxLabel ?? "PB1"}`,
     source: "tax_payment",
     lines: [
       { accountId: accountByRole(accounts, "sales_tax_payable").id, debit: input.amount, credit: 0 },

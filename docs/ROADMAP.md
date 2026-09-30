@@ -100,10 +100,23 @@ Aturan umum agen: Kerjakan sub-fase secara berurutan, **berhenti dan minta revie
 ---
 
 ## Fase 4 (Opsional): Validasi Modularitas Multi-Template
+Dipecah menjadi tiga sub-fase (ADR 015); stop & review setelah tiap sub-fase.
+
+### Sub-fase 4A: Template Retail & Modularitas
 - **Pekerjaan:**
-  - Menambahkan template kedua: `retail` (manajemen stok barang dagang).
-  - Memastikan registrasi template baru tidak mengubah core engine accounting.
+  - Menambahkan template kedua: `retail` (CoA barang dagang termasuk Retur & Potongan Penjualan, Beban Angkut Pembelian, Beban Kemasan).
+  - Memastikan registrasi template baru tidak mengubah core engine accounting: persediaan periodik (ADR 007) dipindah ke `src/core/inventory.ts` dengan peran akun umum `inventory`; UI persediaan menjadi modul `inventory` yang istilahnya mengikuti template.
+  - Label pajak penjualan per workspace (PB1/PPN) dengan pengaturan awal dari template.
+  - Pengaturan → Daftar Akun: "Tambah dari template" untuk akun template yang belum ada/pernah dihapus.
 - **Kriteria Selesai (Stop & Review):** Workspace Retail berhasil dibuat dengan modul dan CoA yang terisolasi dari F&B.
+
+### Sub-fase 4B: Mode PPN Lengkap
+- **Pekerjaan:** Pilihan mode pajak di Pengaturan (generik PB1/PPN atau PPN lengkap): PPN Keluaran pada penjualan, PPN Masukan pada pembelian, setoran = selisihnya. Berlaku untuk semua template, dapat diubah kapan saja. Aturan akuntansi rinci (tarif/DPP, lebih bayar, transisi mode) ditanyakan ke user sebelum dikerjakan lalu dicatat di ADR.
+- **Kriteria Selesai (Stop & Review):** Transaksi PPN lengkap menghasilkan jurnal yang benar dan teruji unit test; laporan tetap memenuhi invarian 1D.
+
+### Sub-fase 4C: Persediaan Perpetual per Barang
+- **Pekerjaan:** Pilihan metode persediaan di Pengaturan (periodik atau perpetual): daftar barang, mutasi stok yang terikat jurnal, HPP per penjualan. Berlaku untuk semua template, dapat diubah kapan saja. Aturan akuntansi rinci (metode biaya, satuan, stok negatif, retur, stok opname, transisi metode) ditanyakan ke user sebelum dikerjakan lalu dicatat di ADR.
+- **Kriteria Selesai (Stop & Review):** Saldo persediaan per barang sama dengan saldo akun persediaan di Buku Besar; HPP tercatat per penjualan dan teruji unit test.
 
 ---
 
@@ -121,3 +134,8 @@ Aturan umum agen: Kerjakan sub-fase secara berurutan, **berhenti dan minta revie
 | 9 | Cara penutupan akun nominal | Lewat akun Ikhtisar Laba Rugi | ADR 014 |
 | 10 | Periode setelah tutup buku | Seluruh periode tahun itu dikunci otomatis | ADR 014 |
 | 11 | Ekspor laporan PDF | Tampilan cetak + fitur cetak/simpan PDF browser (tanpa dependency) | ROADMAP Fase 3 |
+| 12 | Urutan Fase 4 | Dipecah 4A (Retail & modularitas) → 4B (PPN lengkap) → 4C (persediaan perpetual) | ADR 015 |
+| 13 | Metode persediaan & mode pajak | Dipilih di Pengaturan per workspace, untuk semua template, dapat diubah kapan saja | ADR 015 |
+| 14 | Pajak penjualan Retail | Label generik PB1/PPN (4A, default Retail PPN 0%) dan mode PPN lengkap (4B) | ADR 015 |
+| 15 | Akun tambahan CoA Retail | Retur & Potongan Penjualan, Beban Angkut Pembelian, Beban Kemasan; akun template dapat ditambahkan dari Pengaturan | ADR 015 |
+| 16 | Tata letak kode persediaan | Logika umum di `src/core/inventory.ts`, UI modul `inventory` | ADR 015 |

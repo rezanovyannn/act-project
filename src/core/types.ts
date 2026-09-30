@@ -8,7 +8,9 @@ export type IsoDate = string;
 /** Timestamp ISO 8601 lengkap. */
 export type IsoTimestamp = string;
 
-export type TemplateType = "fnb";
+import type { SalesTaxLabel, WorkspaceTaxSettings } from "./sales-tax";
+
+export type TemplateType = "fnb" | "retail";
 export type Currency = "IDR";
 
 export type AccountType =
@@ -28,7 +30,7 @@ export type SystemRole =
   | "retained_earnings"
   | "owner_capital"
   | "drawings"
-  | "raw_material_inventory"
+  | "inventory"
   | "cogs"
   | "accounts_receivable"
   | "accounts_payable"
@@ -58,9 +60,11 @@ export interface Workspace {
   templateType: TemplateType;
   currency: Currency;
   booksStartDate: IsoDate;
-  /** Tarif PB1 dalam basis poin (1000 = 10%), ADR 012. */
+  /** Nama pajak penjualan: PB1 (restoran) atau PPN (ADR 015). */
+  salesTaxLabel: SalesTaxLabel;
+  /** Tarif pajak penjualan dalam basis poin (1000 = 10%), ADR 012. */
   salesTaxRateBps: number;
-  /** `true` bila harga menu sudah termasuk PB1. */
+  /** `true` bila harga jual sudah termasuk pajak. */
   salesTaxInclusive: boolean;
   createdAt: IsoTimestamp;
   updatedAt: IsoTimestamp;
@@ -161,6 +165,10 @@ export interface WorkspaceTemplate {
   type: TemplateType;
   label: string;
   accounts: AccountSeed[];
+  /** Istilah persediaan di UI, mis. "bahan baku" atau "barang dagang" (ADR 015). */
+  inventoryNoun: string;
+  /** Pengaturan pajak penjualan awal workspace baru. */
+  salesTaxDefaults: WorkspaceTaxSettings;
 }
 
 export type TemplateRegistry = Record<TemplateType, WorkspaceTemplate>;
@@ -181,6 +189,7 @@ export interface AuditLog {
   reason: string | null;
   before: unknown;
   after: unknown;
-  actorId: string;
+  /** `null` = perubahan oleh sistem (mis. migrasi skema). */
+  actorId: string | null;
   createdAt: IsoTimestamp;
 }

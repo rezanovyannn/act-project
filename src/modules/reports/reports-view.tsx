@@ -158,7 +158,7 @@ function Reports({
   const periodLabel = `${workspaceName} · ${formatDate(range.fromDate)} – ${formatDate(range.toDate)}`
   const asOfLabel = `${workspaceName} · per ${formatDate(range.toDate)}`
 
-  // Bulan dalam rentang yang ada penjualan/pembelian bahan tetapi belum stok opname (ADR 007).
+  // Bulan dalam rentang yang ada penjualan/pembelian persediaan tetapi belum stok opname (ADR 007).
   const pendingMonths = periods
     .filter((p) => p.endDate >= range.fromDate && p.startDate <= range.toDate)
     .filter((p) => computeDashboardSummary(accounts, journals, p).cogsPending)
@@ -295,7 +295,7 @@ function Reports({
             <InfoIcon className="mt-0.5 size-4 shrink-0" />
             <span>
               <strong>HPP belum disesuaikan</strong> untuk {pendingMonths.join(", ")}. Lakukan stok
-              opname agar HPP dan laba mencerminkan pemakaian bahan baku.
+              opname agar HPP dan laba mencerminkan persediaan yang terpakai atau terjual.
             </span>
           </p>
         )}

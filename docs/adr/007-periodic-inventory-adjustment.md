@@ -1,5 +1,7 @@
 # ADR 007: Metode Persediaan Periodik dengan Penyesuaian Manual
 
+> Sejak ADR 015 metode ini berlaku untuk semua template (Persediaan Bahan Baku F&B, Persediaan Barang Dagang Retail) lewat akun ber-`system_role` `inventory`.
+
 ## Konteks
 Aplikasi awal ditujukan untuk bisnis F&B dengan kompleksitas operasional yang dinamis. Melacak persediaan secara *perpetual* (tiap transaksi) membutuhkan sistem *tracking* yang sangat detail (FIFO/LIFO/Average) yang berisiko tinggi terhadap bug jika salah diimplementasikan pada fase awal.
 

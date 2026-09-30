@@ -15,9 +15,9 @@ import { JournalPreview, PostedNotice } from "@/components/ui/journal-preview"
 import { Label } from "@/components/ui/label"
 import { LoadingState, PageHeader } from "@/components/ui/page-header"
 import { errorMessage, useLoader } from "@/lib/utils"
-import { buildStockOpname, inventoryBookBalance } from "./transactions"
+import { buildStockOpname, inventoryBookBalance } from "@/core/inventory"
 
-/** Stok opname: selisih saldo buku vs fisik diposting ke HPP (ADR 007). */
+/** Stok opname: selisih saldo buku vs fisik diposting ke HPP, semua template (ADR 007 & 015). */
 export function StockOpnameView({
   services,
   workspaceId,
@@ -28,11 +28,13 @@ export function StockOpnameView({
   journalHref: (entryId: string) => string
 }) {
   const data = useLoader(async () => {
-    const [accounts, journals] = await Promise.all([
+    const [workspace, accounts, journals] = await Promise.all([
+      services.workspaces.getById(workspaceId),
       services.accounts.listByWorkspace(workspaceId),
       services.journals.listByWorkspace(workspaceId, { status: "posted" }),
     ])
-    return { accounts, journals }
+    if (!workspace) throw new Error("Workspace tidak ditemukan")
+    return { noun: services.workspaceService.templateOf(workspace.templateType).inventoryNoun, accounts, journals }
   }, [services, workspaceId])
 
   const [entryDate, setEntryDate] = useState(() => endOfMonth(todayIsoDate()))
@@ -43,7 +45,7 @@ export function StockOpnameView({
 
   if (data.loading && !data.data) return <LoadingState />
   if (data.error) return <p role="alert" className="text-sm text-destructive">{errorMessage(data.error)}</p>
-  const { accounts, journals } = data.data!
+  const { noun, accounts, journals } = data.data!
 
   let bookBalance: number | null = null
   try {
@@ -52,7 +54,7 @@ export function StockOpnameView({
     return <p role="alert" className="text-sm text-destructive">{errorMessage(e)}</p>
   }
   const month = entryDate.slice(0, 7)
-  const inventoryId = accounts.find((a) => a.systemRole === "raw_material_inventory")?.id
+  const inventoryId = accounts.find((a) => a.systemRole === "inventory")?.id
   const earlierOpname = journals
     .filter(isLedgerEntry)
     .filter((e) => e.source === "adjustment" && e.entryDate.startsWith(month) && e.lines.some((l) => l.accountId === inventoryId))
@@ -83,7 +85,7 @@ export function StockOpnameView({
     <div className="grid grid-cols-1 gap-6">
       <PageHeader
         title="Stok Opname"
-        description="Hitung fisik persediaan bahan baku, lalu sistem membukukan selisihnya ke HPP."
+        description={`Hitung fisik persediaan ${noun}, lalu sistem membukukan selisihnya ke HPP.`}
       />
       <form onSubmit={submit} className="grid grid-cols-1 gap-6 xl:grid-cols-[minmax(0,1fr)_26rem]">
         <div className="grid content-start gap-5 rounded-lg bg-card p-4 sm:p-6">
@@ -111,7 +113,7 @@ export function StockOpnameView({
                 {result === null
                   ? "Selisih"
                   : result.difference > 0
-                    ? "Pemakaian bahan (tambah HPP)"
+                    ? "Persediaan terpakai/terjual (tambah HPP)"
                     : result.difference < 0
                       ? "Kelebihan fisik (kurangi HPP)"
                       : "Tidak ada selisih"}

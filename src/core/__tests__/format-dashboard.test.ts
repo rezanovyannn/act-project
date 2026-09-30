@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { computeDashboardSummary, defaultDashboardPeriod } from "@/core/dashboard";
 import {
+  capitalizeWords,
   formatAccounting,
   formatDate,
   formatMonth,
@@ -16,6 +17,12 @@ describe("format", () => {
     expect(formatAccounting(-1_250_000)).toBe("(Rp 1.250.000)");
     expect(formatAccounting(0)).toBe("Rp 0");
     expect(formatNumber(36_000_000)).toBe("36.000.000");
+  });
+
+  it("huruf awal tiap kata dikapitalisasi", () => {
+    expect(capitalizeWords("barang dagang")).toBe("Barang Dagang");
+    expect(capitalizeWords("bahan baku")).toBe("Bahan Baku");
+    expect(capitalizeWords("")).toBe("");
   });
 
   it("mem-parse input nominal Rupiah menjadi integer", () => {
