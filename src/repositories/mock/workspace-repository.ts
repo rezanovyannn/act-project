@@ -1,6 +1,6 @@
 import { fail } from "@/core/errors";
 import type { PeriodRange } from "@/core/periods";
-import type { IWorkspaceRepository, NewWorkspace } from "@/core/ports";
+import type { InventorySettings, IWorkspaceRepository, NewWorkspace } from "@/core/ports";
 import { assertValidTaxSettings, type WorkspaceTaxSettings } from "@/core/sales-tax";
 import type { AccountSeed, Workspace } from "@/core/types";
 import type { MockDatabase } from "./mock-database";
@@ -39,6 +39,8 @@ export class MockWorkspaceRepository implements IWorkspaceRepository {
         salesTaxMode: input.salesTax.mode,
         vatDppNumerator: input.salesTax.dppNumerator,
         vatDppDenominator: input.salesTax.dppDenominator,
+        inventoryMethod: "periodic",
+        costMethodHistory: [],
         createdAt: now,
         updatedAt: now,
         deletedAt: null,
@@ -102,6 +104,19 @@ export class MockWorkspaceRepository implements IWorkspaceRepository {
       workspace.salesTaxInclusive = settings.inclusive;
       workspace.updatedAt = this.db.now();
       this.db.audit(state, { workspaceId: id, entityType: "workspace", entityId: id, action: "update_tax_settings", before, after: workspace });
+      return workspace;
+    });
+  }
+
+  async updateInventorySettings(id: string, settings: InventorySettings): Promise<Workspace> {
+    return this.db.write((state) => {
+      const workspace = state.workspaces.find((w) => w.id === id && w.deletedAt === null);
+      if (!workspace) fail("NOT_FOUND", "Workspace tidak ditemukan");
+      const before = { ...workspace, costMethodHistory: [...workspace.costMethodHistory] };
+      workspace.inventoryMethod = settings.inventoryMethod;
+      workspace.costMethodHistory = settings.costMethodHistory.map((h) => ({ ...h }));
+      workspace.updatedAt = this.db.now();
+      this.db.audit(state, { workspaceId: id, entityType: "workspace", entityId: id, action: "update_inventory_settings", before, after: workspace });
       return workspace;
     });
   }

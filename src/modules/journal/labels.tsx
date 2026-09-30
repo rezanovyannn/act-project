@@ -13,6 +13,7 @@ export const SOURCE_LABELS: Record<JournalSource, string> = {
   tax_payment: "Setoran pajak",
   reversal: "Pembalik",
   closing: "Penutup",
+  return: "Retur",
 }
 
 /** Badge status sesuai docs/DESIGN_SYSTEM.md (tidak hanya mengandalkan warna). */

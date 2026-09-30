@@ -3,6 +3,7 @@ import { AccountingError, type ValidationCode } from "@/core/errors";
 import type {
   Account,
   AuditLog,
+  Item,
   JournalEntry,
   Period,
   Workspace,
@@ -59,6 +60,8 @@ export const toWorkspace = (r: any): Workspace => ({
   salesTaxMode: r.sales_tax_mode,
   vatDppNumerator: r.vat_dpp_numerator,
   vatDppDenominator: r.vat_dpp_denominator,
+  inventoryMethod: r.inventory_method,
+  costMethodHistory: r.cost_method_history ?? [],
   salesTaxRateBps: r.sales_tax_rate_bps,
   salesTaxInclusive: r.sales_tax_inclusive,
   createdAt: r.created_at,
@@ -99,6 +102,19 @@ const toAmount = (value: unknown): number => {
   return amount;
 };
 
+export const toItem = (r: any): Item => ({
+  id: r.id,
+  workspaceId: r.workspace_id,
+  code: r.code,
+  name: r.name,
+  unit: r.unit,
+  revenueAccountId: r.revenue_account_id,
+  isActive: r.is_active,
+  createdAt: r.created_at,
+  updatedAt: r.updated_at,
+  deletedAt: r.deleted_at,
+});
+
 export const JOURNAL_SELECT = "*, journal_lines(*)";
 
 export const toJournal = (r: any): JournalEntry => ({
@@ -113,6 +129,7 @@ export const toJournal = (r: any): JournalEntry => ({
   settlementOf: r.settlement_of,
   reversalOf: r.reversal_of,
   correctionOf: r.correction_of,
+  returnOf: r.return_of,
   postedAt: r.posted_at,
   createdAt: r.created_at,
   updatedAt: r.updated_at,
@@ -127,6 +144,8 @@ export const toJournal = (r: any): JournalEntry => ({
       description: l.description,
       debit: toAmount(l.debit),
       credit: toAmount(l.credit),
+      itemId: l.item_id ?? null,
+      quantity: l.quantity === null || l.quantity === undefined ? null : toAmount(l.quantity),
     })),
 });
 

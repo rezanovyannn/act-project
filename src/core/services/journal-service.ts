@@ -3,9 +3,11 @@ import { validateForPosting, validateLineAmounts } from "../journal-validation";
 import { activeOpeningBalance } from "../opening-balance";
 import type {
   IAccountRepository,
+  IItemRepository,
   IJournalRepository,
   IPeriodRepository,
 } from "../ports";
+import { validateReturn } from "../returns";
 import { buildReversalInput, validateReversal } from "../reversal";
 import { validateSettlement, type SettlementContext } from "../settlement";
 import type { Account, IsoDate, JournalEntry, JournalEntryInput } from "../types";
@@ -14,6 +16,7 @@ export interface JournalServiceDeps {
   journals: IJournalRepository;
   accounts: IAccountRepository;
   periods: IPeriodRepository;
+  items: IItemRepository;
 }
 
 export interface CorrectionResult {
@@ -66,12 +69,13 @@ export class JournalService {
     description?: string,
   ): Promise<JournalEntry> {
     const original = await this.requireEntry(entryId);
-    const [existingReversal, activeSettlements] = await Promise.all([
+    const [existingReversal, activeSettlements, activeReturns] = await Promise.all([
       this.deps.journals.findReversalOf(entryId),
       this.deps.journals.listActiveSettlementsOf(entryId),
+      this.deps.journals.listActiveReturnsOf(entryId),
     ]);
     assertNoIssues(
-      validateReversal(original, existingReversal, reversalDate, activeSettlements),
+      validateReversal(original, existingReversal, reversalDate, activeSettlements, activeReturns),
     );
     return this.validateAndPost(
       buildReversalInput(original, reversalDate, description),
@@ -100,11 +104,20 @@ export class JournalService {
     input: JournalEntryInput,
     draftId?: string,
   ): Promise<JournalEntry> {
-    const [accounts, periods] = await Promise.all([
+    const [accounts, periods, items] = await Promise.all([
       this.deps.accounts.listByWorkspace(input.workspaceId),
       this.deps.periods.listByWorkspace(input.workspaceId),
+      this.deps.items.listByWorkspace(input.workspaceId),
     ]);
-    const issues = validateForPosting(input, { accounts, periods });
+    const issues = validateForPosting(input, { accounts, periods, items });
+    if (input.returnOf) {
+      const [target, reversal, activeReturns] = await Promise.all([
+        this.deps.journals.getById(input.returnOf),
+        this.deps.journals.findReversalOf(input.returnOf),
+        this.deps.journals.listActiveReturnsOf(input.returnOf),
+      ]);
+      issues.push(...validateReturn(input, { target, targetReversed: reversal !== null, activeReturns, accounts }));
+    }
     if (input.source === "settlement" || input.settlementOf) {
       const context = await this.settlementContext(input.settlementOf ?? null, accounts);
       issues.push(...validateSettlement(input, context));
@@ -164,11 +177,14 @@ function toInput(entry: JournalEntry): JournalEntryInput {
     settlementOf: entry.settlementOf,
     reversalOf: entry.reversalOf,
     correctionOf: entry.correctionOf,
+    returnOf: entry.returnOf,
     lines: entry.lines.map((line) => ({
       accountId: line.accountId,
       description: line.description,
       debit: line.debit,
       credit: line.credit,
+      itemId: line.itemId,
+      quantity: line.quantity,
     })),
   };
 }

@@ -5,6 +5,7 @@ import type { IJournalRepository, JournalFilter } from "@/core/ports";
 import { activeOpeningBalance } from "@/core/opening-balance";
 import { activeClosingEntries, closingDate, validateClosingResult } from "@/core/closing";
 import { yearOf } from "@/core/dates";
+import { activeReturnsOf, validateReturn } from "@/core/returns";
 import { buildReversalInput, validateReversal } from "@/core/reversal";
 import { validateSettlement } from "@/core/settlement";
 import type { JournalEntry, JournalEntryInput, JournalLine } from "@/core/types";
@@ -69,6 +70,10 @@ export class MockJournalRepository implements IJournalRepository {
 
   async listActiveSettlementsOf(id: string): Promise<JournalEntry[]> {
     return activeSettlements(this.db.read(), id);
+  }
+
+  async listActiveReturnsOf(id: string): Promise<JournalEntry[]> {
+    return activeReturnsOf(this.db.read().journals, id);
   }
 
   async saveDraft(input: JournalEntryInput, draftId?: string): Promise<JournalEntry> {
@@ -175,8 +180,19 @@ export class MockJournalRepository implements IJournalRepository {
         validateForPosting(input, {
           accounts,
           periods: state.periods.filter((p) => p.workspaceId === input.workspaceId),
+          items: state.items.filter((i) => i.workspaceId === input.workspaceId),
         }),
       );
+      if (input.returnOf) {
+        assertNoIssues(
+          validateReturn(input, {
+            target: findActive(state, input.returnOf) ?? null,
+            targetReversed: findReversal(state, input.returnOf) !== null,
+            activeReturns: activeReturnsOf(state.journals, input.returnOf),
+            accounts,
+          }),
+        );
+      }
       if (input.source === "settlement" || input.settlementOf) {
         const targetId = input.settlementOf ?? null;
         assertNoIssues(
@@ -205,6 +221,7 @@ export class MockJournalRepository implements IJournalRepository {
             findReversal(state, original.id),
             input.entryDate,
             activeSettlements(state, original.id),
+            activeReturnsOf(state.journals, original.id),
           ),
         );
       }
@@ -249,6 +266,8 @@ export class MockJournalRepository implements IJournalRepository {
       description: line.description ?? null,
       debit: line.debit,
       credit: line.credit,
+      itemId: line.itemId ?? null,
+      quantity: line.itemId ? (line.quantity ?? 0) : null,
     }));
     return {
       id: existing?.id ?? this.db.generateId(),
@@ -262,6 +281,7 @@ export class MockJournalRepository implements IJournalRepository {
       settlementOf: input.settlementOf ?? null,
       reversalOf: input.reversalOf ?? null,
       correctionOf: input.correctionOf ?? null,
+      returnOf: input.returnOf ?? null,
       postedAt: null,
       createdAt: existing?.createdAt ?? now,
       updatedAt: now,

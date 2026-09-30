@@ -37,7 +37,8 @@ export type SystemRole =
   | "sales_tax_payable"
   | "income_summary"
   | "input_vat"
-  | "non_creditable_vat";
+  | "non_creditable_vat"
+  | "sales_returns";
 
 export type PeriodStatus = "open" | "closed";
 
@@ -53,7 +54,19 @@ export type JournalSource =
   | "settlement"
   | "tax_payment"
   | "reversal"
-  | "closing";
+  | "closing"
+  /** Retur tunai barang (ADR 017); retur yang mengurangi tagihan bersumber settlement. */
+  | "return";
+
+/** Metode persediaan per workspace (ADR 007, 015 & 017). */
+export type InventoryMethod = "periodic" | "perpetual";
+/** Metode biaya persediaan perpetual (ADR 017). */
+export type CostMethod = "average" | "fifo";
+/** Metode biaya yang berlaku mulai tanggal `from` (inklusif). */
+export interface CostMethodPeriod {
+  method: CostMethod;
+  from: IsoDate;
+}
 
 export interface Workspace {
   id: string;
@@ -73,6 +86,10 @@ export interface Workspace {
   /** DPP PPN sebagai pecahan (mis. 11/12), dipakai pada mode PPN lengkap. */
   vatDppNumerator: number;
   vatDppDenominator: number;
+  /** Periodik atau perpetual per barang (ADR 017). */
+  inventoryMethod: InventoryMethod;
+  /** Riwayat metode biaya, terurut; elemen terakhir = metode saat ini. */
+  costMethodHistory: CostMethodPeriod[];
   createdAt: IsoTimestamp;
   updatedAt: IsoTimestamp;
   deletedAt: IsoTimestamp | null;
@@ -112,6 +129,9 @@ export interface JournalLine {
   /** Tepat satu dari `debit`/`credit` bernilai > 0 pada jurnal posted. */
   debit: number;
   credit: number;
+  /** Barang & kuantitas (satuan dasar, bilangan bulat ≥ 0), ADR 017. */
+  itemId: string | null;
+  quantity: number | null;
 }
 
 export interface JournalEntry {
@@ -129,6 +149,8 @@ export interface JournalEntry {
   settlementOf: string | null;
   reversalOf: string | null;
   correctionOf: string | null;
+  /** Transaksi barang yang diretur oleh jurnal ini (ADR 017). */
+  returnOf: string | null;
   postedAt: IsoTimestamp | null;
   createdAt: IsoTimestamp;
   updatedAt: IsoTimestamp;
@@ -142,6 +164,8 @@ export interface JournalLineInput {
   description?: string | null;
   debit: number;
   credit: number;
+  itemId?: string | null;
+  quantity?: number | null;
 }
 
 /** Data jurnal sebelum disimpan (draft) atau diposting. */
@@ -154,6 +178,7 @@ export interface JournalEntryInput {
   settlementOf?: string | null;
   reversalOf?: string | null;
   correctionOf?: string | null;
+  returnOf?: string | null;
   lines: JournalLineInput[];
 }
 
@@ -180,7 +205,30 @@ export interface WorkspaceTemplate {
 
 export type TemplateRegistry = Record<TemplateType, WorkspaceTemplate>;
 
-export type AuditEntity = "workspace" | "account" | "period" | "journal";
+export type AuditEntity = "workspace" | "account" | "period" | "journal" | "item";
+
+/** Master barang untuk persediaan perpetual (ADR 017). */
+export interface Item {
+  id: string;
+  workspaceId: string;
+  code: string;
+  name: string;
+  /** Satuan dasar, mis. pcs, gram, ml. */
+  unit: string;
+  /** Akun pendapatan default saat barang dijual. */
+  revenueAccountId: string | null;
+  isActive: boolean;
+  createdAt: IsoTimestamp;
+  updatedAt: IsoTimestamp;
+  deletedAt: IsoTimestamp | null;
+}
+
+export interface ItemInput {
+  code: string;
+  name: string;
+  unit: string;
+  revenueAccountId: string | null;
+}
 
 /**
  * Jejak audit mutasi (AGENTS.md prinsip 10). Fase 1: ditulis mock repository

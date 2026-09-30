@@ -30,7 +30,15 @@ export type ValidationCode =
   | "NOT_POSTED"
   | "INVALID_TEMPLATE"
   | "DUPLICATE_ACCOUNT_CODE"
-  | "INVALID_TAX_LABEL";
+  | "INVALID_TAX_LABEL"
+  | "ITEM_NOT_FOUND"
+  | "ITEM_INACTIVE"
+  | "ITEM_IN_USE"
+  | "DUPLICATE_ITEM_CODE"
+  | "INVALID_QUANTITY"
+  | "INVALID_RETURN"
+  | "HAS_RETURNS"
+  | "UNKNOWN_COST";
 
 export interface ValidationIssue {
   code: ValidationCode;

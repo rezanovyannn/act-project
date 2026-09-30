@@ -25,7 +25,7 @@ export const RETAIL_ACCOUNTS: AccountSeed[] = [
   { code: "3-9000", name: "Ekuitas Saldo Awal", accountType: "equity", normalBalance: "credit", cashFlowCategory: "none", isCash: false, systemRole: "opening_balance_equity" },
   // Pendapatan (Retur & Potongan: akun kontra, saldo normal debit)
   { code: "4-1000", name: "Penjualan Barang Dagang", accountType: "revenue", normalBalance: "credit", cashFlowCategory: "operating", isCash: false, systemRole: null },
-  { code: "4-1900", name: "Retur & Potongan Penjualan", accountType: "revenue", normalBalance: "debit", cashFlowCategory: "operating", isCash: false, systemRole: null },
+  { code: "4-1900", name: "Retur & Potongan Penjualan", accountType: "revenue", normalBalance: "debit", cashFlowCategory: "operating", isCash: false, systemRole: "sales_returns" },
   // HPP
   { code: "5-1000", name: "HPP Barang Dagang", accountType: "cogs", normalBalance: "debit", cashFlowCategory: "operating", isCash: false, systemRole: "cogs" },
   // Beban

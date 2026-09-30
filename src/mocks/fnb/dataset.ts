@@ -216,6 +216,7 @@ function buildJournals(): JournalEntry[] {
       settlementOf: spec.settlementOf ? entryId(spec.settlementOf) : null,
       reversalOf: spec.reversalOf ? entryId(spec.reversalOf) : null,
       correctionOf: spec.correctionOf ? entryId(spec.correctionOf) : null,
+      returnOf: null,
       postedAt: posted ? timestamp : null,
       createdAt: timestamp,
       updatedAt: timestamp,
@@ -227,6 +228,8 @@ function buildJournals(): JournalEntry[] {
         description: null,
         debit,
         credit,
+        itemId: null,
+        quantity: null,
       })),
     } satisfies JournalEntry;
   });
@@ -270,6 +273,8 @@ export function buildFnbMockState(): MockState {
     salesTaxMode: "simple",
     vatDppNumerator: 1,
     vatDppDenominator: 1,
+    inventoryMethod: "periodic",
+    costMethodHistory: [],
     salesTaxRateBps: 1000,
     salesTaxInclusive: false,
     createdAt: SEED_TIMESTAMP,
@@ -282,6 +287,7 @@ export function buildFnbMockState(): MockState {
     accounts: buildAccounts(),
     periods: buildPeriods(),
     journals: buildJournals(),
+    items: [],
     auditLogs: [],
   };
 }

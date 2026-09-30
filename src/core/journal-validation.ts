@@ -4,6 +4,7 @@ import { formatRupiah, isValidAmount } from "./money";
 import { findPeriodForDate } from "./periods";
 import type {
   Account,
+  Item,
   JournalEntryInput,
   JournalLineInput,
   Period,
@@ -88,6 +89,40 @@ export function validateBalancedLines(
 export interface PostingContext {
   accounts: readonly Account[];
   periods: readonly Period[];
+  /** Barang workspace; wajib bila ada baris ber-barang (ADR 017). */
+  items?: readonly Item[];
+}
+
+/**
+ * Baris ber-barang (ADR 017): qty bilangan bulat ≥ 0 hanya bersama barang,
+ * barang ada di workspace yang sama, dan aktif (kecuali jurnal pembalik).
+ */
+export function validateItemLines(
+  entry: JournalEntryInput,
+  items: readonly Item[] = [],
+): ValidationIssue[] {
+  const issues: ValidationIssue[] = [];
+  const itemsById = new Map(items.map((i) => [i.id, i]));
+  entry.lines.forEach((line, lineIndex) => {
+    const where = `Baris ${lineIndex + 1}`;
+    if (!line.itemId) {
+      if (line.quantity !== undefined && line.quantity !== null) {
+        issues.push({ code: "INVALID_QUANTITY", message: `${where}: kuantitas hanya untuk baris barang`, lineIndex });
+      }
+      return;
+    }
+    const qty = line.quantity;
+    if (typeof qty !== "number" || !Number.isSafeInteger(qty) || qty < 0) {
+      issues.push({ code: "INVALID_QUANTITY", message: `${where}: kuantitas harus bilangan bulat tidak negatif`, lineIndex });
+    }
+    const item = itemsById.get(line.itemId);
+    if (!item || item.deletedAt !== null || item.workspaceId !== entry.workspaceId) {
+      issues.push({ code: "ITEM_NOT_FOUND", message: `${where}: barang tidak ditemukan`, lineIndex });
+    } else if (!item.isActive && entry.source !== "reversal") {
+      issues.push({ code: "ITEM_INACTIVE", message: `${where}: barang ${item.code} ${item.name} sudah nonaktif`, lineIndex });
+    }
+  });
+  return issues;
 }
 
 /**
@@ -115,6 +150,7 @@ export function validateForPosting(
   }
 
   issues.push(...validateBalancedLines(entry.lines));
+  issues.push(...validateItemLines(entry, context.items));
 
   const accountsById = new Map(context.accounts.map((a) => [a.id, a]));
   entry.lines.forEach((line, lineIndex) => {

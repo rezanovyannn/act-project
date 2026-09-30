@@ -115,7 +115,7 @@ Dipecah menjadi tiga sub-fase (ADR 015); stop & review setelah tiap sub-fase.
 - **Kriteria Selesai (Stop & Review):** Transaksi PPN lengkap menghasilkan jurnal yang benar dan teruji unit test; laporan tetap memenuhi invarian 1D.
 
 ### Sub-fase 4C: Persediaan Perpetual per Barang
-- **Pekerjaan:** Pilihan metode persediaan di Pengaturan (periodik atau perpetual): daftar barang, mutasi stok yang terikat jurnal, HPP per penjualan. Berlaku untuk semua template, dapat diubah kapan saja. Aturan akuntansi rinci (metode biaya, satuan, stok negatif, retur, stok opname, transisi metode) ditanyakan ke user sebelum dikerjakan lalu dicatat di ADR.
+- **Pekerjaan (ADR 017):** Pengaturan → Persediaan: metode periodik/perpetual dan metode biaya rata-rata/FIFO. Daftar Barang & kartu stok; qty barang tersimpan di baris jurnal Persediaan. Form perpetual: pembelian, penjualan barang, pemakaian barang, stok opname per barang, retur penjualan/pembelian. Peralihan periodik → perpetual lewat stok opname awal per barang.
 - **Kriteria Selesai (Stop & Review):** Saldo persediaan per barang sama dengan saldo akun persediaan di Buku Besar; HPP tercatat per penjualan dan teruji unit test.
 
 ---
@@ -144,3 +144,11 @@ Dipecah menjadi tiga sub-fase (ADR 015); stop & review setelah tiap sub-fase.
 | 19 | Cakupan PPN Masukan | Semua pembelian & beban; nominal dihitung, bisa dikoreksi sesuai faktur | ADR 016 |
 | 20 | Ganti mode pajak | Pilihan di Pengaturan: berlaku ke depan saja, atau jurnal transisi yang membebankan saldo PPN Masukan | ADR 016 |
 | 21 | Setoran PPN | Otomatis dari saldo per akhir masa, bisa dikoreksi | ADR 016 |
+| 22 | Metode biaya perpetual | Rata-rata tertimbang bergerak dan FIFO, dipilih di Pengaturan | ADR 017 |
+| 23 | Satuan barang | Bilangan bulat satuan dasar | ADR 017 |
+| 24 | Stok minus | Diizinkan dengan peringatan; selisih harga dikoreksi otomatis saat pembelian berikutnya | ADR 017 |
+| 25 | Peralihan metode persediaan | Periodik → perpetual lewat stok opname awal per barang (selisih ke HPP); peralihan lain tanpa jurnal | ADR 017 |
+| 26 | Retur | Retur penjualan & pembelian dengan nilai pokok asal; transaksi kredit: kurangi tagihan atau tunai | ADR 017 |
+| 27 | Pendapatan penjualan barang | Akun pendapatan default per barang | ADR 017 |
+| 28 | Pemakaian bahan F&B | Form Pemakaian Barang terjurnal otomatis (resep/BOM ditunda) | ADR 017 |
+| 29 | Transaksi barang bertanggal mundur | HPP jurnal posted tidak dihitung ulang; peringatan saat posting | ADR 017 |

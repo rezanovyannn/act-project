@@ -11,6 +11,7 @@ export const AUDIT_ENTITY_LABELS: Record<AuditEntity, string> = {
   account: "Akun",
   period: "Periode",
   journal: "Jurnal",
+  item: "Barang",
 };
 
 const ACTION_LABELS: Record<string, string> = {
@@ -25,6 +26,7 @@ const ACTION_LABELS: Record<string, string> = {
   close: "Dikunci",
   reopen: "Dibuka kembali",
   update_tax_settings: "Pengaturan pajak diubah",
+  update_inventory_settings: "Pengaturan persediaan diubah",
 };
 
 export function auditActionLabel(action: string): string {
@@ -58,6 +60,8 @@ export function auditSubject(log: Pick<AuditLog, "entityType" | "entityId" | "be
       return text("startDate") ? formatMonth(text("startDate")!) : log.entityId;
     case "workspace":
       return text("name") ?? log.entityId;
+    case "item":
+      return [text("code"), text("name")].filter(Boolean).join(" ") || log.entityId;
   }
 }
 
@@ -65,6 +69,8 @@ const FIELD_LABELS: Record<string, string> = {
   name: "Nama",
   code: "Kode",
   isActive: "Aktif",
+  unit: "Satuan",
+  inventoryMethod: "Metode persediaan",
   isCash: "Akun kas",
   cashFlowCategory: "Kategori arus kas",
   normalBalance: "Saldo normal",

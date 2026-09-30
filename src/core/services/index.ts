@@ -1,12 +1,15 @@
 import type {
   IAccountRepository,
   IAuditLogRepository,
+  IItemRepository,
   IJournalRepository,
   IPeriodRepository,
   IWorkspaceRepository,
 } from "../ports";
 import type { AccountService } from "./account-service";
 import type { ClosingService } from "./closing-service";
+import type { InventoryService } from "./inventory-service";
+import type { ItemService } from "./item-service";
 import type { JournalService } from "./journal-service";
 import type { PeriodService } from "./period-service";
 import type { TaxService } from "./tax-service";
@@ -14,6 +17,8 @@ import type { WorkspaceService } from "./workspace-service";
 
 export { AccountService } from "./account-service";
 export { ClosingService } from "./closing-service";
+export { InventoryService } from "./inventory-service";
+export { ItemService } from "./item-service";
 export { JournalService } from "./journal-service";
 export { PeriodService } from "./period-service";
 export { TaxService } from "./tax-service";
@@ -32,9 +37,12 @@ export interface AppServices {
   periodService: PeriodService;
   closingService: ClosingService;
   taxService: TaxService;
+  itemService: ItemService;
+  inventoryService: InventoryService;
   auditLogs: IAuditLogRepository;
   workspaces: IWorkspaceRepository;
   accounts: IAccountRepository;
   periods: IPeriodRepository;
   journals: IJournalRepository;
+  items: IItemRepository;
 }

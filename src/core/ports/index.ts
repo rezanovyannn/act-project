@@ -7,7 +7,11 @@ import type {
   AccountSeed,
   AuditEntity,
   AuditLog,
+  CostMethodPeriod,
+  InventoryMethod,
   IsoDate,
+  Item,
+  ItemInput,
   JournalEntry,
   JournalEntryInput,
   Period,
@@ -37,7 +41,29 @@ export interface IWorkspaceRepository {
   ): Promise<Workspace>;
   rename(id: string, name: string): Promise<Workspace>;
   updateSalesTaxSettings(id: string, settings: WorkspaceTaxSettings): Promise<Workspace>;
+  /** Metode persediaan & riwayat metode biaya (ADR 017). */
+  updateInventorySettings(id: string, settings: InventorySettings): Promise<Workspace>;
   softDelete(id: string): Promise<void>;
+}
+
+export interface InventorySettings {
+  inventoryMethod: InventoryMethod;
+  costMethodHistory: CostMethodPeriod[];
+}
+
+export type ItemPatch = Partial<ItemInput & { isActive: boolean }>;
+
+/** Master barang (ADR 017). */
+export interface IItemRepository {
+  /** Barang yang belum dihapus (aktif maupun nonaktif), urut kode. */
+  listByWorkspace(workspaceId: string): Promise<Item[]>;
+  getById(id: string): Promise<Item | null>;
+  /** Ditolak bila kode sudah dipakai barang lain di workspace (DUPLICATE_ITEM_CODE). */
+  create(workspaceId: string, input: ItemInput): Promise<Item>;
+  update(id: string, patch: ItemPatch): Promise<Item>;
+  /** Ditolak bila barang sudah dipakai baris jurnal (ITEM_IN_USE). */
+  softDelete(id: string): Promise<void>;
+  hasJournalLines(id: string): Promise<boolean>;
 }
 
 export type AccountPatch = Partial<
@@ -89,6 +115,8 @@ export interface IJournalRepository {
   findReversalOf(id: string): Promise<JournalEntry | null>;
   /** Jurnal pelunasan posted atas `id` yang belum di-void (ADR 012). */
   listActiveSettlementsOf(id: string): Promise<JournalEntry[]>;
+  /** Jurnal retur posted atas `id` yang belum di-void (ADR 017). */
+  listActiveReturnsOf(id: string): Promise<JournalEntry[]>;
   /**
    * Membuat draft baru (tanpa `draftId`) atau mengganti draft yang ada,
    * header + baris sekaligus. Tidak memvalidasi balance maupun periode.

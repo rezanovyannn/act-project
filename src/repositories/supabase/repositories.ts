@@ -8,7 +8,10 @@ import type {
   AuditLogFilter,
   IAccountRepository,
   IAuditLogRepository,
+  IItemRepository,
   IJournalRepository,
+  InventorySettings,
+  ItemPatch,
   IPeriodRepository,
   IWorkspaceRepository,
   JournalFilter,
@@ -19,6 +22,8 @@ import type {
   Account,
   AccountSeed,
   AuditLog,
+  Item,
+  ItemInput,
   JournalEntry,
   JournalEntryInput,
   Period,
@@ -30,6 +35,7 @@ import {
   JOURNAL_SELECT,
   toAccount,
   toAuditLog,
+  toItem,
   toJournal,
   toPeriod,
   toWorkspace,
@@ -84,6 +90,11 @@ export class SupabaseWorkspaceRepository implements IWorkspaceRepository {
     await unwrap(
       this.client.rpc("update_workspace_tax_settings", { p_id: id, p_settings: settings }),
     );
+    return required(await this.getById(id), "Workspace");
+  }
+
+  async updateInventorySettings(id: string, settings: InventorySettings): Promise<Workspace> {
+    await unwrap(this.client.rpc("update_workspace_inventory_settings", { p_id: id, p_settings: settings }));
     return required(await this.getById(id), "Workspace");
   }
 
@@ -202,12 +213,21 @@ export class SupabaseJournalRepository implements IJournalRepository {
   }
 
   async listActiveSettlementsOf(id: string): Promise<JournalEntry[]> {
+    return this.activeLinked("settlement_of", id);
+  }
+
+  async listActiveReturnsOf(id: string): Promise<JournalEntry[]> {
+    return this.activeLinked("return_of", id);
+  }
+
+  /** Jurnal posted yang merujuk `id` lewat kolom tautan dan belum di-void. */
+  private async activeLinked(column: "settlement_of" | "return_of", id: string): Promise<JournalEntry[]> {
     const settlements = (
       await unwrapRows(
         this.client
           .from("journal_entries")
           .select(JOURNAL_SELECT)
-          .eq("settlement_of", id)
+          .eq(column, id)
           .eq("status", "posted")
           .is("deleted_at", null)
           .order("entry_date")
@@ -266,6 +286,48 @@ export class SupabaseJournalRepository implements IJournalRepository {
   }
 }
 
+export class SupabaseItemRepository implements IItemRepository {
+  constructor(private readonly client: Client) {}
+
+  async listByWorkspace(workspaceId: string): Promise<Item[]> {
+    const rows = await unwrapRows(
+      this.client.from("items").select("*").eq("workspace_id", workspaceId).is("deleted_at", null).order("code"),
+    );
+    return rows.map(toItem);
+  }
+
+  async getById(id: string): Promise<Item | null> {
+    const row = await unwrap(this.client.from("items").select("*").eq("id", id).is("deleted_at", null).maybeSingle());
+    return row ? toItem(row) : null;
+  }
+
+  async create(workspaceId: string, input: ItemInput): Promise<Item> {
+    const id = await unwrap(this.client.rpc("create_item", { p_workspace_id: workspaceId, p_item: input }));
+    return required(await this.getById(id as string), "Barang");
+  }
+
+  async update(id: string, patch: ItemPatch): Promise<Item> {
+    await unwrap(this.client.rpc("update_item", { p_id: id, p_patch: patch }));
+    return required(await this.getById(id), "Barang");
+  }
+
+  async softDelete(id: string): Promise<void> {
+    await unwrap(this.client.rpc("delete_item", { p_id: id }));
+  }
+
+  async hasJournalLines(id: string): Promise<boolean> {
+    const rows = await unwrapRows(
+      this.client
+        .from("journal_lines")
+        .select("id, journal_entries!inner(deleted_at)")
+        .eq("item_id", id)
+        .is("journal_entries.deleted_at", null)
+        .limit(1),
+    );
+    return rows.length > 0;
+  }
+}
+
 export class SupabaseAuditLogRepository implements IAuditLogRepository {
   constructor(private readonly client: Client) {}
 
@@ -284,6 +346,7 @@ export function createSupabaseRepositories(client: Client) {
     accounts: new SupabaseAccountRepository(client),
     periods: new SupabasePeriodRepository(client),
     journals: new SupabaseJournalRepository(client),
+    items: new SupabaseItemRepository(client),
     auditLogs: new SupabaseAuditLogRepository(client),
   };
 }

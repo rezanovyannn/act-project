@@ -13,6 +13,9 @@ export function reverseLines(entry: JournalEntry): JournalLineInput[] {
     description: line.description,
     debit: line.credit,
     credit: line.debit,
+    // Barang & qty ikut dibalik sehingga stok kembali (ADR 017).
+    itemId: line.itemId,
+    quantity: line.quantity,
   }));
 }
 
@@ -45,6 +48,7 @@ export function validateReversal(
   existingReversal: JournalEntry | null,
   reversalDate: IsoDate,
   activeSettlements: readonly JournalEntry[] = [],
+  activeReturns: readonly JournalEntry[] = [],
 ): ValidationIssue[] {
   const issues: ValidationIssue[] = [];
   if (original.status !== "posted" || original.deletedAt !== null) {
@@ -75,6 +79,12 @@ export function validateReversal(
     issues.push({
       code: "HAS_SETTLEMENTS",
       message: `Transaksi ini sudah memiliki ${activeSettlements.length} pelunasan; void pelunasannya lebih dulu`,
+    });
+  }
+  if (activeReturns.length > 0) {
+    issues.push({
+      code: "HAS_RETURNS",
+      message: `Transaksi ini sudah memiliki ${activeReturns.length} retur; void returnya lebih dulu`,
     });
   }
   if (reversalDate < original.entryDate) {
