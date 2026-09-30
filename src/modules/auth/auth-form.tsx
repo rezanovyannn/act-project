@@ -34,7 +34,8 @@ export function AuthForm({
 }: {
   mode: AuthMode
   auth: IAuthService
-  switchHref: string
+  /** Tautan ke halaman lawan (daftar/masuk); null = disembunyikan (pendaftaran ditutup). */
+  switchHref: string | null
   onSuccess: () => void
 }) {
   const copy = COPY[mode]
@@ -139,12 +140,14 @@ export function AuthForm({
         </Button>
       </form>
 
-      <p className="mt-6 text-sm text-muted-foreground">
-        {mode === "login" ? "Belum punya akun? " : "Sudah punya akun? "}
-        <Link href={switchHref} className="font-semibold text-ink underline underline-offset-4">
-          {mode === "login" ? "Daftar" : "Masuk"}
-        </Link>
-      </p>
+      {switchHref && (
+        <p className="mt-6 text-sm text-muted-foreground">
+          {mode === "login" ? "Belum punya akun? " : "Sudah punya akun? "}
+          <Link href={switchHref} className="font-semibold text-ink underline underline-offset-4">
+            {mode === "login" ? "Daftar" : "Masuk"}
+          </Link>
+        </p>
+      )}
     </div>
   )
 }

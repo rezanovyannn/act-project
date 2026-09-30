@@ -58,6 +58,7 @@ Web app akuntansi pribadi multi-workspace untuk freelance (fokus: F&B) berbasis 
 - `pnpm build`: Build aplikasi Next.js
 - `pnpm test:supabase`: Contract test + RLS terhadap proyek Supabase dev (butuh internet & `.env.local`)
 - `pnpm db <perintah>`: Supabase CLI ke database dev, mis. `pnpm db migration list`, `pnpm db db push`
+- `pnpm db:prod <perintah>`: sama, ke database **production** (`SUPABASE_PROD_DB_URL`); jalankan migrasi production sebelum push kode yang bergantung pada skema baru (ADR 018)
 - Sumber data: Supabase bila `.env.local` berisi URL & anon key; `NEXT_PUBLIC_DATA_SOURCE=mock` untuk data contoh Fase 1
 
 <!-- BEGIN:nextjs-agent-rules -->

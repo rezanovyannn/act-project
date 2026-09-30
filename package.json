@@ -11,6 +11,7 @@
     "test:watch": "vitest",
     "typecheck": "next typegen && tsc --noEmit",
     "db": "node scripts/supabase-db.mjs",
+    "db:prod": "node scripts/supabase-db.mjs --prod",
     "test:supabase": "vitest run --config vitest.supabase.config.mts"
   },
   "dependencies": {

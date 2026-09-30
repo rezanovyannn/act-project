@@ -1,7 +1,8 @@
 #!/usr/bin/env node
 /**
  * Menjalankan perintah Supabase CLI yang butuh koneksi database proyek dev
- * (mis. `pnpm db migration list`, `pnpm db db push`).
+ * (mis. `pnpm db migration list`, `pnpm db db push`), atau proyek production
+ * lewat `pnpm db:prod ...` (SUPABASE_PROD_DB_URL, ADR 018).
  *
  * Kenapa perlu skrip ini: dari sebagian jaringan (ISP), hanya sebagian alamat
  * IP pooler Supabase yang dapat dijangkau, sehingga koneksi acak kadang gagal.
@@ -38,13 +39,15 @@ function reachable(ip, port, timeoutMs = 4000) {
   });
 }
 
-const args = process.argv.slice(2);
+const production = process.argv[2] === "--prod";
+const args = process.argv.slice(production ? 3 : 2);
 if (args.length === 0) {
-  console.error("Pemakaian: pnpm db <perintah supabase>, mis. `pnpm db migration list` atau `pnpm db db push`");
+  console.error("Pemakaian: pnpm db <perintah supabase> (dev) atau pnpm db:prod <perintah> (production)");
   process.exit(1);
 }
+if (production) console.error(">>> TARGET: DATABASE PRODUCTION <<<");
 
-const dbUrl = new URL(readEnv("SUPABASE_DB_URL"));
+const dbUrl = new URL(readEnv(production ? "SUPABASE_PROD_DB_URL" : "SUPABASE_DB_URL"));
 const password = decodeURIComponent(dbUrl.password);
 const port = Number(dbUrl.port || 5432);
 const ips = await dns.resolve4(dbUrl.hostname);

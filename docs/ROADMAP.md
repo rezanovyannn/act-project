@@ -120,6 +120,17 @@ Dipecah menjadi tiga sub-fase (ADR 015); stop & review setelah tiap sub-fase.
 
 ---
 
+## Fase 5: Deploy Production (ADR 018)
+- **Pekerjaan:**
+  - Pengaman konfigurasi production (tanpa kunci Supabase tidak jatuh ke data contoh) dan saklar penutup pendaftaran `NEXT_PUBLIC_ALLOW_SIGNUP`.
+  - Repository GitHub privat → import ke Vercel (subdomain `vercel.app`).
+  - Proyek Supabase production (Singapura), migrasi lewat `pnpm db:prod db push`.
+  - Environment variable Vercel: URL & anon key production; Supabase Auth URL Configuration ke alamat production.
+  - Akun pemilik dibuat, lalu pendaftaran ditutup (Supabase + `NEXT_PUBLIC_ALLOW_SIGNUP=false`).
+- **Kriteria Selesai (Stop & Review):** Aplikasi production dapat diakses, pemilik bisa login dan data tersimpan di Supabase production, halaman Daftar tertutup, dan uji asap (buat workspace, posting jurnal, laporan) berhasil.
+
+---
+
 ## Catatan Keputusan (dijawab user, 28 September 2026)
 | # | Pertanyaan | Keputusan | Rujukan |
 |---|---|---|---|
@@ -152,3 +163,6 @@ Dipecah menjadi tiga sub-fase (ADR 015); stop & review setelah tiap sub-fase.
 | 27 | Pendapatan penjualan barang | Akun pendapatan default per barang | ADR 017 |
 | 28 | Pemakaian bahan F&B | Form Pemakaian Barang terjurnal otomatis (resep/BOM ditunda) | ADR 017 |
 | 29 | Transaksi barang bertanggal mundur | HPP jurnal posted tidak dihitung ulang; peringatan saat posting | ADR 017 |
+| 30 | Cara deploy | GitHub privat + import Vercel | ADR 018 |
+| 31 | Pendaftaran production | Ditutup setelah akun pemilik dibuat | ADR 018 |
+| 32 | Alamat production | Subdomain vercel.app (domain sendiri menyusul bila perlu) | ADR 018 |
