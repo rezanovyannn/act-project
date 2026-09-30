@@ -3,6 +3,7 @@
  * di komentar tiap langkah.
  */
 import { beforeEach, describe, expect, it } from "vitest";
+import { computeDashboardSummary } from "@/core/dashboard";
 import { AccountingError, type ValidationCode } from "@/core/errors";
 import { buildInventoryPurchase } from "@/core/inventory";
 import {
@@ -322,6 +323,13 @@ describe("persediaan perpetual pada workspace", () => {
     const unused = await env.itemService.createItem(workspaceId, { code: "C-01", name: "Baru", unit: "gram", revenueAccountId: null });
     await env.itemService.deleteItem(unused.id);
     expect((await env.repos.items.listByWorkspace(workspaceId)).map((i) => i.code)).toEqual(["A-01", "B-01"]);
+  });
+
+  it("dashboard: penanda HPP belum disesuaikan tidak berlaku pada mode perpetual", async () => {
+    const period = { startDate: "2026-01-01", endDate: "2026-01-31" };
+    const all = await journals();
+    expect(computeDashboardSummary(accounts, all, period).cogsPending).toBe(true);
+    expect(computeDashboardSummary(accounts, all, period, { perpetual: true }).cogsPending).toBe(false);
   });
 
   it("peralihan metode biaya & kembali ke periodik tanpa jurnal", async () => {

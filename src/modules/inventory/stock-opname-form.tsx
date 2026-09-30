@@ -16,9 +16,35 @@ import { Label } from "@/components/ui/label"
 import { LoadingState, PageHeader } from "@/components/ui/page-header"
 import { errorMessage, useLoader } from "@/lib/utils"
 import { buildStockOpname, inventoryBookBalance } from "@/core/inventory"
+import { ItemStockOpnameForm } from "./item-stock-opname-form"
+import { useInventoryData } from "./use-inventory-data"
 
-/** Stok opname: selisih saldo buku vs fisik diposting ke HPP, semua template (ADR 007 & 015). */
+/** Stok opname: periodik (nilai rupiah) atau per barang (perpetual), sesuai metode workspace. */
 export function StockOpnameView({
+  services,
+  workspaceId,
+  journalHref,
+}: {
+  services: AppServices
+  workspaceId: string
+  journalHref: (entryId: string) => string
+}) {
+  const data = useInventoryData(services, workspaceId)
+  if (data.loading && !data.data) return <LoadingState />
+  if (data.error) return <p role="alert" className="text-sm text-destructive">{errorMessage(data.error)}</p>
+  if (data.data!.workspace.inventoryMethod !== "perpetual") {
+    return <PeriodicStockOpname services={services} workspaceId={workspaceId} journalHref={journalHref} />
+  }
+  return (
+    <div className="grid grid-cols-1 gap-6">
+      <PageHeader title="Stok Opname" description="Hitung fisik per barang; selisih qty dinilai dengan harga pokok berjalan dan dibukukan ke HPP." />
+      <ItemStockOpnameForm services={services} data={data.data!} journalHref={journalHref} onPosted={data.reload} />
+    </div>
+  )
+}
+
+/** Stok opname periodik: selisih saldo buku vs fisik diposting ke HPP (ADR 007 & 015). */
+function PeriodicStockOpname({
   services,
   workspaceId,
   journalHref,

@@ -24,6 +24,7 @@ interface DashboardData {
   accounts: Account[]
   journals: JournalEntry[]
   periods: Period[]
+  perpetual: boolean
 }
 
 export function DashboardView({
@@ -40,12 +41,13 @@ export function DashboardView({
   journalHref: (entryId: string) => string
 }) {
   const data = useLoader<DashboardData>(async () => {
-    const [accounts, journals, periods] = await Promise.all([
+    const [accounts, journals, periods, workspace] = await Promise.all([
       services.accounts.listByWorkspace(workspaceId),
       services.journals.listByWorkspace(workspaceId),
       services.periods.listByWorkspace(workspaceId),
+      services.workspaces.getById(workspaceId),
     ])
-    return { accounts, journals, periods }
+    return { accounts, journals, periods, perpetual: workspace?.inventoryMethod === "perpetual" }
   }, [services, workspaceId])
   const [selectedPeriodId, setSelectedPeriodId] = useState<string | null>(null)
 
@@ -57,7 +59,7 @@ export function DashboardView({
       </p>
     )
   }
-  const { accounts, journals, periods } = data.data!
+  const { accounts, journals, periods, perpetual } = data.data!
   const period =
     periods.find((p) => p.id === selectedPeriodId) ??
     defaultDashboardPeriod(periods, journals, todayIsoDate())
@@ -103,7 +105,7 @@ export function DashboardView({
     )
   }
 
-  const summary = computeDashboardSummary(accounts, journals, period)
+  const summary = computeDashboardSummary(accounts, journals, period, { perpetual })
   const recent = journals
     .filter(isLedgerEntry)
     .filter((e) => e.entryDate <= period.endDate)

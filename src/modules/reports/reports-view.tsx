@@ -36,6 +36,7 @@ import { InvariantCheck, StatementTable, sectionRows, type StatementRow } from "
 
 interface ReportData {
   workspaceName: string
+  perpetual: boolean
   accounts: Account[]
   journals: JournalEntry[]
   periods: Period[]
@@ -61,7 +62,7 @@ export function ReportsView({ services, workspaceId }: { services: AppServices; 
       services.journals.listByWorkspace(workspaceId, { status: "posted" }),
       services.periods.listByWorkspace(workspaceId),
     ])
-    return { workspaceName: workspace?.name ?? "", accounts, journals, periods }
+    return { workspaceName: workspace?.name ?? "", perpetual: workspace?.inventoryMethod === "perpetual", accounts, journals, periods }
   }, [services, workspaceId])
 
   const today = todayIsoDate()
@@ -77,7 +78,7 @@ export function ReportsView({ services, workspaceId }: { services: AppServices; 
 
   if (data.loading) return <LoadingState />
   if (data.error) return <p role="alert" className="text-sm text-destructive">{errorMessage(data.error)}</p>
-  const { workspaceName, accounts, journals, periods } = data.data!
+  const { workspaceName, perpetual, accounts, journals, periods } = data.data!
   const validRange = range.fromDate !== "" && range.toDate !== "" && range.fromDate <= range.toDate
 
   return (
@@ -127,7 +128,7 @@ export function ReportsView({ services, workspaceId }: { services: AppServices; 
       {!validRange ? (
         <p role="alert" className="text-sm text-destructive">Tanggal awal harus sebelum atau sama dengan tanggal akhir.</p>
       ) : (
-        <Reports workspaceName={workspaceName} accounts={accounts} journals={journals} periods={periods} range={range} printAll={printAll} />
+        <Reports workspaceName={workspaceName} perpetual={perpetual} accounts={accounts} journals={journals} periods={periods} range={range} printAll={printAll} />
       )}
     </div>
   )
@@ -135,6 +136,7 @@ export function ReportsView({ services, workspaceId }: { services: AppServices; 
 
 function Reports({
   workspaceName,
+  perpetual,
   accounts,
   journals,
   periods,
@@ -142,6 +144,7 @@ function Reports({
   printAll,
 }: {
   workspaceName: string
+  perpetual: boolean
   accounts: Account[]
   journals: JournalEntry[]
   periods: Period[]
@@ -161,7 +164,7 @@ function Reports({
   // Bulan dalam rentang yang ada penjualan/pembelian persediaan tetapi belum stok opname (ADR 007).
   const pendingMonths = periods
     .filter((p) => p.endDate >= range.fromDate && p.startDate <= range.toDate)
-    .filter((p) => computeDashboardSummary(accounts, journals, p).cogsPending)
+    .filter((p) => computeDashboardSummary(accounts, journals, p, { perpetual }).cogsPending)
     .map((p) => formatMonth(p.startDate))
 
   const incomeRows: StatementRow[] = [

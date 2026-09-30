@@ -3,7 +3,7 @@
  * Nominal tetap integer Rupiah (tanpa pemisah ribuan) agar mudah diolah ulang.
  */
 import { reversedEntryIds } from "./reversal";
-import type { Account, AuditLog, IsoTimestamp, JournalEntry, Period, Workspace } from "./types";
+import type { Account, AuditLog, IsoTimestamp, Item, JournalEntry, Period, Workspace } from "./types";
 
 export const BACKUP_FORMAT = "act-project/workspace-backup";
 export const BACKUP_VERSION = 1;
@@ -16,12 +16,14 @@ export interface WorkspaceBackup {
   accounts: Account[];
   periods: Period[];
   journals: JournalEntry[];
+  /** Master barang (ADR 017). */
+  items: Item[];
   auditLogs: AuditLog[];
-  summary: { accounts: number; periods: number; journals: number; journalLines: number; auditLogs: number };
+  summary: { accounts: number; periods: number; journals: number; journalLines: number; items: number; auditLogs: number };
 }
 
 export function buildBackup(
-  parts: Pick<WorkspaceBackup, "workspace" | "accounts" | "periods" | "journals" | "auditLogs">,
+  parts: Pick<WorkspaceBackup, "workspace" | "accounts" | "periods" | "journals" | "items" | "auditLogs">,
   exportedAt: IsoTimestamp,
 ): WorkspaceBackup {
   return {
@@ -34,6 +36,7 @@ export function buildBackup(
       periods: parts.periods.length,
       journals: parts.journals.length,
       journalLines: parts.journals.reduce((sum, j) => sum + j.lines.length, 0),
+      items: parts.items.length,
       auditLogs: parts.auditLogs.length,
     },
   };
@@ -64,13 +67,16 @@ export const JOURNAL_CSV_HEADER = [
   "Keterangan Baris",
   "Debit",
   "Kredit",
+  "Kode Barang",
+  "Qty",
   "Di-void",
   "Membalik Nomor",
 ] as const;
 
 /** Satu baris CSV per baris jurnal (draft & posted yang belum dihapus). */
-export function journalLinesCsv(accounts: readonly Account[], journals: readonly JournalEntry[]): string {
+export function journalLinesCsv(accounts: readonly Account[], journals: readonly JournalEntry[], items: readonly Item[] = []): string {
   const accountsById = new Map(accounts.map((a) => [a.id, a]));
+  const itemsById = new Map(items.map((i) => [i.id, i]));
   const active = journals.filter((j) => j.deletedAt === null);
   const numbers = new Map(active.map((j) => [j.id, j.entryNumber]));
   const voided = reversedEntryIds(active);
@@ -92,6 +98,8 @@ export function journalLinesCsv(accounts: readonly Account[], journals: readonly
           line.description ?? "",
           line.debit,
           line.credit,
+          line.itemId ? itemsById.get(line.itemId)?.code ?? "" : "",
+          line.quantity ?? "",
           voided.has(entry.id) ? "Ya" : "Tidak",
           entry.reversalOf ? numbers.get(entry.reversalOf) ?? "" : "",
         ];

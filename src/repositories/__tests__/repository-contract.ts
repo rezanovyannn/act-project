@@ -6,9 +6,11 @@ import { beforeEach, describe, expect, it } from "vitest";
 import { AccountingError, type ValidationCode } from "@/core/errors";
 import { buildClosingPlan } from "@/core/closing";
 import { monthlyPeriodsForYear } from "@/core/periods";
+import { buildReversalInput } from "@/core/reversal";
 import type {
   IAccountRepository,
   IAuditLogRepository,
+  IItemRepository,
   IJournalRepository,
   IPeriodRepository,
   IWorkspaceRepository,
@@ -24,6 +26,7 @@ export interface ContractRepositories {
   periods: IPeriodRepository;
   journals: IJournalRepository;
   auditLogs: IAuditLogRepository;
+  items: IItemRepository;
 }
 
 async function expectCode(promise: Promise<unknown>, code: ValidationCode) {
@@ -411,6 +414,119 @@ export function describeRepositoryContract(
         // Dapat ditutup ulang.
         const again = await repos.journals.closeFiscalYear(workspace.id, 2026, plan.entries);
         expect(again).toHaveLength(4);
+      });
+    });
+
+    describe("persediaan perpetual (ADR 017)", () => {
+      async function setupItems() {
+        const accounts = await repos.accounts.listByWorkspace(workspace.id);
+        const role = (r: string) => accounts.find((a) => a.systemRole === r)!.id;
+        const item = await repos.items.create(workspace.id, { code: "BRG-1", name: "Kopi bubuk", unit: "gram", revenueAccountId: jualId });
+        const purchase = await repos.journals.postJournal({
+          workspaceId: workspace.id,
+          entryDate: "2026-03-01",
+          description: "Beli kopi",
+          source: "purchase",
+          lines: [
+            { accountId: role("inventory"), debit: 50_000, credit: 0, itemId: item.id, quantity: 1_000 },
+            { accountId: kasId, debit: 0, credit: 50_000 },
+          ],
+        });
+        const saleEntry = await repos.journals.postJournal({
+          workspaceId: workspace.id,
+          entryDate: "2026-03-05",
+          description: "Jual kopi",
+          source: "revenue",
+          lines: [
+            { accountId: kasId, debit: 30_000, credit: 0 },
+            { accountId: jualId, debit: 0, credit: 30_000, itemId: item.id, quantity: 300 },
+            { accountId: role("cogs"), debit: 15_000, credit: 0 },
+            { accountId: role("inventory"), debit: 0, credit: 15_000, itemId: item.id, quantity: 300 },
+          ],
+        });
+        return { item, purchase, saleEntry, role };
+      }
+
+      it("master barang: kode unik, ubah, nonaktif, hapus hanya bila belum dipakai", async () => {
+        const item = await repos.items.create(workspace.id, { code: "BRG-1", name: "Gula", unit: "gram", revenueAccountId: null });
+        expect(item).toMatchObject({ code: "BRG-1", unit: "gram", isActive: true, revenueAccountId: null, deletedAt: null });
+        await expectCode(repos.items.create(workspace.id, { code: "BRG-1", name: "Lain", unit: "pcs", revenueAccountId: null }), "DUPLICATE_ITEM_CODE");
+        const updated = await repos.items.update(item.id, { name: "Gula pasir", revenueAccountId: jualId, isActive: false });
+        expect(updated).toMatchObject({ name: "Gula pasir", revenueAccountId: jualId, isActive: false });
+        expect(await repos.items.hasJournalLines(item.id)).toBe(false);
+        await repos.items.softDelete(item.id);
+        expect(await repos.items.listByWorkspace(workspace.id)).toEqual([]);
+        const [log] = await repos.auditLogs.listByWorkspace(workspace.id, { entityType: "item", entityId: item.id });
+        expect(log.action).toBe("delete");
+      });
+
+      it("baris jurnal menyimpan barang & qty; pembalik ikut membawa barang", async () => {
+        const { item, saleEntry } = await setupItems();
+        const inventoryLine = saleEntry.lines.find((l) => l.itemId === item.id && l.credit > 0 && l.quantity === 300);
+        expect(inventoryLine).toBeTruthy();
+        expect(saleEntry.lines.find((l) => l.accountId === kasId)).toMatchObject({ itemId: null, quantity: null });
+        expect(await repos.items.hasJournalLines(item.id)).toBe(true);
+        await expectCode(repos.items.softDelete(item.id), "ITEM_IN_USE");
+        const reversal = await repos.journals.postJournal(buildReversalInput(saleEntry, "2026-03-06"));
+        expect(reversal.lines.filter((l) => l.itemId === item.id).map((l) => [l.debit, l.credit, l.quantity])).toEqual([
+          [30_000, 0, 300],
+          [15_000, 0, 300],
+        ]);
+      });
+
+      it("validasi baris barang di lapisan terakhir", async () => {
+        const { item, role } = await setupItems();
+        const base = { workspaceId: workspace.id, entryDate: "2026-03-07", description: "Uji", source: "manual" as const };
+        const withItem = (extra: Record<string, unknown>) => ({
+          ...base,
+          lines: [{ accountId: role("inventory"), debit: 1_000, credit: 0, ...extra }, { accountId: kasId, debit: 0, credit: 1_000 }],
+        });
+        await expectCode(repos.journals.postJournal(withItem({ itemId: item.id, quantity: -1 })), "INVALID_QUANTITY");
+        await expectCode(repos.journals.postJournal(withItem({ quantity: 5 })), "INVALID_QUANTITY");
+        await expectCode(repos.journals.postJournal(withItem({ itemId: "00000000-0000-0000-0000-000000000001", quantity: 1 })), "ITEM_NOT_FOUND");
+        await repos.items.update(item.id, { isActive: false });
+        await expectCode(repos.journals.postJournal(withItem({ itemId: item.id, quantity: 1 })), "ITEM_INACTIVE");
+      });
+
+      it("retur: qty kumulatif dibatasi, transaksi asal ber-retur tidak dapat di-void", async () => {
+        const { item, saleEntry, role } = await setupItems();
+        const returnOf = (quantity: number, value: number, cost: number): JournalEntryInput => ({
+          workspaceId: workspace.id,
+          entryDate: "2026-03-08",
+          description: "Retur kopi",
+          source: "return",
+          returnOf: saleEntry.id,
+          lines: [
+            { accountId: jualId, debit: value, credit: 0, itemId: item.id, quantity },
+            { accountId: kasId, debit: 0, credit: value },
+            { accountId: role("inventory"), debit: cost, credit: 0, itemId: item.id, quantity },
+            { accountId: role("cogs"), debit: 0, credit: cost },
+          ],
+        });
+        await expectCode(repos.journals.postJournal(returnOf(301, 30_100, 15_050)), "INVALID_RETURN");
+        const first = await repos.journals.postJournal(returnOf(200, 20_000, 10_000));
+        expect(first).toMatchObject({ source: "return", returnOf: saleEntry.id });
+        expect(await repos.journals.listActiveReturnsOf(saleEntry.id)).toHaveLength(1);
+        await expectCode(repos.journals.postJournal(returnOf(101, 10_100, 5_050)), "INVALID_RETURN");
+        await expectCode(repos.journals.postJournal(buildReversalInput(saleEntry, "2026-03-09")), "HAS_RETURNS");
+        await expectCode(repos.journals.postJournal({ ...returnOf(1, 100, 50), returnOf: null }), "INVALID_RETURN");
+        // Void retur membuka kembali qty yang dapat diretur.
+        await repos.journals.postJournal(buildReversalInput(first, "2026-03-09"));
+        expect(await repos.journals.listActiveReturnsOf(saleEntry.id)).toHaveLength(0);
+        await repos.journals.postJournal(returnOf(300, 30_000, 15_000));
+      });
+
+      it("pengaturan persediaan: metode & riwayat metode biaya", async () => {
+        const updated = await repos.workspaces.updateInventorySettings(workspace.id, {
+          inventoryMethod: "perpetual",
+          costMethodHistory: [
+            { method: "average", from: "2026-01-01" },
+            { method: "fifo", from: "2026-04-01" },
+          ],
+        });
+        expect(updated).toMatchObject({ inventoryMethod: "perpetual", costMethodHistory: [{ method: "average", from: "2026-01-01" }, { method: "fifo", from: "2026-04-01" }] });
+        const logs = await repos.auditLogs.listByWorkspace(workspace.id, { entityType: "workspace" });
+        expect(logs[0].action).toBe("update_inventory_settings");
       });
     });
   });

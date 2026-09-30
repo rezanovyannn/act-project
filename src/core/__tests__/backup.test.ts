@@ -66,7 +66,7 @@ describe("backup", () => {
 
   it("backup JSON memuat semua data dan ringkasan jumlahnya", () => {
     const backup = buildBackup(
-      { workspace: state.workspaces[0], accounts: state.accounts, periods: state.periods, journals: state.journals, auditLogs: [] },
+      { workspace: state.workspaces[0], accounts: state.accounts, periods: state.periods, journals: state.journals, items: [], auditLogs: [] },
       "2026-09-29T10:00:00.000Z",
     );
     expect(backup).toMatchObject({ format: "act-project/workspace-backup", version: 1, exportedAt: "2026-09-29T10:00:00.000Z" });
@@ -75,6 +75,7 @@ describe("backup", () => {
       periods: 24,
       journals: state.journals.length,
       journalLines: state.journals.reduce((sum, j) => sum + j.lines.length, 0),
+      items: 0,
       auditLogs: 0,
     });
     expect(JSON.parse(JSON.stringify(backup))).toEqual(backup);

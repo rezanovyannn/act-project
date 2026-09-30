@@ -151,6 +151,9 @@ export function validateForPosting(
 
   issues.push(...validateBalancedLines(entry.lines));
   issues.push(...validateItemLines(entry, context.items));
+  if (entry.source === "return" && !entry.returnOf) {
+    issues.push({ code: "INVALID_RETURN", message: "Jurnal retur harus merujuk transaksi asal" });
+  }
 
   const accountsById = new Map(context.accounts.map((a) => [a.id, a]));
   entry.lines.forEach((line, lineIndex) => {

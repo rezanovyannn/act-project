@@ -24,6 +24,9 @@ interface LineState {
   description: string
   debit: number | null
   credit: number | null
+  /** Barang & qty dari jurnal asal (mis. draft koreksi), dipertahankan apa adanya (ADR 017). */
+  itemId: string | null
+  quantity: number | null
 }
 
 let nextKey = 0
@@ -33,6 +36,8 @@ const emptyLine = (): LineState => ({
   description: "",
   debit: 0,
   credit: 0,
+  itemId: null,
+  quantity: null,
 })
 
 function linesFrom(draft?: JournalEntry): LineState[] {
@@ -43,6 +48,8 @@ function linesFrom(draft?: JournalEntry): LineState[] {
     description: line.description ?? "",
     debit: line.debit,
     credit: line.credit,
+    itemId: line.itemId,
+    quantity: line.quantity,
   }))
 }
 
@@ -67,6 +74,8 @@ export function JournalForm({
     () => services.accounts.listByWorkspace(workspaceId),
     [services, workspaceId],
   )
+  const items = useLoader(() => services.items.listByWorkspace(workspaceId), [services, workspaceId])
+  const itemsById = new Map((items.data ?? []).map((i) => [i.id, i]))
   const [entryDate, setEntryDate] = useState(draft?.entryDate ?? todayIsoDate())
   const [description, setDescription] = useState(draft?.description ?? "")
   const [lines, setLines] = useState<LineState[]>(() => linesFrom(draft))
@@ -109,11 +118,14 @@ export function JournalForm({
       counterparty: draft?.counterparty ?? null,
       settlementOf: draft?.settlementOf ?? null,
       correctionOf: draft?.correctionOf ?? null,
+      returnOf: draft?.returnOf ?? null,
       lines: lines.filter(isMeaningful).map((l) => ({
         accountId: l.accountId,
         description: l.description.trim() || null,
         debit: l.debit ?? 0,
         credit: l.credit ?? 0,
+        itemId: l.itemId,
+        quantity: l.quantity,
       })),
     }
   }
@@ -220,6 +232,12 @@ export function JournalForm({
                     onChange={(e) => updateLine(line.key, { description: e.target.value })}
                     placeholder="Opsional"
                   />
+                  {line.itemId && (
+                    <p className="col-span-2 text-xs text-muted-foreground md:order-last md:col-span-5">
+                      Baris barang: {itemsById.get(line.itemId)?.name ?? "barang"} × {line.quantity}{" "}
+                      {itemsById.get(line.itemId)?.unit ?? ""} (dipertahankan dari jurnal asal)
+                    </p>
+                  )}
                   <AmountInput
                     aria-label={`Debit baris ${index + 1}`}
                     value={line.debit}

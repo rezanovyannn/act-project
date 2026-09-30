@@ -16,6 +16,8 @@ import { LoadingState, PageHeader } from "@/components/ui/page-header"
 import { PaymentField, initialPayment, toPayment, type PaymentState } from "@/components/ui/payment-field"
 import { errorMessage, useLoader } from "@/lib/utils"
 import { buildInventoryPurchase } from "@/core/inventory"
+import { ItemPurchaseForm } from "./item-purchase-form"
+import { useInventoryData } from "./use-inventory-data"
 
 
 /** Pembelian persediaan (tunai/kredit) ke akun persediaan, semua template (ADR 007 & 015). */
@@ -38,6 +40,7 @@ export function PurchaseView({
     return {
       noun: services.workspaceService.templateOf(workspace.templateType).inventoryNoun,
       taxSettings: workspaceTaxSettings(workspace),
+      perpetual: workspace.inventoryMethod === "perpetual",
       accounts,
       journals,
     }
@@ -45,7 +48,7 @@ export function PurchaseView({
 
   if (data.loading && !data.data) return <LoadingState />
   if (data.error) return <p role="alert" className="text-sm text-destructive">{errorMessage(data.error)}</p>
-  const { noun, taxSettings, accounts, journals } = data.data!
+  const { noun, taxSettings, perpetual, accounts, journals } = data.data!
   const inventoryName = accounts.find((a) => a.systemRole === "inventory")?.name ?? "Persediaan"
   const suppliers = [...new Set(journals.filter((j) => j.source === "purchase").map((j) => j.counterparty).filter(Boolean) as string[])]
 
@@ -53,8 +56,15 @@ export function PurchaseView({
     <div className="grid grid-cols-1 gap-6">
       <PageHeader
         title={`Pembelian ${capitalizeWords(noun)}`}
-        description={`Dicatat sebagai ${inventoryName} (aset). HPP diakui saat stok opname akhir periode.`}
+        description={
+          perpetual
+            ? `Dicatat per barang ke ${inventoryName} (persediaan perpetual). HPP diakui saat barang keluar.`
+            : `Dicatat sebagai ${inventoryName} (aset). HPP diakui saat stok opname akhir periode.`
+        }
       />
+      {perpetual ? (
+        <PerpetualPurchase services={services} workspaceId={workspaceId} noun={noun} journalHref={journalHref} />
+      ) : (
       <PurchaseForm
         services={services}
         workspaceId={workspaceId}
@@ -65,8 +75,26 @@ export function PurchaseView({
         journalHref={journalHref}
         onPosted={data.reload}
       />
+      )}
     </div>
   )
+}
+
+function PerpetualPurchase({
+  services,
+  workspaceId,
+  noun,
+  journalHref,
+}: {
+  services: AppServices
+  workspaceId: string
+  noun: string
+  journalHref: (entryId: string) => string
+}) {
+  const data = useInventoryData(services, workspaceId)
+  if (data.loading && !data.data) return <LoadingState />
+  if (data.error) return <p role="alert" className="text-sm text-destructive">{errorMessage(data.error)}</p>
+  return <ItemPurchaseForm services={services} data={data.data!} noun={noun} journalHref={journalHref} onPosted={data.reload} />
 }
 
 function PurchaseForm({

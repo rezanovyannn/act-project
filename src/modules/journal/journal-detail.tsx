@@ -37,6 +37,7 @@ interface DetailData {
   entry: JournalEntry | null
   all: JournalEntry[]
   accountsById: Map<string, { code: string; name: string; isActive: boolean }>
+  itemsById: Map<string, { code: string; name: string; unit: string }>
 }
 
 export function JournalDetail({
@@ -60,15 +61,17 @@ export function JournalDetail({
   onCorrectionDraft: (draftId: string) => void
 }) {
   const data = useLoader<DetailData>(async () => {
-    const [entry, all, accounts] = await Promise.all([
+    const [entry, all, accounts, items] = await Promise.all([
       services.journals.getById(entryId),
       services.journals.listByWorkspace(workspaceId),
       services.accounts.listByWorkspace(workspaceId),
+      services.items.listByWorkspace(workspaceId),
     ])
     return {
       entry: entry?.workspaceId === workspaceId ? entry : null,
       all,
       accountsById: new Map(accounts.map((a) => [a.id, a])),
+      itemsById: new Map(items.map((i) => [i.id, i])),
     }
   }, [services, workspaceId, entryId])
   const [busy, setBusy] = useState(false)
@@ -259,7 +262,15 @@ export function JournalDetail({
                       <span className="ml-2 text-xs text-muted-foreground">nonaktif</span>
                     )}
                   </TableCell>
-                  <TableCell className="text-muted-foreground">{line.description ?? ""}</TableCell>
+                  <TableCell className="text-muted-foreground">
+                    {line.description ?? ""}
+                    {line.itemId && (
+                      <span className="block text-xs">
+                        {data.data!.itemsById.get(line.itemId)?.name ?? "Barang"} × {line.quantity}{" "}
+                        {data.data!.itemsById.get(line.itemId)?.unit ?? ""}
+                      </span>
+                    )}
+                  </TableCell>
                   <TableCell className="text-right">
                     <Amount value={line.debit} hideZero />
                   </TableCell>

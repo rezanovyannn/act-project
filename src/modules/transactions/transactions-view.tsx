@@ -10,12 +10,13 @@ import { LoadingState, PageHeader } from "@/components/ui/page-header"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { errorMessage } from "@/lib/utils"
 import { ExpenseForm } from "./expense-form"
+import { ItemSaleForm } from "./item-sale-form"
 import { SaleForm } from "./sale-form"
 import { TaxPaymentForm } from "./tax-payment-form"
 import { useWorkspaceData } from "./use-workspace-data"
 import { VatSettlementForm } from "./vat-settlement-form"
 
-export type TransactionTab = "sale" | "expense" | "tax"
+export type TransactionTab = "sale" | "item_sale" | "expense" | "tax"
 
 /** Input Cepat: form transaksi yang otomatis membentuk jurnal. */
 export function TransactionsView({
@@ -58,6 +59,7 @@ export function TransactionsView({
       <Tabs defaultValue={initialTab} className="grid grid-cols-1 gap-4">
         <TabsList className="w-fit max-w-full flex-wrap">
           <TabsTrigger value="sale">Penjualan</TabsTrigger>
+          {current.workspace.inventoryMethod === "perpetual" && <TabsTrigger value="item_sale">Penjualan barang</TabsTrigger>}
           <TabsTrigger value="expense">Beban operasional</TabsTrigger>
           <TabsTrigger value="tax">Setoran {current.workspace.salesTaxLabel}</TabsTrigger>
         </TabsList>
@@ -68,6 +70,11 @@ export function TransactionsView({
             {...formProps}
           />
         </TabsContent>
+        {current.workspace.inventoryMethod === "perpetual" && (
+          <TabsContent value="item_sale">
+            <ItemSaleForm key={current.workspace.salesTaxMode + current.workspace.salesTaxRateBps} {...formProps} />
+          </TabsContent>
+        )}
         <TabsContent value="expense">
           <ExpenseForm {...formProps} />
         </TabsContent>

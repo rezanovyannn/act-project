@@ -5,6 +5,7 @@ import Link from "next/link"
 import { usePathname } from "next/navigation"
 import {
   BookOpenIcon,
+  BoxesIcon,
   ClipboardCheckIcon,
   FileTextIcon,
   HistoryIcon,
@@ -13,8 +14,10 @@ import {
   LayoutDashboardIcon,
   MenuIcon,
   PackageIcon,
+  PackageMinusIcon,
   ReceiptIcon,
   SettingsIcon,
+  Undo2Icon,
   type LucideIcon,
 } from "lucide-react"
 import type { Container } from "@/lib/container"
@@ -59,8 +62,11 @@ function navGroups(workspaceId: string, template: WorkspaceTemplate): NavGroup[]
   groups.push({
     label: "Persediaan",
     items: [
+      { label: "Daftar Barang", href: routes.inventoryItems(workspaceId), icon: BoxesIcon },
       { label: `Pembelian ${capitalizeWords(template.inventoryNoun)}`, href: routes.inventoryPurchases(workspaceId), icon: PackageIcon },
       { label: "Stok Opname", href: routes.inventoryStockOpname(workspaceId), icon: ClipboardCheckIcon },
+      { label: "Pemakaian Barang", href: routes.inventoryUsage(workspaceId), icon: PackageMinusIcon },
+      { label: "Retur Barang", href: routes.inventoryReturns(workspaceId), icon: Undo2Icon },
     ],
   })
   groups.push({

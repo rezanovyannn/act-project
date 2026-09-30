@@ -1,25 +1,27 @@
 "use client"
 
 import type { AppServices } from "@/core/services"
-import type { Account, JournalEntry, Workspace } from "@/core/types"
+import type { Account, Item, JournalEntry, Workspace } from "@/core/types"
 import { useLoader } from "@/lib/utils"
 
 export interface WorkspaceData {
   workspace: Workspace
   accounts: Account[]
   journals: JournalEntry[]
+  items: Item[]
 }
 
 /** Workspace, akun, dan jurnal untuk form transaksi. */
 export function useWorkspaceData(services: AppServices, workspaceId: string) {
   return useLoader<WorkspaceData>(async () => {
-    const [workspace, accounts, journals] = await Promise.all([
+    const [workspace, accounts, journals, items] = await Promise.all([
       services.workspaces.getById(workspaceId),
       services.accounts.listByWorkspace(workspaceId),
       services.journals.listByWorkspace(workspaceId),
+      services.items.listByWorkspace(workspaceId),
     ])
     if (!workspace) throw new Error("Workspace tidak ditemukan")
-    return { workspace, accounts, journals }
+    return { workspace, accounts, journals, items }
   }, [services, workspaceId])
 }
 

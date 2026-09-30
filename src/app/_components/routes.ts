@@ -13,6 +13,9 @@ export const routes = {
   settings: (workspaceId: string, tab?: string) => `/w/${workspaceId}/settings${tab ? `?tab=${tab}` : ""}`,
   transactions: (workspaceId: string) => `/w/${workspaceId}/transactions`,
   credits: (workspaceId: string) => `/w/${workspaceId}/credits`,
+  inventoryItems: (workspaceId: string) => `/w/${workspaceId}/inventory/items`,
+  inventoryUsage: (workspaceId: string) => `/w/${workspaceId}/inventory/usage`,
+  inventoryReturns: (workspaceId: string) => `/w/${workspaceId}/inventory/returns`,
   inventoryPurchases: (workspaceId: string) => `/w/${workspaceId}/inventory/purchases`,
   inventoryStockOpname: (workspaceId: string) => `/w/${workspaceId}/inventory/stock-opname`,
 }

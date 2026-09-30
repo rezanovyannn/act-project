@@ -17,6 +17,7 @@ export default function SettingsPage() {
       workspaceId={workspaceId}
       journalHref={(entryId) => routes.journal(workspaceId, entryId)}
       initialTab={tab}
+      itemsHref={routes.inventoryItems(workspaceId)}
     />
   )
 }

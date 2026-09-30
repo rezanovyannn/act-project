@@ -26,13 +26,14 @@ export function BackupTab({ services, workspace }: { services: AppServices; work
   async function exportJson() {
     setBusy("json")
     try {
-      const [accounts, periods, journals, auditLogs] = await Promise.all([
+      const [accounts, periods, journals, items, auditLogs] = await Promise.all([
         services.accounts.listByWorkspace(workspace.id),
         services.periods.listByWorkspace(workspace.id),
         services.journals.listByWorkspace(workspace.id),
+        services.items.listByWorkspace(workspace.id),
         services.auditLogs.listByWorkspace(workspace.id),
       ])
-      const backup = buildBackup({ workspace, accounts, periods, journals, auditLogs }, new Date().toISOString())
+      const backup = buildBackup({ workspace, accounts, periods, journals, items, auditLogs }, new Date().toISOString())
       download(backupFileName(workspace.name, todayIsoDate(), "json"), JSON.stringify(backup, null, 2), "application/json")
       toast.success(`Backup diunduh: ${backup.summary.journals} jurnal, ${backup.summary.accounts} akun`)
     } catch (e) {
@@ -45,13 +46,14 @@ export function BackupTab({ services, workspace }: { services: AppServices; work
   async function exportCsv() {
     setBusy("csv")
     try {
-      const [accounts, journals] = await Promise.all([
+      const [accounts, journals, items] = await Promise.all([
         services.accounts.listByWorkspace(workspace.id),
         services.journals.listByWorkspace(workspace.id),
+        services.items.listByWorkspace(workspace.id),
       ])
       download(
         backupFileName(workspace.name, todayIsoDate(), "csv", "jurnal"),
-        journalLinesCsv(accounts, journals),
+        journalLinesCsv(accounts, journals, items),
         "text/csv;charset=utf-8",
       )
       toast.success("CSV jurnal diunduh")

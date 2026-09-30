@@ -37,6 +37,8 @@ export function computeDashboardSummary(
   accounts: readonly Account[],
   entries: readonly JournalEntry[],
   period: PeriodRange,
+  /** Mode perpetual: HPP diakui per transaksi, penanda "HPP belum disesuaikan" tidak berlaku (ADR 017). */
+  options: { perpetual?: boolean } = {},
 ): DashboardSummary {
   // Laba rugi periode tanpa jurnal penutup & pembaliknya (ADR 014).
   const inPeriod = accountTotals(withoutClosing(entries), { fromDate: period.startDate, toDate: period.endDate });
@@ -99,7 +101,7 @@ export function computeDashboardSummary(
     inputVat: byRole("input_vat"),
     draftCount: entries.filter((e) => e.status === "draft" && e.deletedAt === null).length,
     postedCount: postedInPeriod.length,
-    cogsPending: !hasOpname && (revenue > 0 || hasInventoryActivity),
+    cogsPending: !options.perpetual && !hasOpname && (revenue > 0 || hasInventoryActivity),
   };
 }
 
