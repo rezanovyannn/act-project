@@ -82,7 +82,7 @@ export function AuditLogView({
         <p className="rounded-lg bg-card px-4 py-6 text-center text-sm text-muted-foreground">Belum ada catatan audit.</p>
       ) : (
         <div className="grid gap-3">
-          <ul className="divide-y rounded-[24px] bg-canvas ring-1 ring-border text-sm" aria-label="Catatan audit">
+          <ul className="divide-y rounded-2xl bg-canvas ring-1 ring-border text-sm" aria-label="Catatan audit">
             {logs.data!.slice(0, limit).map((log) => {
               const subject = auditSubject(log)
               const changes = auditChanges(log.before, log.after)

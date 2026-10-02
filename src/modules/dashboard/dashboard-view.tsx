@@ -275,7 +275,7 @@ export function DashboardView({
         <div className="grid content-start gap-4">
           <div className="rounded-lg bg-canvas p-6 ring-1 ring-border">
             <p className="text-sm text-muted-foreground">Total likuiditas (kas & bank)</p>
-            <Amount value={summary.cashTotal} className="mt-1 block text-2xl font-bold text-ink" />
+            <Amount value={summary.cashTotal} className="mt-1 block text-xl font-bold text-ink" />
             <ul className="mt-4 grid gap-2 text-sm">
               {summary.cashAccounts.map((a, i) => (
                 <li key={a.accountId} className="flex items-center justify-between gap-4">
@@ -329,7 +329,7 @@ const DOT_COLORS = ["bg-ink", "bg-ring", "bg-chart-2", "bg-success-deep", "bg-ch
 function Title() {
   return (
     <div>
-      <h1 className="text-3xl font-bold tracking-tight text-ink">Dashboard</h1>
+      <h1 className="text-2xl font-bold tracking-tight text-ink">Dashboard</h1>
       <p className="text-sm text-muted-foreground">Ringkasan keuangan per bulan, dihitung langsung dari jurnal posted.</p>
     </div>
   )
@@ -376,13 +376,13 @@ function KpiCard({
   emphasis?: boolean
 }) {
   return (
-    <div className={cn("grid content-between gap-4 rounded-lg p-6 ring-1", emphasis ? "bg-primary/5 ring-primary/20" : "bg-canvas ring-border")}>
+    <div className={cn("grid content-between gap-3 rounded-lg p-5 ring-1", emphasis ? "bg-primary/5 ring-primary/20" : "bg-canvas ring-border")}>
       <div className="grid gap-2">
         <div className="flex items-start justify-between gap-2">
           <p className={cn("text-sm font-medium", emphasis ? "text-primary" : "text-muted-foreground")}>{label}</p>
           {badge}
         </div>
-        <Amount value={value} className="block text-2xl font-bold text-ink" />
+        <Amount value={value} className="block text-xl font-bold text-ink" />
       </div>
       <dl className="grid gap-1 border-t pt-3 text-xs">
         {footer.map(([term, detail]) => (
@@ -401,7 +401,7 @@ function WeeklyChart({ weeks }: { weeks: WeeklyCash[] }) {
   const height = (value: number) => `${Math.max(value > 0 ? 3 : 0, Math.round((value / max) * 100))}%`
   return (
     <figure className="grid gap-2">
-      <div className="flex h-48 items-end justify-around gap-2 border-b px-2" aria-hidden>
+      <div className="flex h-36 items-end justify-around gap-2 border-b px-2" aria-hidden>
         {weeks.map((w) => (
           <div key={w.label} className="flex h-full items-end gap-1.5" title={`${w.label}: masuk ${formatAccounting(w.inflow)}, keluar ${formatAccounting(w.outflow)}`}>
             <div className="w-6 rounded-t-md bg-ink sm:w-8" style={{ height: height(w.inflow) }} />
@@ -531,15 +531,15 @@ function RecentJournals({
             <tbody className="divide-y">
               {shown.map((entry) => (
                 <tr key={entry.id} className="align-top">
-                  <td className="px-6 py-4">
+                  <td className="px-5 py-3">
                     <span className="block text-ink">{formatDate(entry.entryDate)}</span>
                     <span className="mt-1 inline-block rounded-md bg-card px-1.5 py-0.5 font-mono text-[11px] text-muted-foreground">{entry.entryNumber}</span>
                   </td>
-                  <td className="px-3 py-4">
+                  <td className="px-3 py-3">
                     <span className="block text-ink">{entry.description}</span>
                     {entry.counterparty && <span className="block text-xs text-muted-foreground">{entry.counterparty}</span>}
                   </td>
-                  <td className="px-3 py-4">
+                  <td className="px-3 py-3">
                     <ul className="grid gap-0.5 text-xs">
                       {entry.lines.map((line) => {
                         const account = accountsById.get(line.accountId)
@@ -552,10 +552,10 @@ function RecentJournals({
                       })}
                     </ul>
                   </td>
-                  <td className="px-3 py-4 text-right"><Amount value={total(entry, "debit")} /></td>
-                  <td className="px-3 py-4 text-right"><Amount value={total(entry, "credit")} /></td>
-                  <td className="px-3 py-4"><StatusBadge entry={entry} voided={reversed.has(entry.id)} /></td>
-                  <td className="px-6 py-4 text-right">
+                  <td className="px-3 py-3 text-right"><Amount value={total(entry, "debit")} /></td>
+                  <td className="px-3 py-3 text-right"><Amount value={total(entry, "credit")} /></td>
+                  <td className="px-3 py-3"><StatusBadge entry={entry} voided={reversed.has(entry.id)} /></td>
+                  <td className="px-5 py-3 text-right">
                     <Link href={journalHref(entry.id)} aria-label={`Lihat ${entry.entryNumber}`} className="inline-grid size-8 place-items-center rounded-lg text-muted-foreground hover:bg-card hover:text-ink">
                       <EyeIcon className="size-4" />
                     </Link>

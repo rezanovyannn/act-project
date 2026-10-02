@@ -104,7 +104,7 @@ export function InventoryTab({
       </p>
 
       {!perpetual ? (
-        <section className="grid gap-4 rounded-[24px] bg-canvas ring-1 ring-border p-4 sm:p-6">
+        <section className="grid gap-4 rounded-2xl bg-canvas ring-1 ring-border p-4 sm:p-6">
           <div>
             <h2 className="font-semibold">Aktifkan persediaan perpetual</h2>
             <p className="text-sm text-muted-foreground">
@@ -133,7 +133,7 @@ export function InventoryTab({
           {activeItems.length === 0 ? (
             <p className="text-sm text-muted-foreground">Belum ada barang aktif.</p>
           ) : (
-            <div className="overflow-x-auto rounded-[24px] bg-canvas ring-1 ring-border">
+            <div className="overflow-x-auto rounded-2xl bg-canvas ring-1 ring-border">
               <Table>
                 <TableHeader>
                   <TableRow>
@@ -205,7 +205,7 @@ export function InventoryTab({
         </section>
       ) : (
         <>
-          <section className="grid gap-4 rounded-[24px] bg-canvas ring-1 ring-border p-4 sm:p-6">
+          <section className="grid gap-4 rounded-2xl bg-canvas ring-1 ring-border p-4 sm:p-6">
             <h2 className="font-semibold">Metode biaya</h2>
             <ul className="grid gap-1 text-sm text-muted-foreground">
               {workspace.costMethodHistory.map((h) => (
@@ -245,7 +245,7 @@ export function InventoryTab({
               Tanpa jurnal: stok per barang pada tanggal berlaku menjadi harga/lapisan awal metode baru.
             </p>
           </section>
-          <section className="grid gap-3 rounded-[24px] bg-canvas ring-1 ring-border p-4 sm:p-6">
+          <section className="grid gap-3 rounded-2xl bg-canvas ring-1 ring-border p-4 sm:p-6">
             <h2 className="font-semibold">Kembali ke metode periodik</h2>
             <p className="text-sm text-muted-foreground">
               Tanpa jurnal: stok per barang dibekukan, saldo akun Persediaan tetap, dan HPP kembali diakui lewat

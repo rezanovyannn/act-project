@@ -121,3 +121,12 @@
     print-color-adjust: exact;
   }
 }
+
+/*
+ * Kerapatan ringkas di dalam workspace (Oktober 2026): seluruh ukuran berbasis rem
+ * (teks, jarak, tinggi kontrol, lebar sidebar) diperkecil 12,5%. Persen agar tetap
+ * mengikuti ukuran huruf yang diatur pengguna di browser. Login & Workspace Saya tidak terpengaruh.
+ */
+html:has([data-density="compact"]) {
+  font-size: 87.5%;
+}

@@ -64,7 +64,7 @@ export function LedgerView({
         title="Buku Besar"
         description="Mutasi dan saldo berjalan per akun dari jurnal posted."
       />
-      <div className="grid gap-4 rounded-[24px] bg-canvas ring-1 ring-border p-4 sm:grid-cols-[minmax(0,2fr)_1fr_1fr] sm:p-6">
+      <div className="grid gap-4 rounded-2xl bg-canvas ring-1 ring-border p-4 sm:grid-cols-[minmax(0,2fr)_1fr_1fr] sm:p-6">
         <div className="grid gap-2">
           <Label htmlFor="ledger-account">Akun</Label>
           <AccountCombobox
@@ -118,7 +118,7 @@ function LedgerTable({
         {account.code} · {account.name} — saldo normal {balanceSide}
         {!account.isActive && " · nonaktif"}
       </p>
-      <div className="overflow-hidden rounded-[24px] bg-canvas ring-1 ring-border">
+      <div className="overflow-hidden rounded-2xl bg-canvas ring-1 ring-border">
         <Table>
           <TableHeader className="bg-card">
             <TableRow>

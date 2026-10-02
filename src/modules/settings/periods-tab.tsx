@@ -67,7 +67,7 @@ export function PeriodsTab({
       </div>
 
       {years.map((year) => (
-        <section key={year} className="overflow-hidden rounded-[24px] bg-canvas ring-1 ring-border" aria-label={`Tahun buku ${year}`}>
+        <section key={year} className="overflow-hidden rounded-2xl bg-canvas ring-1 ring-border" aria-label={`Tahun buku ${year}`}>
           <h2 className="border-b bg-card px-4 py-2.5 text-sm font-bold">Tahun buku {year}</h2>
           <ul className="divide-y">
             {periods
@@ -117,7 +117,7 @@ export function PeriodsTab({
         {statusLogs.length === 0 ? (
           <p className="text-sm text-muted-foreground">Belum ada perubahan status periode.</p>
         ) : (
-          <ul className="divide-y rounded-[24px] bg-canvas ring-1 ring-border text-sm">
+          <ul className="divide-y rounded-2xl bg-canvas ring-1 ring-border text-sm">
             {statusLogs.map((log) => {
               const period = periodById.get(log.entityId)
               return (

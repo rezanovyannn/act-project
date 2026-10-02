@@ -173,7 +173,7 @@ export function JournalForm({
         </p>
       )}
 
-      <div className="grid gap-4 rounded-[24px] bg-canvas ring-1 ring-border p-4 sm:grid-cols-[12rem_1fr] sm:p-6">
+      <div className="grid gap-4 rounded-2xl bg-canvas ring-1 ring-border p-4 sm:grid-cols-[12rem_1fr] sm:p-6">
         <div className="grid gap-2">
           <Label htmlFor="journal-date">Tanggal</Label>
           <Input
@@ -201,7 +201,7 @@ export function JournalForm({
         )}
       </div>
 
-      <div className="rounded-[24px] bg-canvas ring-1 ring-border">
+      <div className="rounded-2xl bg-canvas ring-1 ring-border">
         <div className="hidden grid-cols-[minmax(0,2fr)_minmax(0,1.5fr)_10rem_10rem_2.5rem] gap-3 border-b bg-card px-4 py-3 text-sm font-bold text-ink md:grid">
           <span>Akun</span>
           <span>Keterangan baris</span>

@@ -138,7 +138,7 @@ export function ReturnsView({
         </TabsList>
       </Tabs>
       <form onSubmit={submit} className="grid grid-cols-1 gap-6 xl:grid-cols-[minmax(0,1fr)_26rem]">
-        <div className="grid content-start gap-5 rounded-[24px] bg-canvas ring-1 ring-border p-4 sm:p-6">
+        <div className="grid content-start gap-5 rounded-2xl bg-canvas ring-1 ring-border p-4 sm:p-6">
           <div className="grid gap-2">
             <Label htmlFor="return-target">{kind === "sales" ? "Penjualan asal" : "Pembelian asal"}</Label>
             <Select value={targetId} onValueChange={(v) => { setTargetId(v); setQuantities({}); setRefund("") }}>
@@ -156,7 +156,7 @@ export function ReturnsView({
           </div>
           {target && (
             <>
-              <div className="overflow-x-auto rounded-[24px] bg-canvas ring-1 ring-border">
+              <div className="overflow-x-auto rounded-2xl bg-canvas ring-1 ring-border">
                 <Table>
                   <TableHeader>
                     <TableRow>

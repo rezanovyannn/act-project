@@ -237,7 +237,7 @@ export function JournalDetail({
         )}
       </div>
 
-      <div className="overflow-hidden rounded-[24px] bg-canvas ring-1 ring-border">
+      <div className="overflow-hidden rounded-2xl bg-canvas ring-1 ring-border">
         <Table>
           <TableHeader className="bg-card">
             <TableRow>

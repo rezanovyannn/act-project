@@ -15,7 +15,7 @@ function PageHeader({
   return (
     <div className={cn("flex flex-wrap items-end justify-between gap-4", className)}>
       <div className="min-w-0">
-        <h1 className="text-3xl leading-tight font-bold tracking-tight text-ink">{title}</h1>
+        <h1 className="text-2xl leading-tight font-bold tracking-tight text-ink">{title}</h1>
         {description && <p className="mt-1.5 max-w-3xl text-sm text-muted-foreground">{description}</p>}
       </div>
       {actions && <div className="flex flex-wrap items-center gap-2">{actions}</div>}
@@ -25,7 +25,7 @@ function PageHeader({
 
 function EmptyState({ title, children }: { title: string; children?: React.ReactNode }) {
   return (
-    <div className="rounded-[24px] border-2 border-dashed px-6 py-12 text-center">
+    <div className="rounded-2xl border-2 border-dashed px-6 py-12 text-center">
       <p className="font-semibold text-ink">{title}</p>
       {children && <div className="mt-2 text-sm text-muted-foreground">{children}</div>}
     </div>

@@ -70,7 +70,7 @@ export function BackupTab({ services, workspace }: { services: AppServices; work
         Unduh salinan data workspace ini. File berisi seluruh data keuangan, jadi simpan di tempat aman
         dan jangan dibagikan sembarangan.
       </p>
-      <section className="grid gap-3 rounded-[24px] bg-canvas ring-1 ring-border p-4 sm:p-6">
+      <section className="grid gap-3 rounded-2xl bg-canvas ring-1 ring-border p-4 sm:p-6">
         <div className="flex items-start gap-3">
           <FileJsonIcon className="mt-0.5 size-5 shrink-0" />
           <div>
@@ -86,7 +86,7 @@ export function BackupTab({ services, workspace }: { services: AppServices; work
           {busy === "json" ? "Menyiapkan…" : "Unduh backup JSON"}
         </Button>
       </section>
-      <section className="grid gap-3 rounded-[24px] bg-canvas ring-1 ring-border p-4 sm:p-6">
+      <section className="grid gap-3 rounded-2xl bg-canvas ring-1 ring-border p-4 sm:p-6">
         <div className="flex items-start gap-3">
           <FileSpreadsheetIcon className="mt-0.5 size-5 shrink-0" />
           <div>

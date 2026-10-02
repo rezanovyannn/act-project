@@ -62,11 +62,11 @@ export function CreditsView({
         description="Transaksi kredit yang belum lunas. Pelunasan boleh sebagian dan tidak boleh melebihi sisa tagihan."
       />
       <div className="grid gap-4 sm:grid-cols-2">
-        <div className="rounded-[24px] bg-canvas ring-1 ring-border p-6">
+        <div className="rounded-2xl bg-canvas ring-1 ring-border p-6">
           <p className="text-xs font-medium text-muted-foreground">Total piutang pelanggan</p>
           <Amount value={totalOf("receivable")} className="mt-1 block text-lg font-semibold text-ink" />
         </div>
-        <div className="rounded-[24px] bg-canvas ring-1 ring-border p-6">
+        <div className="rounded-2xl bg-canvas ring-1 ring-border p-6">
           <p className="text-xs font-medium text-muted-foreground">Total utang pemasok</p>
           <Amount value={totalOf("payable")} className="mt-1 block text-lg font-semibold text-ink" />
         </div>
@@ -113,7 +113,7 @@ function CreditGroups({
   return (
     <div className="grid gap-4">
       {[...groups.entries()].map(([name, items]) => (
-        <section key={name} className="overflow-hidden rounded-[24px] bg-canvas ring-1 ring-border">
+        <section key={name} className="overflow-hidden rounded-2xl bg-canvas ring-1 ring-border">
           <header className="flex flex-wrap items-center justify-between gap-2 border-b bg-card px-4 py-3">
             <h2 className="font-semibold">{name}</h2>
             <span className="text-sm">

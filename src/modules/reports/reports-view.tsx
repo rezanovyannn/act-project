@@ -100,7 +100,7 @@ export function ReportsView({
         description="Dihitung langsung dari jurnal posted. Laporan posisi (Neraca Saldo, Neraca) memakai tanggal akhir."
       />
 
-      <div className="grid gap-4 rounded-[24px] bg-canvas ring-1 ring-border p-4 sm:p-6 print:hidden">
+      <div className="grid gap-4 rounded-2xl bg-canvas ring-1 ring-border p-4 sm:p-6 print:hidden">
         <div className="flex flex-wrap gap-2" role="group" aria-label="Pilihan cepat periode">
           {presets(today).map((preset) => (
             <Button
@@ -246,7 +246,7 @@ function Reports({
     .reduce((sum, l) => sum + l.amount, 0)
 
   const trialTable = (
-  <section className="overflow-hidden rounded-[24px] bg-canvas ring-1 ring-border" aria-label="Neraca Saldo">
+  <section className="overflow-hidden rounded-2xl bg-canvas ring-1 ring-border" aria-label="Neraca Saldo">
     <header className="border-b bg-card px-4 py-3 text-center">
       <h2 className="text-lg font-bold">Neraca Saldo</h2>
       <p className="text-sm text-muted-foreground">{asOfLabel}</p>

@@ -112,7 +112,7 @@ function Navigation({
 }) {
   const pathname = usePathname()
   return (
-    <div className="flex h-full flex-col gap-6">
+    <div className="flex h-full flex-col gap-5">
       <Logo onNavigate={onNavigate} />
       <WorkspaceSwitcher
         services={services}
@@ -120,7 +120,7 @@ function Navigation({
         workspaceHref={routes.dashboard}
         allWorkspacesHref={routes.workspaces()}
       />
-      <nav aria-label="Menu utama" className="grid gap-5">
+      <nav aria-label="Menu utama" className="grid gap-4">
         {navGroups(workspaceId, services.workspaceService.templateOf(templateType), openClaims).map((group) => (
           <div key={group.label} className="grid gap-1">
             <p className="px-3 pb-1 text-[11px] font-semibold tracking-wider text-muted-foreground uppercase">{group.label}</p>
@@ -214,13 +214,13 @@ export function AppShell({
   )
 
   return (
-    <div className="flex min-h-full flex-1">
-      <aside className="sticky top-0 hidden h-dvh w-72 shrink-0 overflow-y-auto border-r bg-sidebar p-4 lg:block print:hidden">
+    <div data-density="compact" className="flex min-h-full flex-1">
+      <aside className="sticky top-0 hidden h-dvh w-64 shrink-0 overflow-y-auto border-r bg-sidebar p-4 lg:block print:hidden">
         <Navigation services={services} workspaceId={workspaceId} templateType={templateType} openClaims={openClaims} />
       </aside>
       <div className="flex min-w-0 flex-1 flex-col">
         <header className="sticky top-0 z-30 border-b bg-canvas/95 backdrop-blur print:hidden">
-          <div className="flex h-16 items-center gap-3 px-4 sm:px-6 lg:px-8">
+          <div className="flex h-14 items-center gap-3 px-4 sm:px-6">
             <Sheet open={mobileOpen} onOpenChange={setMobileOpen}>
               <SheetTrigger asChild>
                 <Button variant="ghost" size="icon" aria-label="Buka menu" className="lg:hidden">
@@ -248,7 +248,7 @@ export function AppShell({
             </Button>
           </div>
         </header>
-        <main className="mx-auto w-full max-w-7xl flex-1 px-4 py-6 sm:px-6 lg:px-8 lg:py-8 print:max-w-none print:p-0">
+        <main className="mx-auto w-full max-w-[90rem] flex-1 px-4 py-5 sm:px-6 lg:py-6 print:max-w-none print:p-0">
           {children}
         </main>
         <Footer services={services} />

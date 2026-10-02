@@ -41,7 +41,7 @@ export function OpeningBalanceTab({
     return (
       <div className="grid max-w-2xl gap-4">
         {posted && <PostedNotice entry={posted} href={journalHref(posted.id)} />}
-        <div className="grid gap-2 rounded-[24px] bg-canvas ring-1 ring-border p-6 text-sm">
+        <div className="grid gap-2 rounded-2xl bg-canvas ring-1 ring-border p-6 text-sm">
           <p className="font-semibold text-ink">Saldo awal sudah diposting</p>
           <p>
             <Link href={journalHref(existing.id)} className="font-semibold text-ink underline underline-offset-4">
@@ -130,7 +130,7 @@ function OpeningBalanceForm({
           const group = editable.filter((a) => a.accountType === type)
           if (group.length === 0) return null
           return (
-            <fieldset key={type} className="overflow-hidden rounded-[24px] bg-canvas ring-1 ring-border">
+            <fieldset key={type} className="overflow-hidden rounded-2xl bg-canvas ring-1 ring-border">
               <legend className="sr-only">{ACCOUNT_TYPE_LABELS[type]}</legend>
               <p className="border-b bg-card px-4 py-2.5 text-sm font-bold text-ink">{ACCOUNT_TYPE_LABELS[type]}</p>
               <ul className="divide-y">

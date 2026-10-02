@@ -115,7 +115,7 @@ export function ItemsView({
       {current.items.length === 0 ? (
         <p className="rounded-lg bg-card px-4 py-6 text-center text-sm text-muted-foreground">Belum ada barang.</p>
       ) : (
-        <div className="overflow-x-auto rounded-[24px] bg-canvas ring-1 ring-border">
+        <div className="overflow-x-auto rounded-2xl bg-canvas ring-1 ring-border">
           <Table>
             <TableHeader>
               <TableRow>

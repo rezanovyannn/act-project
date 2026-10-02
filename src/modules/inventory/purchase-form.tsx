@@ -163,7 +163,7 @@ function PurchaseForm({
 
   return (
     <form onSubmit={submit} className="grid grid-cols-1 gap-6 xl:grid-cols-[minmax(0,1fr)_26rem]">
-      <div className="grid content-start gap-5 rounded-[24px] bg-canvas ring-1 ring-border p-4 sm:p-6">
+      <div className="grid content-start gap-5 rounded-2xl bg-canvas ring-1 ring-border p-4 sm:p-6">
         <div className="grid gap-4 sm:grid-cols-[12rem_1fr]">
           <div className="grid gap-2">
             <Label htmlFor="purchase-date">Tanggal</Label>

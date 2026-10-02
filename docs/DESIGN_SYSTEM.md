@@ -99,6 +99,16 @@ Mengikuti mockup user (ROADMAP Catatan Keputusan 33–36). Bagian ini menggantik
   - Wajib disertai tabel tersembunyi (`sr-only` pada pembungkus, bukan pada `<table>`) untuk pembaca layar.
 - **Data, bukan karangan:** angka atau label tanpa sumber data (jumlah pesanan, jatuh tempo, patokan "batas aman", badge paket) tidak ditampilkan; gunakan metrik yang dihitung dari jurnal.
 
+## Kerapatan ringkas di dalam workspace (Oktober 2026)
+- Kerangka workspace memakai `data-density="compact"`. Selama itu tampil, ukuran dasar huruf menjadi 87,5% (`globals.css`), sehingga semua ukuran berbasis rem (teks, jarak, tinggi kontrol, lebar sidebar) ikut mengecil dan tetap mengikuti pengaturan browser.
+- Ukuran khusus modul:
+  - judul halaman `text-2xl`;
+  - angka kartu dashboard `text-xl`;
+  - sudut kartu `rounded-2xl`;
+  - sidebar `w-64`, top bar `h-14`.
+- Login dan Workspace Saya tetap ukuran normal.
+- Untuk mengubah tingkat kerapatan cukup ganti persen di `globals.css` (mis. 93,75% lebih longgar, 81,25% lebih padat).
+
 ## Halaman autentikasi (redesign Oktober 2026)
 - **Kartu utama:**
   - Latar halaman bergradasi lembut.
