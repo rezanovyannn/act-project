@@ -29,7 +29,7 @@ export function InputVatField({
   rateLabel: string
 }) {
   return (
-    <div className="grid gap-3 rounded-lg bg-canvas p-4">
+    <div className="grid gap-3 rounded-2xl bg-card p-4">
       <label className="flex items-center gap-3 text-sm">
         <Switch checked={enabled} onCheckedChange={onEnabledChange} />
         Ada faktur PPN (PPN Masukan dapat dikreditkan)

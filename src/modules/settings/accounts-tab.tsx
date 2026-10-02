@@ -90,7 +90,7 @@ export function AccountsTab({
         const group = accounts.filter((a) => a.accountType === type)
         if (group.length === 0) return null
         return (
-          <section key={type} className="overflow-hidden rounded-lg border bg-canvas" aria-label={ACCOUNT_TYPE_LABELS[type]}>
+          <section key={type} className="overflow-hidden rounded-[24px] bg-canvas ring-1 ring-border" aria-label={ACCOUNT_TYPE_LABELS[type]}>
             <h2 className="border-b bg-card px-4 py-2.5 text-sm font-bold">{ACCOUNT_TYPE_LABELS[type]}</h2>
             <Table>
               <TableHeader>

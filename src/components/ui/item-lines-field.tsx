@@ -66,7 +66,7 @@ export function ItemLinesField({
         const item = items.find((i) => i.id === line.itemId)
         const stock = line.itemId && stockQty ? stockQty(line.itemId) : null
         return (
-          <div key={line.key} className="grid gap-2 rounded-lg bg-canvas p-3">
+          <div key={line.key} className="grid gap-2 rounded-2xl bg-card p-3">
             <div className={amountLabel ? "grid gap-2 sm:grid-cols-[minmax(0,1fr)_8rem_10rem_2.5rem]" : "grid gap-2 sm:grid-cols-[minmax(0,1fr)_8rem_2.5rem]"}>
               <Select value={line.itemId} onValueChange={(itemId) => update(line.key, { itemId })}>
                 <SelectTrigger id={`${idPrefix}-item-${index + 1}`} aria-label={`Barang baris ${index + 1}`} className="w-full bg-background">

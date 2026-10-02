@@ -74,7 +74,7 @@ export function ItemStockOpnameForm({
 
   return (
     <form onSubmit={submit} className="grid grid-cols-1 gap-6">
-      <div className="grid gap-4 rounded-lg bg-card p-4 sm:p-6">
+      <div className="grid gap-4 rounded-[24px] bg-canvas ring-1 ring-border p-4 sm:p-6">
         <div className="grid gap-2 sm:max-w-xs">
           <Label htmlFor="item-opname-date">Tanggal stok opname</Label>
           <Input id="item-opname-date" type="date" value={entryDate} onChange={(e) => setEntryDate(e.target.value)} required />
@@ -83,7 +83,7 @@ export function ItemStockOpnameForm({
           Isi qty fisik barang yang dihitung (kosongkan yang tidak dihitung). Selisih dinilai dengan harga pokok
           per {formatDate(entryDate)} dan dibukukan ke HPP.
         </p>
-        <div className="overflow-x-auto rounded-lg border bg-canvas">
+        <div className="overflow-x-auto rounded-[24px] bg-canvas ring-1 ring-border">
           <Table>
             <TableHeader>
               <TableRow>

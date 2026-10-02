@@ -143,7 +143,7 @@ export function TaxTab({
         {current.mode === "full_vat" && " (PPN lengkap)"}.
       </p>
 
-      <section className="grid gap-4 rounded-lg bg-card p-4 sm:p-6">
+      <section className="grid gap-4 rounded-[24px] bg-canvas ring-1 ring-border p-4 sm:p-6">
         <div className="grid gap-2">
           <Label htmlFor="tax-mode">Mode pajak</Label>
           <Select value={mode} onValueChange={(v) => changeMode(v as SalesTaxMode)}>
@@ -212,7 +212,7 @@ export function TaxTab({
       </section>
 
       {leavingFullVat && (
-        <fieldset className="grid gap-3 rounded-lg bg-card p-4 sm:p-6">
+        <fieldset className="grid gap-3 rounded-[24px] bg-canvas ring-1 ring-border p-4 sm:p-6">
           <legend className="sr-only">Saldo PPN Masukan saat keluar dari PPN lengkap</legend>
           <p className="text-sm font-semibold text-ink">Saldo PPN Masukan saat keluar dari mode PPN lengkap</p>
           <p className="text-sm text-muted-foreground">

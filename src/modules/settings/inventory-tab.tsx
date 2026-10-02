@@ -104,7 +104,7 @@ export function InventoryTab({
       </p>
 
       {!perpetual ? (
-        <section className="grid gap-4 rounded-lg bg-card p-4 sm:p-6">
+        <section className="grid gap-4 rounded-[24px] bg-canvas ring-1 ring-border p-4 sm:p-6">
           <div>
             <h2 className="font-semibold">Aktifkan persediaan perpetual</h2>
             <p className="text-sm text-muted-foreground">
@@ -133,7 +133,7 @@ export function InventoryTab({
           {activeItems.length === 0 ? (
             <p className="text-sm text-muted-foreground">Belum ada barang aktif.</p>
           ) : (
-            <div className="overflow-x-auto rounded-lg border bg-canvas">
+            <div className="overflow-x-auto rounded-[24px] bg-canvas ring-1 ring-border">
               <Table>
                 <TableHeader>
                   <TableRow>
@@ -170,7 +170,7 @@ export function InventoryTab({
               </Table>
             </div>
           )}
-          <dl className="grid gap-1 rounded-lg bg-canvas p-4 text-sm">
+          <dl className="grid gap-1 rounded-2xl bg-card p-4 text-sm">
             <div className="flex justify-between gap-4">
               <dt className="text-muted-foreground">Saldo akun Persediaan per {formatDate(entryDate)}</dt>
               <dd><Amount value={snapshot.reconciliation.accountBalance} /></dd>
@@ -205,7 +205,7 @@ export function InventoryTab({
         </section>
       ) : (
         <>
-          <section className="grid gap-4 rounded-lg bg-card p-4 sm:p-6">
+          <section className="grid gap-4 rounded-[24px] bg-canvas ring-1 ring-border p-4 sm:p-6">
             <h2 className="font-semibold">Metode biaya</h2>
             <ul className="grid gap-1 text-sm text-muted-foreground">
               {workspace.costMethodHistory.map((h) => (
@@ -245,7 +245,7 @@ export function InventoryTab({
               Tanpa jurnal: stok per barang pada tanggal berlaku menjadi harga/lapisan awal metode baru.
             </p>
           </section>
-          <section className="grid gap-3 rounded-lg bg-card p-4 sm:p-6">
+          <section className="grid gap-3 rounded-[24px] bg-canvas ring-1 ring-border p-4 sm:p-6">
             <h2 className="font-semibold">Kembali ke metode periodik</h2>
             <p className="text-sm text-muted-foreground">
               Tanpa jurnal: stok per barang dibekukan, saldo akun Persediaan tetap, dan HPP kembali diakui lewat

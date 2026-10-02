@@ -98,7 +98,7 @@ export function VatSettlementForm({
 
   return (
     <form onSubmit={submit} className="grid grid-cols-1 gap-6 xl:grid-cols-[minmax(0,1fr)_26rem]">
-      <div className="grid content-start gap-5 rounded-lg bg-card p-4 sm:p-6">
+      <div className="grid content-start gap-5 rounded-[24px] bg-canvas ring-1 ring-border p-4 sm:p-6">
         <div className="grid gap-4 sm:grid-cols-2">
           <div className="grid gap-2">
             <Label htmlFor="vat-period">Masa pajak</Label>
@@ -120,7 +120,7 @@ export function VatSettlementForm({
           </div>
         </div>
 
-        <dl className="grid gap-2 rounded-lg bg-canvas p-4 text-sm">
+        <dl className="grid gap-2 rounded-2xl bg-card p-4 text-sm">
           <p className="text-xs font-medium text-muted-foreground">
             Saldo per akhir masa{periodEnd ? ` (${formatDate(periodEnd)})` : ""}
           </p>
@@ -169,7 +169,7 @@ export function VatSettlementForm({
       </div>
 
       <div className="grid content-start gap-4">
-        <dl className="grid gap-2 rounded-lg bg-canvas p-4 text-sm ring-1 ring-border">
+        <dl className="grid gap-2 rounded-2xl bg-canvas p-4 text-sm ring-1 ring-border">
           <div className="flex justify-between border-b pb-2 font-bold text-ink">
             <dt>Kurang bayar (disetor)</dt>
             <dd><Amount value={payable} /></dd>

@@ -91,7 +91,7 @@ export function JournalList({
         description="Semua jurnal di workspace ini. Jurnal posted tidak bisa diubah; gunakan Void atau Koreksi. Tombol Jurnal baru ada di bilah atas."
       />
 
-      <div className="grid gap-4 rounded-lg bg-card p-4 lg:grid-cols-[auto_1fr]">
+      <div className="grid gap-4 rounded-[24px] bg-canvas ring-1 ring-border p-4 lg:grid-cols-[auto_1fr]">
         <div className="flex flex-wrap items-center gap-2" role="group" aria-label="Filter status">
           {STATUS_FILTERS.map((filter) => (
             <button
@@ -194,7 +194,7 @@ function JournalTable({
   detailHref: (entryId: string) => string
 }) {
   return (
-    <div className="overflow-hidden rounded-lg border bg-canvas">
+    <div className="overflow-hidden rounded-[24px] bg-canvas ring-1 ring-border">
       <Table>
         <TableHeader className="bg-card">
           <TableRow>

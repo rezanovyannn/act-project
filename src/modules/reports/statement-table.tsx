@@ -18,7 +18,7 @@ export function sectionRows(section: ReportSection, emptyLabel = "Tidak ada sald
 /** Tabel laporan keuangan: judul seksi, baris akun, subtotal, total. */
 export function StatementTable({ title, subtitle, rows }: { title: string; subtitle: string; rows: StatementRow[] }) {
   return (
-    <section className="overflow-hidden rounded-lg border bg-canvas" aria-label={title}>
+    <section className="overflow-hidden rounded-[24px] bg-canvas ring-1 ring-border" aria-label={title}>
       <header className="border-b bg-card px-4 py-3 text-center sm:px-6">
         <h2 className="text-lg font-bold">{title}</h2>
         <p className="text-sm text-muted-foreground">{subtitle}</p>

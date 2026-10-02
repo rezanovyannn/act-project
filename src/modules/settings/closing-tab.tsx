@@ -128,7 +128,7 @@ export function ClosingTab({
       ) : (
         <div className="grid grid-cols-1 gap-6 xl:grid-cols-[minmax(0,1fr)_26rem]">
           <div className="grid content-start gap-4">
-            <dl className="grid gap-2 rounded-lg bg-card p-4 text-sm sm:p-6">
+            <dl className="grid gap-2 rounded-[24px] bg-canvas ring-1 ring-border p-4 text-sm sm:p-6">
               <Row label={`Pendapatan ${year}`} value={preview.data!.plan.revenue} />
               <Row label="HPP" value={preview.data!.plan.cogs} />
               <Row label="Beban operasional" value={preview.data!.plan.expenses} />

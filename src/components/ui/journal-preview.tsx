@@ -15,7 +15,7 @@ function JournalPreview({
 }) {
   const byId = new Map(accounts.map((a) => [a.id, a]))
   return (
-    <div className="rounded-lg border bg-canvas">
+    <div className="overflow-hidden rounded-[24px] bg-canvas ring-1 ring-border">
       <p className="border-b bg-card px-4 py-2 text-sm font-bold text-ink">{title}</p>
       {lines.length === 0 ? (
         <p className="px-4 py-3 text-sm text-muted-foreground">Lengkapi isian untuk melihat jurnal.</p>
