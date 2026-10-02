@@ -77,6 +77,28 @@ Implementasi: token di `src/app/globals.css` (Tailwind v4 `@theme`) dan komponen
   - Item aktif ditandai garis/indikator merah dan teks `ink` tebal.
   - Header atas berlatar `canvas` dengan hairline bawah.
 
+## Kerangka & Dashboard (redesign Oktober 2026)
+Mengikuti mockup user (ROADMAP Catatan Keputusan 33–36). Bagian ini menggantikan aturan di atas bila bertentangan.
+
+- **Sidebar:**
+  - Urutan dari atas: logo, kartu workspace (avatar inisial), grup menu berlabel kapital kecil (*Menu utama*, *Persediaan*, *Sistem & pengaturan*), dan kartu pengguna di bawah (avatar inisial, email, peran "Pemilik", tombol keluar).
+  - Item aktif berlatar `primary/10`, teks `primary` tebal, dan titik merah.
+  - Badge angka merah hanya berisi data nyata, mis. jumlah tagihan belum lunas.
+- **Top bar** (`canvas`, hairline bawah):
+  - Pencarian global berbentuk pill (Ctrl/⌘+K) dan tombol **Jurnal baru** (satu-satunya tombol merah di kerangka).
+  - Slot aksi halaman (`TOPBAR_SLOT_ID`), mis. pilih bulan & Ekspor di Dashboard.
+  - Halaman tidak menduplikasi tombol Jurnal baru.
+- **Footer:** hanya informasi yang benar (nama & versi aplikasi, basis akrual/SAK EMKM, lokasi data). Dilarang menampilkan klaim kepatuhan, status server, atau keamanan yang tidak diverifikasi.
+- **Kartu KPI:**
+  - Latar `canvas` + ring hairline, label `mute`, angka 24px tebal.
+  - Chip rasio/pertumbuhan di kanan atas dan rincian dua baris di bawah garis.
+  - Kartu laba bersih diberi aksen `primary/5`.
+- **Grafik:**
+  - Batang SVG/CSS tanpa dependency.
+  - Kas masuk = `ink`, kas keluar = `primary`. Ini pengecualian aturan "satu aksen" dan hanya berlaku untuk grafik.
+  - Wajib disertai tabel tersembunyi (`sr-only` pada pembungkus, bukan pada `<table>`) untuk pembaca layar.
+- **Data, bukan karangan:** angka atau label tanpa sumber data (jumlah pesanan, jatuh tempo, patokan "batas aman", badge paket) tidak ditampilkan; gunakan metrik yang dihitung dari jurnal.
+
 ## Responsif
 - Desktop (≥1024px): sidebar tetap + konten maksimal ~1280px.
 - Tablet (768–1023px): sidebar menjadi drawer.

@@ -63,3 +63,9 @@ export function todayIsoDate(now: Date = new Date()): IsoDate {
 export function capitalizeWords(text: string): string {
   return text.replace(/(^|\s)\S/g, (c) => c.toUpperCase());
 }
+
+/** Basis poin → persen satu desimal, mis. 1420 → `14,2%`; `signed` menambah `+` untuk nilai positif. */
+export function formatPercentBps(bps: number, signed = false): string {
+  const text = `${(bps / 100).toLocaleString("id-ID", { minimumFractionDigits: 1, maximumFractionDigits: 1 })}%`;
+  return signed && bps > 0 ? `+${text}` : text;
+}

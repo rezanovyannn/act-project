@@ -14,6 +14,12 @@ import {
 import { useLoader } from "@/lib/utils"
 import { TEMPLATE_LABELS } from "./labels"
 
+/** "Kedai Senja" → "KS". */
+function initialsOf(name: string): string {
+  const words = name.trim().split(/\s+/).filter(Boolean)
+  return (words.length > 1 ? words[0][0] + words[1][0] : name.slice(0, 2)).toUpperCase() || "·"
+}
+
 export function WorkspaceSwitcher({
   services,
   currentWorkspaceId,
@@ -33,7 +39,10 @@ export function WorkspaceSwitcher({
 
   return (
     <DropdownMenu>
-      <DropdownMenuTrigger className="flex w-full items-center gap-3 rounded-lg bg-canvas px-3 py-2.5 text-left outline-none focus-visible:ring-3 focus-visible:ring-ring/50">
+      <DropdownMenuTrigger className="flex w-full items-center gap-3 rounded-lg bg-canvas px-3 py-2.5 text-left ring-1 ring-border outline-none focus-visible:ring-3 focus-visible:ring-ring/50">
+        <span aria-hidden className="grid size-9 shrink-0 place-items-center rounded-lg bg-primary/10 text-xs font-bold text-primary">
+          {initialsOf(current?.name ?? "")}
+        </span>
         <span className="min-w-0 flex-1">
           <span className="block truncate text-sm font-semibold text-ink">
             {current?.name ?? "Memuat…"}

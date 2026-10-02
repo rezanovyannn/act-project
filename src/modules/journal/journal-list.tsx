@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react"
 import Link from "next/link"
-import { PlusIcon, SearchIcon } from "lucide-react"
+import { SearchIcon } from "lucide-react"
 import { formatDate } from "@/core/format"
 import { reversedEntryIds } from "@/core/reversal"
 import type { AppServices } from "@/core/services"
@@ -45,12 +45,10 @@ export function JournalList({
   services,
   workspaceId,
   detailHref,
-  newHref,
 }: {
   services: AppServices
   workspaceId: string
   detailHref: (entryId: string) => string
-  newHref: string
 }) {
   const journals = useLoader(
     () => services.journals.listByWorkspace(workspaceId),
@@ -90,15 +88,7 @@ export function JournalList({
     <div className="grid grid-cols-1 gap-6">
       <PageHeader
         title="Jurnal Umum"
-        description="Semua jurnal di workspace ini. Jurnal posted tidak bisa diubah; gunakan Void atau Koreksi."
-        actions={
-          <Button asChild>
-            <Link href={newHref}>
-              <PlusIcon data-icon="inline-start" />
-              Jurnal baru
-            </Link>
-          </Button>
-        }
+        description="Semua jurnal di workspace ini. Jurnal posted tidak bisa diubah; gunakan Void atau Koreksi. Tombol Jurnal baru ada di bilah atas."
       />
 
       <div className="grid gap-4 rounded-lg bg-card p-4 lg:grid-cols-[auto_1fr]">

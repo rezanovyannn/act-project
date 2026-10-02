@@ -15,9 +15,13 @@ export function AccountBar({ services, className }: { services: Container; class
 
   if (services.dataSource === "mock") {
     return (
-      <p className={cn("text-xs text-muted-foreground", className)}>
-        Mode data contoh · tersimpan di browser ini
-      </p>
+      <div className={cn("flex items-center gap-3 rounded-lg bg-canvas p-3 ring-1 ring-border", className)}>
+        <span aria-hidden className="grid size-9 shrink-0 place-items-center rounded-full bg-secondary text-xs font-bold text-ink">DC</span>
+        <span className="min-w-0 text-xs">
+          <span className="block font-semibold text-ink">Data contoh</span>
+          <span className="block text-muted-foreground">Tersimpan di browser ini</span>
+        </span>
+      </div>
     )
   }
 
@@ -33,14 +37,19 @@ export function AccountBar({ services, className }: { services: Container; class
     }
   }
 
+  const email = services.user.email ?? ""
+  const initials = email.slice(0, 2).toUpperCase() || "?"
   return (
-    <div className={cn("flex min-w-0 items-center gap-2 text-xs text-muted-foreground", className)}>
-      <span className="min-w-0 truncate" title={services.user.email ?? undefined}>
-        {services.user.email}
+    <div className={cn("flex min-w-0 items-center gap-3 rounded-lg bg-canvas p-3 ring-1 ring-border", className)}>
+      <span aria-hidden className="grid size-9 shrink-0 place-items-center rounded-full bg-secondary text-xs font-bold text-ink">
+        {initials}
       </span>
-      <Button variant="ghost" size="sm" onClick={signOut} disabled={busy} aria-label="Keluar">
-        <LogOutIcon data-icon="inline-start" />
-        Keluar
+      <span className="min-w-0 flex-1 text-xs">
+        <span className="block truncate font-semibold text-ink" title={email}>{email}</span>
+        <span className="block text-muted-foreground">Pemilik</span>
+      </span>
+      <Button variant="ghost" size="icon" onClick={signOut} disabled={busy} aria-label="Keluar" title="Keluar">
+        <LogOutIcon />
       </Button>
     </div>
   )

@@ -1,3 +1,6 @@
+/** Elemen top bar tempat halaman menaruh aksi khususnya (mis. pilih bulan & Ekspor di Dashboard). */
+export const TOPBAR_SLOT_ID = "app-topbar-actions"
+
 /** Semua URL aplikasi di satu tempat. */
 export const routes = {
   workspaces: () => "/",

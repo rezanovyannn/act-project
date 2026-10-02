@@ -54,7 +54,18 @@ function presets(today: string): { label: string; range: DateRange }[] {
   ]
 }
 
-export function ReportsView({ services, workspaceId }: { services: AppServices; workspaceId: string }) {
+const REPORT_TABS = ["trial", "income", "balance", "equity", "cash"] as const
+
+export function ReportsView({
+  services,
+  workspaceId,
+  initialTab,
+}: {
+  services: AppServices
+  workspaceId: string
+  /** Tab awal, mis. `cash` dari tautan "analisis arus kas" di dashboard. */
+  initialTab?: string | null
+}) {
   const data = useLoader<ReportData>(async () => {
     const [workspace, accounts, journals, periods] = await Promise.all([
       services.workspaces.getById(workspaceId),
@@ -128,13 +139,14 @@ export function ReportsView({ services, workspaceId }: { services: AppServices; 
       {!validRange ? (
         <p role="alert" className="text-sm text-destructive">Tanggal awal harus sebelum atau sama dengan tanggal akhir.</p>
       ) : (
-        <Reports workspaceName={workspaceName} perpetual={perpetual} accounts={accounts} journals={journals} periods={periods} range={range} printAll={printAll} />
+        <Reports initialTab={REPORT_TABS.includes(initialTab as (typeof REPORT_TABS)[number]) ? initialTab! : "income"} workspaceName={workspaceName} perpetual={perpetual} accounts={accounts} journals={journals} periods={periods} range={range} printAll={printAll} />
       )}
     </div>
   )
 }
 
 function Reports({
+  initialTab,
   workspaceName,
   perpetual,
   accounts,
@@ -143,6 +155,7 @@ function Reports({
   range,
   printAll,
 }: {
+  initialTab: string
   workspaceName: string
   perpetual: boolean
   accounts: Account[]
@@ -151,7 +164,7 @@ function Reports({
   range: DateRange
   printAll: boolean
 }) {
-  const [tab, setTab] = useState("income")
+  const [tab, setTab] = useState(initialTab)
   const tb = trialBalance(accounts, journals, range.toDate)
   const is = incomeStatement(accounts, journals, range)
   const bs = balanceSheet(accounts, journals, range.toDate)

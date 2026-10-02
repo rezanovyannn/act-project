@@ -15,7 +15,6 @@ export default function JournalsPage() {
       services={services}
       workspaceId={workspaceId}
       detailHref={(entryId) => routes.journal(workspaceId, entryId)}
-      newHref={routes.newJournal(workspaceId)}
     />
   )
 }

@@ -166,3 +166,7 @@ Dipecah menjadi tiga sub-fase (ADR 015); stop & review setelah tiap sub-fase.
 | 30 | Cara deploy | GitHub privat + import Vercel | ADR 018 |
 | 31 | Pendaftaran production | Ditutup setelah akun pemilik dibuat | ADR 018 |
 | 32 | Alamat production | Subdomain vercel.app (domain sendiri menyusul bila perlu) | ADR 018 |
+| 33 | Redesign dashboard (2 Okt 2026) | Mengikuti mockup user: dashboard + kerangka aplikasi (sidebar, top bar, footer) | docs/DESIGN_SYSTEM.md |
+| 34 | Elemen mockup tanpa sumber data | Diganti data nyata (jumlah transaksi penjualan, tagihan belum lunas); patokan & klaim (jatuh tempo, "batas aman", badge paket, klaim kepatuhan/keamanan di footer) tidak ditampilkan | docs/DESIGN_SYSTEM.md |
+| 35 | Pencarian & ekspor | Pencarian global ⌘K (jurnal, akun, barang, halaman) dengan cmdk yang sudah ada; Ekspor = cetak/simpan PDF dashboard | docs/DESIGN_SYSTEM.md |
+| 36 | Grafik dashboard | Batang SVG/CSS sendiri, tanpa dependency baru | docs/DESIGN_SYSTEM.md |
