@@ -174,3 +174,4 @@ Dipecah menjadi tiga sub-fase (ADR 015); stop & review setelah tiap sub-fase.
 | 38 | Login Google | Tidak dulu; tetap email + kata sandi (Catatan Keputusan 7) | ADR 013 |
 | 39 | Lupa kata sandi | Dibuat: tautan reset lewat email Supabase + halaman atur kata sandi baru | ADR 019 |
 | 40 | "Ingat perangkat ini" | Dibuat: tidak dicentang = sesi berakhir saat browser ditutup | ADR 019 |
+| 41 | Redesign "Workspace Saya" (2 Okt 2026) | Kartu per workspace dengan data nyata (pendapatan & jurnal bulan berjalan, status, saldo awal, metode persediaan), cari & filter template; tanpa avatar tim, notifikasi, banner konsultan, dan klaim footer | docs/DESIGN_SYSTEM.md |
