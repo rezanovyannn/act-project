@@ -5,13 +5,18 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 import { dataSource, supabaseAnonKey, supabaseUrl } from "@/lib/supabase/config";
+import { applyRemember, REMEMBER_COOKIE } from "@/lib/supabase/session-cookies";
 
-const PUBLIC_PATHS = ["/login", "/register"];
+const PUBLIC_PATHS = ["/login", "/register", "/forgot-password", "/reset-password"];
+/** Halaman publik yang tetap boleh dibuka saat sudah login (sesi pemulihan kata sandi, ADR 019). */
+const PUBLIC_WHEN_SIGNED_IN = ["/reset-password"];
 
 export async function proxy(request: NextRequest) {
   if (dataSource() === "mock") return NextResponse.next();
 
   let response = NextResponse.next({ request });
+  // "Ingat perangkat ini" tidak dicentang: cookie sesi yang diperbarui proxy juga tanpa umur (ADR 019).
+  const remember = request.cookies.get(REMEMBER_COOKIE)?.value !== "0";
   const supabase = createServerClient(supabaseUrl, supabaseAnonKey, {
     cookies: {
       getAll() {
@@ -20,7 +25,9 @@ export async function proxy(request: NextRequest) {
       setAll(cookiesToSet, headers) {
         cookiesToSet.forEach(({ name, value }) => request.cookies.set(name, value));
         response = NextResponse.next({ request });
-        cookiesToSet.forEach(({ name, value, options }) => response.cookies.set(name, value, options));
+        cookiesToSet.forEach(({ name, value, options }) =>
+          response.cookies.set(name, value, applyRemember(options, remember)),
+        );
         Object.entries(headers).forEach(([key, value]) => response.headers.set(key, value));
       },
     },
@@ -38,7 +45,7 @@ export async function proxy(request: NextRequest) {
     url.search = pathname === "/" ? "" : `?next=${encodeURIComponent(pathname)}`;
     return NextResponse.redirect(url);
   }
-  if (signedIn && isPublic) {
+  if (signedIn && isPublic && !PUBLIC_WHEN_SIGNED_IN.some((path) => pathname === path)) {
     const url = request.nextUrl.clone();
     url.pathname = "/";
     url.search = "";

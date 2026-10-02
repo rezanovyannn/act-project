@@ -26,6 +26,7 @@ import { AccountBar } from "@/app/_components/account-bar"
 import { openClaimCounts } from "@/core/dashboard-insights"
 import { capitalizeWords, todayIsoDate } from "@/core/format"
 import type { TemplateType, WorkspaceTemplate } from "@/core/types"
+import { AppLogo } from "@/components/ui/app-logo"
 import { Button } from "@/components/ui/button"
 import { Sheet, SheetContent, SheetTitle, SheetTrigger } from "@/components/ui/sheet"
 import { cn, useLoader } from "@/lib/utils"
@@ -88,16 +89,10 @@ function navGroups(workspaceId: string, template: WorkspaceTemplate, openClaims:
   ]
 }
 
-/** Logo aplikasi: satu-satunya pemakaian merah di luar aksi utama (DESIGN_SYSTEM.md). */
 function Logo({ onNavigate }: { onNavigate?: () => void }) {
   return (
-    <Link href={routes.workspaces()} className="flex items-center gap-2 px-2 text-lg font-bold text-ink" onClick={onNavigate}>
-      <span aria-hidden className="grid size-7 place-items-center rounded-lg bg-primary text-sm font-bold text-primary-foreground">
-        P
-      </span>
-      <span>
-        Pembukuan<span className="text-primary">.</span>
-      </span>
+    <Link href={routes.workspaces()} className="px-2" onClick={onNavigate}>
+      <AppLogo />
     </Link>
   )
 }

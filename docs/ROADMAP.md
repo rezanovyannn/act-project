@@ -170,3 +170,7 @@ Dipecah menjadi tiga sub-fase (ADR 015); stop & review setelah tiap sub-fase.
 | 34 | Elemen mockup tanpa sumber data | Diganti data nyata (jumlah transaksi penjualan, tagihan belum lunas); patokan & klaim (jatuh tempo, "batas aman", badge paket, klaim kepatuhan/keamanan di footer) tidak ditampilkan | docs/DESIGN_SYSTEM.md |
 | 35 | Pencarian & ekspor | Pencarian global ⌘K (jurnal, akun, barang, halaman) dengan cmdk yang sudah ada; Ekspor = cetak/simpan PDF dashboard | docs/DESIGN_SYSTEM.md |
 | 36 | Grafik dashboard | Batang SVG/CSS sendiri, tanpa dependency baru | docs/DESIGN_SYSTEM.md |
+| 37 | Redesign halaman login (2 Okt 2026) | Kartu login mockup user (bagian web); tanpa tombol aplikasi mobile, badge SSL, dan tautan footer fiktif | docs/DESIGN_SYSTEM.md |
+| 38 | Login Google | Tidak dulu; tetap email + kata sandi (Catatan Keputusan 7) | ADR 013 |
+| 39 | Lupa kata sandi | Dibuat: tautan reset lewat email Supabase + halaman atur kata sandi baru | ADR 019 |
+| 40 | "Ingat perangkat ini" | Dibuat: tidak dicentang = sesi berakhir saat browser ditutup | ADR 019 |

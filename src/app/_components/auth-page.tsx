@@ -1,15 +1,19 @@
 "use client"
 
 import { useEffect, useMemo, useSyncExternalStore } from "react"
+import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { LoadingState } from "@/components/ui/page-header"
 import { getAuthService, resetContainer } from "@/lib/container"
-import Link from "next/link"
 import { dataSource, signupAllowed } from "@/lib/supabase/config"
-import { AuthForm, type AuthMode } from "@/modules/auth/auth-form"
+import { AuthCard } from "@/modules/auth/auth-card"
+import { AuthForm } from "@/modules/auth/auth-form"
+import { ForgotPasswordForm, ResetPasswordForm } from "@/modules/auth/password-reset"
 
-/** Halaman login/daftar; di mode mock tidak diperlukan dan langsung ke beranda. */
-export function AuthPage({ mode }: { mode: AuthMode }) {
+export type AuthPageMode = "login" | "register" | "forgot" | "reset"
+
+/** Halaman autentikasi; di mode mock tidak diperlukan dan langsung ke beranda. */
+export function AuthPage({ mode }: { mode: AuthPageMode }) {
   const router = useRouter()
   // true hanya di browser (layanan auth memerlukan cookie/localStorage).
   const inBrowser = useSyncExternalStore(
@@ -24,33 +28,41 @@ export function AuthPage({ mode }: { mode: AuthMode }) {
   }, [router])
 
   if (!auth) return <LoadingState />
-  if (mode === "register" && !signupAllowed) {
-    return (
-      <main className="mx-auto grid w-full max-w-md gap-3 px-4 py-16">
-        <h1 className="text-2xl font-bold">Pendaftaran ditutup</h1>
-        <p className="text-sm text-muted-foreground">Aplikasi ini hanya untuk pemilik yang sudah terdaftar.</p>
-        <Link href="/login" className="w-fit font-semibold underline underline-offset-4">Masuk</Link>
-      </main>
-    )
-  }
 
   const next = () => {
     const target = new URLSearchParams(window.location.search).get("next")
     return target && target.startsWith("/") && !target.startsWith("//") ? target : "/"
   }
+  // Muat ulang penuh agar proxy membaca cookie sesi yang baru.
+  const enter = (target: string) => {
+    resetContainer()
+    window.location.assign(target)
+  }
 
+  if (mode === "forgot") {
+    return <ForgotPasswordForm auth={auth} redirectTo={`${window.location.origin}/reset-password`} loginHref="/login" />
+  }
+  if (mode === "reset") {
+    return <ResetPasswordForm auth={auth} forgotHref="/forgot-password" onDone={() => enter("/")} />
+  }
+  if (mode === "register" && !signupAllowed) {
+    return (
+      <AuthCard
+        title="Pendaftaran ditutup"
+        description="Aplikasi ini hanya untuk pemilik yang sudah terdaftar."
+        aside={<Link href="/login" className="font-semibold text-primary underline-offset-4 hover:underline">Masuk</Link>}
+      >
+        <p className="text-center text-sm font-semibold text-ink">Pendaftaran ditutup</p>
+      </AuthCard>
+    )
+  }
   return (
-    <main className="flex flex-1 items-center justify-center px-4 py-12">
-      <AuthForm
-        mode={mode}
-        auth={auth}
-        switchHref={mode === "login" ? (signupAllowed ? "/register" : null) : "/login"}
-        onSuccess={() => {
-          resetContainer()
-          // Muat ulang penuh agar proxy membaca cookie sesi yang baru.
-          window.location.assign(next())
-        }}
-      />
-    </main>
+    <AuthForm
+      mode={mode}
+      auth={auth}
+      switchHref={mode === "login" ? (signupAllowed ? "/register" : null) : "/login"}
+      forgotHref="/forgot-password"
+      onSuccess={() => enter(next())}
+    />
   )
 }

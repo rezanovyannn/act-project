@@ -99,6 +99,14 @@ Mengikuti mockup user (ROADMAP Catatan Keputusan 33–36). Bagian ini menggantik
   - Wajib disertai tabel tersembunyi (`sr-only` pada pembungkus, bukan pada `<table>`) untuk pembaca layar.
 - **Data, bukan karangan:** angka atau label tanpa sumber data (jumlah pesanan, jatuh tempo, patokan "batas aman", badge paket) tidak ditampilkan; gunakan metrik yang dihitung dari jurnal.
 
+## Halaman autentikasi (redesign Oktober 2026)
+- **Kartu utama:**
+  - Latar halaman bergradasi lembut.
+  - Kartu `canvas` radius 32px berisi logo besar (`AppLogo`), deskripsi singkat, kolom setinggi 48px berlatar `surface-card` dengan label tersembunyi (sr-only) dan placeholder, tombol utama merah selebar kartu, lalu tautan sekunder.
+- **Kolom kata sandi** punya tombol teks *Perlihatkan/Sembunyikan* (`aria-pressed`).
+- **Kartu kedua** untuk tautan Daftar/Masuk; hanya tampil bila pendaftaran dibuka (ADR 018).
+- **Larangan:** tidak ada badge keamanan, tombol toko aplikasi, atau tautan footer yang tidak punya halaman/fitur nyata.
+
 ## Responsif
 - Desktop (≥1024px): sidebar tetap + konten maksimal ~1280px.
 - Tablet (768–1023px): sidebar menjadi drawer.

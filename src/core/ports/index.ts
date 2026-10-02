@@ -163,7 +163,12 @@ export interface SignUpResult {
 /** Autentikasi pengguna (ADR 013: email + kata sandi). */
 export interface IAuthService {
   currentUser(): Promise<AuthUser | null>;
-  signIn(email: string, password: string): Promise<AuthUser>;
+  /** `remember = false`: sesi berakhir saat browser ditutup (ADR 019). */
+  signIn(email: string, password: string, options?: { remember?: boolean }): Promise<AuthUser>;
   signUp(email: string, password: string): Promise<SignUpResult>;
   signOut(): Promise<void>;
+  /** Mengirim email berisi tautan atur ulang kata sandi ke `redirectTo` (ADR 019). */
+  requestPasswordReset(email: string, redirectTo: string): Promise<void>;
+  /** Mengganti kata sandi pengguna yang sedang login (termasuk sesi pemulihan). */
+  updatePassword(password: string): Promise<void>;
 }

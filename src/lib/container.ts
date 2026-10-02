@@ -64,6 +64,12 @@ class MockAuthService implements IAuthService {
     return { user: this.user, needsEmailConfirmation: false };
   }
   async signOut() {}
+  async requestPasswordReset() {
+    throw new Error("Tidak tersedia di mode data contoh");
+  }
+  async updatePassword() {
+    throw new Error("Tidak tersedia di mode data contoh");
+  }
 }
 
 /** Layanan autentikasi sesuai sumber data (dipakai halaman login/daftar). */
