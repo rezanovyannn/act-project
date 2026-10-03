@@ -9,6 +9,7 @@ import type {
   IAccountRepository,
   IAuditLogRepository,
   IItemRepository,
+  IStockCountRepository,
   IJournalRepository,
   InventorySettings,
   ItemPatch,
@@ -24,6 +25,9 @@ import type {
   AuditLog,
   Item,
   ItemInput,
+  IsoDate,
+  StockCount,
+  StockCountInput,
   JournalEntry,
   JournalEntryInput,
   Period,
@@ -36,6 +40,7 @@ import {
   toAccount,
   toAuditLog,
   toItem,
+  toStockCount,
   toJournal,
   toPeriod,
   toWorkspace,
@@ -328,6 +333,36 @@ export class SupabaseItemRepository implements IItemRepository {
   }
 }
 
+export class SupabaseStockCountRepository implements IStockCountRepository {
+  constructor(private readonly client: Client) {}
+
+  async listByWorkspace(workspaceId: string): Promise<StockCount[]> {
+    const rows = await unwrapRows(
+      this.client.from("stock_counts").select("*, stock_count_lines(*)").eq("workspace_id", workspaceId).is("deleted_at", null).order("count_date"),
+    );
+    const journalIds = rows.map((r) => r.journal_entry_id as string | null).filter((id): id is string => Boolean(id));
+    const reversed = new Set<string>();
+    if (journalIds.length > 0) {
+      const reversals = await unwrapRows(
+        this.client.from("journal_entries").select("reversal_of").in("reversal_of", journalIds).eq("status", "posted").is("deleted_at", null),
+      );
+      for (const r of reversals) reversed.add(r.reversal_of as string);
+    }
+    // Aktif = belum dibatalkan dan jurnalnya belum di-void (ADR 020).
+    return rows.filter((r) => !(r.journal_entry_id && reversed.has(r.journal_entry_id))).map(toStockCount);
+  }
+
+  async post(input: StockCountInput, journal: JournalEntryInput | null): Promise<StockCount> {
+    const id = (await unwrap(this.client.rpc("post_stock_count", { p_count: input, p_journal: journal }))) as string;
+    const row = await unwrap(this.client.from("stock_counts").select("*, stock_count_lines(*)").eq("id", id).maybeSingle());
+    return toStockCount(required(row, "Stok opname"));
+  }
+
+  async cancel(id: string, reversalDate: IsoDate): Promise<void> {
+    await unwrap(this.client.rpc("cancel_stock_count", { p_id: id, p_reversal_date: reversalDate }));
+  }
+}
+
 export class SupabaseAuditLogRepository implements IAuditLogRepository {
   constructor(private readonly client: Client) {}
 
@@ -347,6 +382,7 @@ export function createSupabaseRepositories(client: Client) {
     periods: new SupabasePeriodRepository(client),
     journals: new SupabaseJournalRepository(client),
     items: new SupabaseItemRepository(client),
+    stockCounts: new SupabaseStockCountRepository(client),
     auditLogs: new SupabaseAuditLogRepository(client),
   };
 }

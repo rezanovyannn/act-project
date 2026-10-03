@@ -31,16 +31,19 @@ export function PurchaseView({
   journalHref: (entryId: string) => string
 }) {
   const data = useLoader(async () => {
-    const [workspace, accounts, journals] = await Promise.all([
+    const [workspace, accounts, journals, items] = await Promise.all([
       services.workspaces.getById(workspaceId),
       services.accounts.listByWorkspace(workspaceId),
       services.journals.listByWorkspace(workspaceId),
+      services.items.listByWorkspace(workspaceId),
     ])
     if (!workspace) throw new Error("Workspace tidak ditemukan")
     return {
       noun: services.workspaceService.templateOf(workspace.templateType).inventoryNoun,
       taxSettings: workspaceTaxSettings(workspace),
       perpetual: workspace.inventoryMethod === "perpetual",
+      // Periodik dengan daftar bahan: dicatat per bahan untuk tabel COGS (ADR 020).
+      perItem: workspace.inventoryMethod === "perpetual" || items.some((i) => i.isActive),
       accounts,
       journals,
     }
@@ -48,7 +51,7 @@ export function PurchaseView({
 
   if (data.loading && !data.data) return <LoadingState />
   if (data.error) return <p role="alert" className="text-sm text-destructive">{errorMessage(data.error)}</p>
-  const { noun, taxSettings, perpetual, accounts, journals } = data.data!
+  const { noun, taxSettings, perpetual, perItem, accounts, journals } = data.data!
   const inventoryName = accounts.find((a) => a.systemRole === "inventory")?.name ?? "Persediaan"
   const suppliers = [...new Set(journals.filter((j) => j.source === "purchase").map((j) => j.counterparty).filter(Boolean) as string[])]
 
@@ -59,11 +62,13 @@ export function PurchaseView({
         description={
           perpetual
             ? `Dicatat per barang ke ${inventoryName} (persediaan perpetual). HPP diakui saat barang keluar.`
-            : `Dicatat sebagai ${inventoryName} (aset). HPP diakui saat stok opname akhir periode.`
+            : perItem
+              ? `Dicatat per bahan ke ${inventoryName} (aset). HPP diakui lewat Stok Opname & COGS.`
+              : `Dicatat sebagai ${inventoryName} (aset). HPP diakui saat stok opname akhir periode.`
         }
       />
-      {perpetual ? (
-        <PerpetualPurchase services={services} workspaceId={workspaceId} noun={noun} journalHref={journalHref} />
+      {perItem ? (
+        <ItemPurchase services={services} workspaceId={workspaceId} noun={noun} journalHref={journalHref} />
       ) : (
       <PurchaseForm
         services={services}
@@ -80,7 +85,7 @@ export function PurchaseView({
   )
 }
 
-function PerpetualPurchase({
+function ItemPurchase({
   services,
   workspaceId,
   noun,

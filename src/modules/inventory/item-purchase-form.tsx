@@ -20,7 +20,7 @@ import { errorMessage } from "@/lib/utils"
 import { backdateWarnings } from "./backdate"
 import { snapshotAt, type InventoryData } from "./use-inventory-data"
 
-/** Pembelian barang per item (persediaan perpetual, ADR 017). */
+/** Pembelian barang per item: perpetual (ADR 017) atau per bahan untuk COGS periodik (ADR 020). */
 export function ItemPurchaseForm({
   services,
   data,
@@ -50,7 +50,10 @@ export function ItemPurchaseForm({
   const [posted, setPosted] = useState<JournalEntry | null>(null)
   const [saving, setSaving] = useState(false)
 
+  const periodic = workspace.inventoryMethod === "periodic"
   const snapshot = snapshotAt(data, entryDate)
+  // Periodik: stok per bahan tidak berjalan, jadi tanpa koreksi stok minus & sisa stok.
+  const context = periodic ? { ...snapshot.context, stocks: new Map() } : snapshot.context
   const filled = filledItemLines(lines, true)
   const subtotal = filled.reduce((t, l) => t + l.amount, 0)
   const suggestedVat = fullVat ? computeInputVat(subtotal, taxSettings) : 0
@@ -62,7 +65,7 @@ export function ItemPurchaseForm({
     try {
       preview = buildItemPurchase(
         { workspaceId: workspace.id, entryDate, description, payment: toPayment(payment), lines: filled, inputVat },
-        snapshot.context,
+        context,
       )
     } catch (e) {
       previewError = errorMessage(e)
@@ -70,7 +73,7 @@ export function ItemPurchaseForm({
   }
   const warnings = [
     ...(preview?.warnings ?? []),
-    ...backdateWarnings(journals, accounts, items, filled.map((l) => l.itemId), entryDate),
+    ...(periodic ? [] : backdateWarnings(journals, accounts, items, filled.map((l) => l.itemId), entryDate)),
   ]
 
   async function submit(event: React.FormEvent) {
@@ -120,7 +123,7 @@ export function ItemPurchaseForm({
           lines={lines}
           onChange={setLines}
           amountLabel={fullVat ? "Harga beli sebelum PPN" : "Harga beli"}
-          stockQty={(id) => snapshot.context.stocks.get(id)?.qty ?? 0}
+          stockQty={periodic ? undefined : (id) => snapshot.context.stocks.get(id)?.qty ?? 0}
         />
         {fullVat && (
           <InputVatField

@@ -38,7 +38,8 @@ export type ValidationCode =
   | "INVALID_QUANTITY"
   | "INVALID_RETURN"
   | "HAS_RETURNS"
-  | "UNKNOWN_COST";
+  | "UNKNOWN_COST"
+  | "INVALID_STOCK_COUNT";
 
 export interface ValidationIssue {
   code: ValidationCode;

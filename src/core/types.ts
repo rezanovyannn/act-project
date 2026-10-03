@@ -63,6 +63,9 @@ export type InventoryMethod = "periodic" | "perpetual";
 /** Metode biaya persediaan perpetual (ADR 017). */
 export type CostMethod = "average" | "fifo";
 /** Metode biaya yang berlaku mulai tanggal `from` (inklusif). */
+/** Dasar nilai stok akhir pada stok opname sisa bahan (ADR 020). */
+export type StockValuation = "average" | "last";
+
 export interface CostMethodPeriod {
   method: CostMethod;
   from: IsoDate;
@@ -90,6 +93,8 @@ export interface Workspace {
   inventoryMethod: InventoryMethod;
   /** Riwayat metode biaya, terurut; elemen terakhir = metode saat ini. */
   costMethodHistory: CostMethodPeriod[];
+  /** Harga satuan untuk menilai sisa bahan: rata-rata atau beli terakhir (ADR 020). */
+  stockValuation: StockValuation;
   createdAt: IsoTimestamp;
   updatedAt: IsoTimestamp;
   deletedAt: IsoTimestamp | null;
@@ -217,6 +222,8 @@ export interface Item {
   unit: string;
   /** Akun pendapatan default saat barang dijual. */
   revenueAccountId: string | null;
+  /** Section/kategori bebas, mis. "Protein", "Sayur & Buah" (ADR 020). */
+  category: string | null;
   isActive: boolean;
   createdAt: IsoTimestamp;
   updatedAt: IsoTimestamp;
@@ -228,6 +235,28 @@ export interface ItemInput {
   name: string;
   unit: string;
   revenueAccountId: string | null;
+  category?: string | null;
+}
+
+/** Baris stok opname sisa bahan: qty sisa & nilai rupiahnya (ADR 020). */
+export interface StockCountLine {
+  itemId: string;
+  quantity: number;
+  value: number;
+}
+
+export interface StockCountInput {
+  workspaceId: string;
+  countDate: IsoDate;
+  valuation: StockValuation;
+  lines: StockCountLine[];
+}
+
+export interface StockCount extends StockCountInput {
+  id: string;
+  /** Jurnal penyesuaian HPP; null bila nilai fisik = saldo buku. */
+  journalEntryId: string | null;
+  createdAt: IsoTimestamp;
 }
 
 /**

@@ -71,7 +71,7 @@ export class InventoryService {
     if (change.kind === "to_periodic") {
       if (workspace.inventoryMethod === "periodic") fail("INVALID_ACCOUNT", "Workspace sudah memakai metode periodik");
       return {
-        workspace: await this.deps.workspaces.updateInventorySettings(workspaceId, { inventoryMethod: "periodic", costMethodHistory: history }),
+        workspace: await this.deps.workspaces.updateInventorySettings(workspaceId, { inventoryMethod: "periodic", costMethodHistory: history, stockValuation: workspace.stockValuation }),
         transitionEntry: null,
       };
     }

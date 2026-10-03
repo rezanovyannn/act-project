@@ -6,7 +6,7 @@ import { toast } from "sonner"
 import { formatAccounting, formatDate, todayIsoDate } from "@/core/format"
 import type { AppServices } from "@/core/services"
 import { buildSnapshot, currentCostMethod } from "@/core/services/inventory-service"
-import type { CostMethod, JournalEntry, Workspace } from "@/core/types"
+import type { CostMethod, JournalEntry, StockValuation, Workspace } from "@/core/types"
 import { Amount } from "@/components/ui/amount"
 import { AmountInput } from "@/components/ui/amount-input"
 import { Button } from "@/components/ui/button"
@@ -32,6 +32,11 @@ import {
 } from "@/components/ui/select"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { errorMessage, useLoader } from "@/lib/utils"
+
+const VALUATION_LABELS: Record<StockValuation, string> = {
+  average: "Harga beli rata-rata (stok awal + pembelian periode)",
+  last: "Harga beli terakhir",
+}
 
 const COST_LABELS: Record<CostMethod, string> = { average: "Rata-rata tertimbang bergerak", fifo: "FIFO (masuk pertama keluar pertama)" }
 
@@ -99,9 +104,41 @@ export function InventoryTab({
   return (
     <div className="grid max-w-4xl grid-cols-1 gap-5">
       <p className="text-sm text-muted-foreground">
-        Metode saat ini: <strong className="text-ink">{perpetual ? `Perpetual · ${COST_LABELS[costMethod]}` : "Periodik (stok opname nilai rupiah)"}</strong>.
+        Metode saat ini: <strong className="text-ink">{perpetual ? `Perpetual · ${COST_LABELS[costMethod]}` : "Periodik (stok opname sisa bahan & COGS)"}</strong>.
         Perubahan tercatat di Riwayat Audit.
       </p>
+
+      {!perpetual && (
+        <section className="grid gap-3 rounded-2xl bg-canvas ring-1 ring-border p-4 sm:p-6">
+          <div>
+            <h2 className="font-semibold">Nilai sisa bahan di Stok Opname &amp; COGS</h2>
+            <p className="text-sm text-muted-foreground">
+              Dasar harga untuk menilai qty sisa bahan saat stok opname. Berlaku untuk stok opname berikutnya; stok opname
+              yang sudah disimpan tidak dihitung ulang.
+            </p>
+          </div>
+          <div className="grid max-w-md gap-2">
+            <Label htmlFor="inv-valuation">Dasar nilai stok</Label>
+            <Select
+              value={workspace.stockValuation}
+              disabled={saving}
+              onValueChange={(v) =>
+                run(
+                  async () => (await services.stockCountService.setValuation(workspace.id, v as StockValuation), { transitionEntry: null }),
+                  `Dasar nilai stok: ${VALUATION_LABELS[v as StockValuation].toLowerCase()}`,
+                )
+              }
+            >
+              <SelectTrigger id="inv-valuation" className="w-full bg-background"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                {(Object.keys(VALUATION_LABELS) as StockValuation[]).map((v) => (
+                  <SelectItem key={v} value={v}>{VALUATION_LABELS[v]}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        </section>
+      )}
 
       {!perpetual ? (
         <section className="grid gap-4 rounded-2xl bg-canvas ring-1 ring-border p-4 sm:p-6">

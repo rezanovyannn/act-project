@@ -15,6 +15,8 @@ export default function StockOpnamePage() {
       services={services}
       workspaceId={workspaceId}
       journalHref={(entryId) => routes.journal(workspaceId, entryId)}
+      itemsHref={routes.inventoryItems(workspaceId)}
+      settingsHref={routes.settings(workspaceId, "inventory")}
     />
   )
 }

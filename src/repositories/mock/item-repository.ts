@@ -35,6 +35,7 @@ export class MockItemRepository implements IItemRepository {
       const now = this.db.now();
       const item: Item = {
         ...input,
+        category: input.category?.trim() || null,
         id: this.db.generateId(),
         workspaceId,
         isActive: true,

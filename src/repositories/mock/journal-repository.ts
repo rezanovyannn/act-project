@@ -168,7 +168,7 @@ export class MockJournalRepository implements IJournalRepository {
   }
 
   /** Posting di dalam write() yang sedang berjalan (lapisan pertahanan terakhir, ADR 008). */
-  private postInState(
+  postInState(
     state: MockState,
     input: JournalEntryInput,
     draftId?: string,

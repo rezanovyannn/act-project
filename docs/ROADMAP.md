@@ -131,6 +131,25 @@ Dipecah menjadi tiga sub-fase (ADR 015); stop & review setelah tiap sub-fase.
 
 ---
 
+## Fase 6: Stok Opname Sisa Bahan, COGS & Variance (ADR 020)
+Satu menu sidebar **Stok Opname & COGS** berisi dua tab. Untuk metode persediaan periodik; workspace perpetual tetap memakai stok opname per barang (ADR 017). Workspace periodik yang belum punya bahan aktif tetap memakai stok opname nilai rupiah.
+
+### Sub-fase 6A: Stok Opname Sisa Bahan & Tabel COGS
+- **Pekerjaan:**
+  - Kategori/section bebas per bahan di Daftar Barang.
+  - Pengaturan dasar nilai stok per workspace: harga beli terakhir atau rata-rata.
+  - Pembelian bahan baku per bahan (qty & harga).
+  - Stok opname = input qty **sisa** per bahan, dikelompokkan per section; nilai = qty × harga sesuai pengaturan; jurnal penyesuaian HPP otomatis.
+  - Template & import/export CSV dan Excel (.xlsx, ExcelJS).
+  - Tab COGS: Nama Bahan | Stok Awal | Pembelian | Stok Akhir | COGS (COGS = Stok Awal + Pembelian − Stok Akhir).
+- **Kriteria Selesai (Stop & Review):** Total COGS tabel = HPP penyesuaian di jurnal; import/export bolak-balik tanpa kehilangan data; unit test perhitungan.
+
+### Sub-fase 6B: Resep & Variance Theoretical vs Actual
+- **Pekerjaan:** menu & resep (bahan per porsi); porsi terjual dari rekap per periode (input/import) dan dari form penjualan per menu; analisa variance per bahan: theoretical (porsi × resep × harga) vs actual (COGS stok opname).
+- **Kriteria Selesai (Stop & Review):** Variance per bahan & total terhitung benar dan teruji unit test.
+
+---
+
 ## Catatan Keputusan (dijawab user, 28 September 2026)
 | # | Pertanyaan | Keputusan | Rujukan |
 |---|---|---|---|
@@ -175,3 +194,10 @@ Dipecah menjadi tiga sub-fase (ADR 015); stop & review setelah tiap sub-fase.
 | 39 | Lupa kata sandi | Dibuat: tautan reset lewat email Supabase + halaman atur kata sandi baru | ADR 019 |
 | 40 | "Ingat perangkat ini" | Dibuat: tidak dicentang = sesi berakhir saat browser ditutup | ADR 019 |
 | 41 | Redesign "Workspace Saya" (2 Okt 2026) | Kartu per workspace dengan data nyata (pendapatan & jurnal bulan berjalan, status, saldo awal, metode persediaan), cari & filter template; tanpa avatar tim, notifikasi, banner konsultan, dan klaim footer | docs/DESIGN_SYSTEM.md |
+| 42 | Stok opname F&B (3 Okt 2026) | Input sisa bahan (qty) per bahan, dikelompokkan per section; satu menu "Stok Opname & COGS" | ADR 020 |
+| 43 | Nilai stok akhir | Pilihan per workspace di Pengaturan: harga beli terakhir atau rata-rata | ADR 020 |
+| 44 | Section bahan baku | Kategori bebas per bahan di Daftar Barang | ADR 020 |
+| 45 | Template import/export | CSV dan Excel .xlsx (dependency ExcelJS disetujui user) | ADR 020 |
+| 46 | Pembelian bahan baku | Per bahan (qty & harga) | ADR 020 |
+| 47 | Jurnal stok opname | Penyesuaian HPP otomatis = saldo buku Persediaan − nilai stok akhir | ADR 020 |
+| 48 | Porsi terjual (theoretical cost) | Keduanya: rekap per periode (input/import) dan form penjualan per menu | ADR 020 |

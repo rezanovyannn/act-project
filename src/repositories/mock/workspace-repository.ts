@@ -41,6 +41,7 @@ export class MockWorkspaceRepository implements IWorkspaceRepository {
         vatDppDenominator: input.salesTax.dppDenominator,
         inventoryMethod: "periodic",
         costMethodHistory: [],
+        stockValuation: "average",
         createdAt: now,
         updatedAt: now,
         deletedAt: null,
@@ -115,6 +116,7 @@ export class MockWorkspaceRepository implements IWorkspaceRepository {
       const before = { ...workspace, costMethodHistory: [...workspace.costMethodHistory] };
       workspace.inventoryMethod = settings.inventoryMethod;
       workspace.costMethodHistory = settings.costMethodHistory.map((h) => ({ ...h }));
+      if (settings.stockValuation) workspace.stockValuation = settings.stockValuation;
       workspace.updatedAt = this.db.now();
       this.db.audit(state, { workspaceId: id, entityType: "workspace", entityId: id, action: "update_inventory_settings", before, after: workspace });
       return workspace;

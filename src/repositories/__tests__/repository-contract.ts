@@ -11,6 +11,7 @@ import type {
   IAccountRepository,
   IAuditLogRepository,
   IItemRepository,
+  IStockCountRepository,
   IJournalRepository,
   IPeriodRepository,
   IWorkspaceRepository,
@@ -27,6 +28,7 @@ export interface ContractRepositories {
   journals: IJournalRepository;
   auditLogs: IAuditLogRepository;
   items: IItemRepository;
+  stockCounts: IStockCountRepository;
 }
 
 async function expectCode(promise: Promise<unknown>, code: ValidationCode) {
@@ -527,6 +529,88 @@ export function describeRepositoryContract(
         expect(updated).toMatchObject({ inventoryMethod: "perpetual", costMethodHistory: [{ method: "average", from: "2026-01-01" }, { method: "fifo", from: "2026-04-01" }] });
         const logs = await repos.auditLogs.listByWorkspace(workspace.id, { entityType: "workspace" });
         expect(logs[0].action).toBe("update_inventory_settings");
+      });
+    });
+
+    describe("stok opname sisa bahan (ADR 020)", () => {
+      async function setup() {
+        const accounts = await repos.accounts.listByWorkspace(workspace.id);
+        const role = (r: string) => accounts.find((a) => a.systemRole === r)!.id;
+        const item = await repos.items.create(workspace.id, { code: "BB-1", name: "Tepung", unit: "gram", revenueAccountId: null, category: "Dry Goods" });
+        await repos.journals.postJournal({
+          workspaceId: workspace.id,
+          entryDate: "2026-03-01",
+          description: "Beli tepung",
+          source: "purchase",
+          lines: [
+            { accountId: role("inventory"), debit: 100_000, credit: 0, itemId: item.id, quantity: 10_000 },
+            { accountId: kasId, debit: 0, credit: 100_000 },
+          ],
+        });
+        const journal = (date: string, amount: number): JournalEntryInput => ({
+          workspaceId: workspace.id,
+          entryDate: date,
+          description: "Stok opname sisa bahan",
+          source: "adjustment",
+          lines: [
+            { accountId: role("cogs"), debit: amount, credit: 0 },
+            { accountId: role("inventory"), debit: 0, credit: amount },
+          ],
+        });
+        return { item, journal };
+      }
+
+      it("menyimpan stok opname beserta jurnal & section barang", async () => {
+        const { item, journal } = await setup();
+        expect(item.category).toBe("Dry Goods");
+        const count = await repos.stockCounts.post(
+          { workspaceId: workspace.id, countDate: "2026-03-31", valuation: "average", lines: [{ itemId: item.id, quantity: 2_000, value: 20_000 }] },
+          journal("2026-03-31", 80_000),
+        );
+        expect(count).toMatchObject({ countDate: "2026-03-31", valuation: "average", lines: [{ itemId: item.id, quantity: 2_000, value: 20_000 }] });
+        expect(count.journalEntryId).toBeTruthy();
+        const posted = await repos.journals.getById(count.journalEntryId!);
+        expect(posted).toMatchObject({ source: "adjustment", status: "posted" });
+        expect(await repos.stockCounts.listByWorkspace(workspace.id)).toHaveLength(1);
+        const updated = await repos.items.update(item.id, { category: "Kering" });
+        expect(updated.category).toBe("Kering");
+      });
+
+      it("menolak tanggal tidak setelah opname terakhir, jurnal salah, qty negatif; tanpa jurnal boleh", async () => {
+        const { item, journal } = await setup();
+        await repos.stockCounts.post({ workspaceId: workspace.id, countDate: "2026-03-31", valuation: "last", lines: [{ itemId: item.id, quantity: 0, value: 0 }] }, null);
+        await expectCode(
+          repos.stockCounts.post({ workspaceId: workspace.id, countDate: "2026-03-31", valuation: "average", lines: [] }, null),
+          "INVALID_STOCK_COUNT",
+        );
+        await expectCode(
+          repos.stockCounts.post({ workspaceId: workspace.id, countDate: "2026-04-30", valuation: "average", lines: [] }, journal("2026-04-29", 1)),
+          "INVALID_STOCK_COUNT",
+        );
+        await expectCode(
+          repos.stockCounts.post({ workspaceId: workspace.id, countDate: "2026-04-30", valuation: "average", lines: [{ itemId: item.id, quantity: -1, value: 0 }] }, null),
+          "INVALID_QUANTITY",
+        );
+        expect(await repos.stockCounts.listByWorkspace(workspace.id)).toHaveLength(1);
+      });
+
+      it("batalkan stok opname terakhir membalik jurnalnya; void jurnal juga membatalkan", async () => {
+        const { item, journal } = await setup();
+        const first = await repos.stockCounts.post(
+          { workspaceId: workspace.id, countDate: "2026-03-31", valuation: "average", lines: [{ itemId: item.id, quantity: 2_000, value: 20_000 }] },
+          journal("2026-03-31", 80_000),
+        );
+        const second = await repos.stockCounts.post(
+          { workspaceId: workspace.id, countDate: "2026-04-30", valuation: "average", lines: [{ itemId: item.id, quantity: 1_000, value: 10_000 }] },
+          journal("2026-04-30", 10_000),
+        );
+        await expectCode(repos.stockCounts.cancel(first.id, "2026-04-30"), "INVALID_STOCK_COUNT");
+        await repos.stockCounts.cancel(second.id, "2026-04-30");
+        expect((await repos.journals.findReversalOf(second.journalEntryId!))?.entryDate).toBe("2026-04-30");
+        expect((await repos.stockCounts.listByWorkspace(workspace.id)).map((c) => c.id)).toEqual([first.id]);
+        const original = (await repos.journals.getById(first.journalEntryId!))!;
+        await repos.journals.postJournal(buildReversalInput(original, "2026-04-01"));
+        expect(await repos.stockCounts.listByWorkspace(workspace.id)).toEqual([]);
       });
     });
   });

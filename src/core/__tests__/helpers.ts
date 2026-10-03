@@ -4,6 +4,7 @@ import { InventoryService } from "@/core/services/inventory-service";
 import { ItemService } from "@/core/services/item-service";
 import { JournalService } from "@/core/services/journal-service";
 import { PeriodService } from "@/core/services/period-service";
+import { StockCountService } from "@/core/services/stock-count-service";
 import { TaxService } from "@/core/services/tax-service";
 import { WorkspaceService } from "@/core/services/workspace-service";
 import type { Account, JournalEntryInput, JournalLineInput } from "@/core/types";
@@ -39,6 +40,7 @@ export function createTestEnv(seed: () => MockState = emptyMockState) {
     taxService: new TaxService({ ...repos, journalService }),
     itemService: new ItemService(repos),
     inventoryService: new InventoryService({ ...repos, journalService }),
+    stockCountService: new StockCountService(repos),
     accountService: new AccountService(repos),
     periodService: new PeriodService(repos),
     closingService: new ClosingService(repos),

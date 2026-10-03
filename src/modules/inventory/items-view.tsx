@@ -90,12 +90,12 @@ export function ItemsView({
 
       {!perpetual ? (
         <p role="note" className="rounded-lg bg-card px-4 py-3 text-sm text-ink">
-          Metode periodik: stok per barang belum dilacak. Siapkan daftar barang di sini, lalu aktifkan metode
-          perpetual di{" "}
+          Metode periodik: catat pembelian per bahan, lalu hitung sisa bahan di Stok Opname &amp; COGS (isi Section
+          agar bahan terkelompok). Untuk melacak stok berjalan per barang, aktifkan metode perpetual di{" "}
           <Link href={settingsHref} className="font-semibold underline underline-offset-4">
             Pengaturan → Persediaan
-          </Link>{" "}
-          dengan stok opname awal per barang.
+          </Link>
+          .
         </p>
       ) : reconciliation.unitemized === 0 ? (
         <p role="status" className="flex flex-wrap items-center gap-2 rounded-lg bg-success-pale px-4 py-3 text-sm text-success-deep">
@@ -121,9 +121,14 @@ export function ItemsView({
               <TableRow>
                 <TableHead className="w-24">Kode</TableHead>
                 <TableHead>Barang</TableHead>
-                <TableHead className="w-28 text-right">Stok</TableHead>
-                <TableHead className="w-36 text-right">Nilai</TableHead>
-                <TableHead className="w-32 text-right">HPP/satuan</TableHead>
+                <TableHead className="w-36">Section</TableHead>
+                {perpetual && (
+                  <>
+                    <TableHead className="w-28 text-right">Stok</TableHead>
+                    <TableHead className="w-36 text-right">Nilai</TableHead>
+                    <TableHead className="w-32 text-right">HPP/satuan</TableHead>
+                  </>
+                )}
                 <TableHead className="w-12" />
               </TableRow>
             </TableHeader>
@@ -140,13 +145,18 @@ export function ItemsView({
                       {!item.isActive && <Badge variant="secondary" className="ml-2">Nonaktif</Badge>}
                       {qty < 0 && <Badge variant="destructive" className="ml-2">Stok minus</Badge>}
                     </TableCell>
-                    <TableCell className="text-right tabular-nums">
-                      {qty.toLocaleString("id-ID")} {item.unit}
-                    </TableCell>
-                    <TableCell className="text-right"><Amount value={value} /></TableCell>
-                    <TableCell className="text-right">
-                      {qty > 0 ? <Amount value={mulDivRound(value, 1, qty)} /> : <span className="text-muted-foreground">—</span>}
-                    </TableCell>
+                    <TableCell className="text-muted-foreground">{item.category ?? "—"}</TableCell>
+                    {perpetual && (
+                      <>
+                        <TableCell className="text-right tabular-nums">
+                          {qty.toLocaleString("id-ID")} {item.unit}
+                        </TableCell>
+                        <TableCell className="text-right"><Amount value={value} /></TableCell>
+                        <TableCell className="text-right">
+                          {qty > 0 ? <Amount value={mulDivRound(value, 1, qty)} /> : <span className="text-muted-foreground">—</span>}
+                        </TableCell>
+                      </>
+                    )}
                     <TableCell>
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
@@ -189,6 +199,7 @@ export function ItemsView({
           services={services}
           workspaceId={workspaceId}
           item={editing === "new" ? null : editing}
+          sections={[...new Set(current.items.map((i) => i.category).filter((c): c is string => !!c))].sort()}
           revenueAccounts={current.accounts.filter((a) => a.accountType === "revenue" && a.isActive && a.systemRole !== "sales_returns")}
           onClose={() => setEditing(null)}
           onSaved={() => {
@@ -208,6 +219,7 @@ function ItemDialog({
   services,
   workspaceId,
   item,
+  sections,
   revenueAccounts,
   onClose,
   onSaved,
@@ -215,6 +227,7 @@ function ItemDialog({
   services: AppServices
   workspaceId: string
   item: Item | null
+  sections: string[]
   revenueAccounts: Account[]
   onClose: () => void
   onSaved: () => void
@@ -222,6 +235,7 @@ function ItemDialog({
   const [code, setCode] = useState(item?.code ?? "")
   const [name, setName] = useState(item?.name ?? "")
   const [unit, setUnit] = useState(item?.unit ?? "pcs")
+  const [category, setCategory] = useState(item?.category ?? "")
   const [revenueAccountId, setRevenueAccountId] = useState(item?.revenueAccountId ?? revenueAccounts[0]?.id ?? NO_ACCOUNT)
   const [error, setError] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
@@ -230,7 +244,7 @@ function ItemDialog({
     event.preventDefault()
     setSaving(true)
     setError(null)
-    const input = { code, name, unit, revenueAccountId: revenueAccountId === NO_ACCOUNT ? null : revenueAccountId }
+    const input = { code, name, unit, category, revenueAccountId: revenueAccountId === NO_ACCOUNT ? null : revenueAccountId }
     try {
       const saved = item ? await services.itemService.updateItem(item.id, input) : await services.itemService.createItem(workspaceId, input)
       toast.success(`${saved.code} · ${saved.name} disimpan`)
@@ -279,6 +293,14 @@ function ItemDialog({
                 </SelectContent>
               </Select>
             </div>
+          </div>
+          <div className="grid gap-2">
+            <Label htmlFor="item-category">Section</Label>
+            <Input id="item-category" list="item-category-options" value={category} onChange={(e) => setCategory(e.target.value)} placeholder="mis. Protein, Sayur, Bumbu, Minuman" />
+            <datalist id="item-category-options">
+              {sections.map((s) => <option key={s} value={s} />)}
+            </datalist>
+            <p className="text-xs text-muted-foreground">Mengelompokkan bahan di Stok Opname & COGS. Boleh dikosongkan.</p>
           </div>
           {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
           <DialogFooter>

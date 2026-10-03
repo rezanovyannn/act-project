@@ -4,6 +4,7 @@ import type {
   Account,
   AuditLog,
   Item,
+  StockCount,
   JournalEntry,
   Period,
   Workspace,
@@ -62,6 +63,7 @@ export const toWorkspace = (r: any): Workspace => ({
   vatDppDenominator: r.vat_dpp_denominator,
   inventoryMethod: r.inventory_method,
   costMethodHistory: r.cost_method_history ?? [],
+  stockValuation: r.stock_valuation ?? "average",
   salesTaxRateBps: r.sales_tax_rate_bps,
   salesTaxInclusive: r.sales_tax_inclusive,
   createdAt: r.created_at,
@@ -109,10 +111,21 @@ export const toItem = (r: any): Item => ({
   name: r.name,
   unit: r.unit,
   revenueAccountId: r.revenue_account_id,
+  category: r.category ?? null,
   isActive: r.is_active,
   createdAt: r.created_at,
   updatedAt: r.updated_at,
   deletedAt: r.deleted_at,
+});
+
+export const toStockCount = (r: any): StockCount => ({
+  id: r.id,
+  workspaceId: r.workspace_id,
+  countDate: r.count_date,
+  valuation: r.valuation,
+  journalEntryId: r.journal_entry_id,
+  createdAt: r.created_at,
+  lines: (r.stock_count_lines ?? []).map((l: any) => ({ itemId: l.item_id, quantity: toAmount(l.quantity), value: toAmount(l.value) })),
 });
 
 export const JOURNAL_SELECT = "*, journal_lines(*)";

@@ -4,16 +4,19 @@ import { MockItemRepository } from "./item-repository";
 import { MockJournalRepository } from "./journal-repository";
 import { MockDatabase } from "./mock-database";
 import { MockPeriodRepository } from "./period-repository";
+import { MockStockCountRepository } from "./stock-count-repository";
 import { MockWorkspaceRepository } from "./workspace-repository";
 
 export * from "./mock-database";
 
 export function createMockRepositories(db: MockDatabase) {
+  const journals = new MockJournalRepository(db);
   return {
     workspaces: new MockWorkspaceRepository(db),
     accounts: new MockAccountRepository(db),
     periods: new MockPeriodRepository(db),
-    journals: new MockJournalRepository(db),
+    journals,
+    stockCounts: new MockStockCountRepository(db, journals),
     items: new MockItemRepository(db),
     auditLogs: new MockAuditLogRepository(db),
   };

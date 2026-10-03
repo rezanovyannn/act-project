@@ -16,6 +16,9 @@ import type {
   JournalEntryInput,
   Period,
   PeriodStatus,
+  StockCount,
+  StockCountInput,
+  StockValuation,
   TemplateType,
   Workspace,
 } from "../types";
@@ -49,6 +52,21 @@ export interface IWorkspaceRepository {
 export interface InventorySettings {
   inventoryMethod: InventoryMethod;
   costMethodHistory: CostMethodPeriod[];
+  /** Kosong = tidak diubah (ADR 020). */
+  stockValuation?: StockValuation;
+}
+
+/** Stok opname sisa bahan (ADR 020). */
+export interface IStockCountRepository {
+  /** Stok opname aktif (belum dibatalkan), urut tanggal. */
+  listByWorkspace(workspaceId: string): Promise<StockCount[]>;
+  /**
+   * Atomik: posting jurnal penyesuaian (bila ada) lalu menyimpan stok opname.
+   * Ditolak bila tanggalnya tidak setelah stok opname aktif terakhir.
+   */
+  post(input: StockCountInput, journal: JournalEntryInput | null): Promise<StockCount>;
+  /** Membatalkan stok opname aktif terakhir: jurnalnya dibalik pada `reversalDate`. */
+  cancel(id: string, reversalDate: IsoDate): Promise<void>;
 }
 
 export type ItemPatch = Partial<ItemInput & { isActive: boolean }>;

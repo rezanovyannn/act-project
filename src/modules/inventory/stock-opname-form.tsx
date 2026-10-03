@@ -1,6 +1,7 @@
 "use client"
 
 import { useState } from "react"
+import Link from "next/link"
 import { InfoIcon } from "lucide-react"
 import { endOfMonth } from "@/core/dates"
 import { formatAccounting, formatDate, todayIsoDate } from "@/core/format"
@@ -17,23 +18,40 @@ import { LoadingState, PageHeader } from "@/components/ui/page-header"
 import { errorMessage, useLoader } from "@/lib/utils"
 import { buildStockOpname, inventoryBookBalance } from "@/core/inventory"
 import { ItemStockOpnameForm } from "./item-stock-opname-form"
+import { StockCountView } from "./stock-count-view"
 import { useInventoryData } from "./use-inventory-data"
 
-/** Stok opname: periodik (nilai rupiah) atau per barang (perpetual), sesuai metode workspace. */
+/** Stok opname: sisa bahan & COGS (periodik, ADR 020), nilai rupiah (periodik tanpa daftar bahan), atau per barang (perpetual, ADR 017). */
 export function StockOpnameView({
   services,
   workspaceId,
   journalHref,
+  itemsHref,
+  settingsHref,
 }: {
   services: AppServices
   workspaceId: string
   journalHref: (entryId: string) => string
+  itemsHref: string
+  settingsHref: string
 }) {
   const data = useInventoryData(services, workspaceId)
   if (data.loading && !data.data) return <LoadingState />
   if (data.error) return <p role="alert" className="text-sm text-destructive">{errorMessage(data.error)}</p>
   if (data.data!.workspace.inventoryMethod !== "perpetual") {
-    return <PeriodicStockOpname services={services} workspaceId={workspaceId} journalHref={journalHref} />
+    // Belum ada daftar bahan: tetap stok opname nilai rupiah (ADR 007).
+    if (!data.data!.items.some((i) => i.isActive)) {
+      return <PeriodicStockOpname services={services} workspaceId={workspaceId} journalHref={journalHref} itemsHref={itemsHref} />
+    }
+    return (
+      <StockCountView
+        services={services}
+        workspaceId={workspaceId}
+        journalHref={journalHref}
+        itemsHref={itemsHref}
+        settingsHref={settingsHref}
+      />
+    )
   }
   return (
     <div className="grid grid-cols-1 gap-6">
@@ -48,10 +66,12 @@ function PeriodicStockOpname({
   services,
   workspaceId,
   journalHref,
+  itemsHref,
 }: {
   services: AppServices
   workspaceId: string
   journalHref: (entryId: string) => string
+  itemsHref: string
 }) {
   const data = useLoader(async () => {
     const [workspace, accounts, journals] = await Promise.all([
@@ -113,6 +133,14 @@ function PeriodicStockOpname({
         title="Stok Opname"
         description={`Hitung fisik persediaan ${noun}, lalu sistem membukukan selisihnya ke HPP.`}
       />
+      <p role="note" className="flex gap-2 rounded-2xl bg-card px-4 py-3 text-sm text-ink">
+        <InfoIcon className="mt-0.5 size-4 shrink-0" />
+        <span>
+          Ingin input sisa per bahan dan tabel COGS? Tambahkan bahan (dengan Section) di{" "}
+          <Link href={itemsHref} className="font-semibold underline underline-offset-4">Daftar Barang</Link>; halaman ini lalu
+          berganti menjadi Stok Opname &amp; COGS.
+        </span>
+      </p>
       <form onSubmit={submit} className="grid grid-cols-1 gap-6 xl:grid-cols-[minmax(0,1fr)_26rem]">
         <div className="grid content-start gap-5 rounded-2xl bg-canvas ring-1 ring-border p-4 sm:p-6">
           <div className="grid gap-4 sm:grid-cols-2">

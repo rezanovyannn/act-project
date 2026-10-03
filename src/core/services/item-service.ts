@@ -38,6 +38,7 @@ export class ItemService {
       name: input.name.trim(),
       unit: input.unit.trim(),
       revenueAccountId: input.revenueAccountId || null,
+      category: input.category?.trim() || null,
     };
     if (clean.code === "") fail("EMPTY_NAME", "Kode barang wajib diisi");
     if (clean.name === "") fail("EMPTY_NAME", "Nama barang wajib diisi");

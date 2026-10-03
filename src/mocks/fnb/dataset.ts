@@ -275,6 +275,7 @@ export function buildFnbMockState(): MockState {
     vatDppDenominator: 1,
     inventoryMethod: "periodic",
     costMethodHistory: [],
+    stockValuation: "average",
     salesTaxRateBps: 1000,
     salesTaxInclusive: false,
     createdAt: SEED_TIMESTAMP,
@@ -288,6 +289,7 @@ export function buildFnbMockState(): MockState {
     periods: buildPeriods(),
     journals: buildJournals(),
     items: [],
+    stockCounts: [],
     auditLogs: [],
   };
 }

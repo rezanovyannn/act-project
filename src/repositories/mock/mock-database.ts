@@ -1,4 +1,4 @@
-import type { Account, AuditEntity, AuditLog, Item, JournalEntry, Period, Workspace } from "@/core/types";
+import type { Account, AuditEntity, AuditLog, Item, JournalEntry, Period, StockCount, Workspace } from "@/core/types";
 
 /** Subset API `localStorage` yang dipakai; memudahkan test dengan storage memori. */
 export interface KeyValueStorage {
@@ -21,7 +21,7 @@ export class MemoryStorage implements KeyValueStorage {
 }
 
 /** Naikkan bila bentuk data berubah; data lama di browser akan diganti seed. */
-export const MOCK_SCHEMA_VERSION = 7;
+export const MOCK_SCHEMA_VERSION = 8;
 export const MOCK_STORAGE_KEY = "act-project:mock-db";
 
 export interface MockState {
@@ -31,6 +31,8 @@ export interface MockState {
   periods: Period[];
   journals: JournalEntry[];
   items: Item[];
+  /** Stok opname sisa bahan (ADR 020); dibatalkan = deletedAt terisi. */
+  stockCounts: (StockCount & { deletedAt: string | null })[];
   auditLogs: AuditLog[];
 }
 
@@ -42,6 +44,7 @@ export function emptyMockState(): MockState {
     periods: [],
     journals: [],
     items: [],
+    stockCounts: [],
     auditLogs: [],
   };
 }
