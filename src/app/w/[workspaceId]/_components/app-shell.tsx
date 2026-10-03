@@ -6,6 +6,7 @@ import { usePathname } from "next/navigation"
 import {
   BookOpenIcon,
   BoxesIcon,
+  ChefHatIcon,
   ClipboardCheckIcon,
   FileTextIcon,
   HistoryIcon,
@@ -74,6 +75,8 @@ function navGroups(workspaceId: string, template: WorkspaceTemplate, openClaims:
       items: [
         { label: "Daftar Barang", href: routes.inventoryItems(workspaceId), icon: BoxesIcon },
         { label: `Pembelian ${capitalizeWords(template.inventoryNoun)}`, href: routes.inventoryPurchases(workspaceId), icon: PackageIcon },
+        // Resep & variance theoretical vs actual khusus F&B (ADR 021).
+        ...(template.type === "fnb" ? [{ label: "Menu & Resep", href: routes.inventoryMenus(workspaceId), icon: ChefHatIcon }] : []),
         { label: "Stok Opname & COGS", href: routes.inventoryStockOpname(workspaceId), icon: ClipboardCheckIcon },
         { label: "Pemakaian Barang", href: routes.inventoryUsage(workspaceId), icon: PackageMinusIcon },
         { label: "Retur Barang", href: routes.inventoryReturns(workspaceId), icon: Undo2Icon },

@@ -9,6 +9,8 @@ import type {
   IAccountRepository,
   IAuditLogRepository,
   IItemRepository,
+  IMenuRepository,
+  MenuPatch,
   IStockCountRepository,
   IJournalRepository,
   InventorySettings,
@@ -25,6 +27,14 @@ import type {
   AuditLog,
   Item,
   ItemInput,
+  Menu,
+  MenuInput,
+  MenuSale,
+  MenuSaleLine,
+  PortionSummary,
+  PortionSummaryInput,
+  Recipe,
+  RecipeInput,
   IsoDate,
   StockCount,
   StockCountInput,
@@ -40,6 +50,10 @@ import {
   toAccount,
   toAuditLog,
   toItem,
+  toMenu,
+  toMenuSaleLine,
+  toPortionSummary,
+  toRecipe,
   toStockCount,
   toJournal,
   toPeriod,
@@ -363,6 +377,113 @@ export class SupabaseStockCountRepository implements IStockCountRepository {
   }
 }
 
+type SaleLineRow = { journal_entry_id: string; journal_entries: { entry_date: string } } & Record<string, unknown>;
+
+/** Menu, resep, rekap porsi, penjualan menu (ADR 021): baca SELECT, tulis RPC. */
+export class SupabaseMenuRepository implements IMenuRepository {
+  constructor(
+    private readonly client: Client,
+    private readonly journals: SupabaseJournalRepository,
+  ) {}
+
+  async listMenus(workspaceId: string): Promise<Menu[]> {
+    const rows = await unwrapRows(this.client.from("menus").select("*").eq("workspace_id", workspaceId).is("deleted_at", null).order("code"));
+    return rows.map(toMenu);
+  }
+
+  async getMenu(id: string): Promise<Menu | null> {
+    const row = await unwrap(this.client.from("menus").select("*").eq("id", id).is("deleted_at", null).maybeSingle());
+    return row ? toMenu(row) : null;
+  }
+
+  async createMenu(workspaceId: string, input: MenuInput): Promise<Menu> {
+    const id = await unwrap(this.client.rpc("create_menu", { p_workspace_id: workspaceId, p_menu: input }));
+    return required(await this.getMenu(id as string), "Menu");
+  }
+
+  async updateMenu(id: string, patch: MenuPatch): Promise<Menu> {
+    await unwrap(this.client.rpc("update_menu", { p_id: id, p_patch: patch }));
+    return required(await this.getMenu(id), "Menu");
+  }
+
+  async deleteMenu(id: string): Promise<void> {
+    await unwrap(this.client.rpc("delete_menu", { p_id: id }));
+  }
+
+  async listRecipes(workspaceId: string): Promise<Recipe[]> {
+    const rows = await unwrapRows(
+      this.client.from("recipes").select("*, recipe_lines(*)").eq("workspace_id", workspaceId).is("deleted_at", null).order("menu_id").order("effective_from"),
+    );
+    return rows.map(toRecipe);
+  }
+
+  async saveRecipe(input: RecipeInput): Promise<Recipe> {
+    const id = (await unwrap(this.client.rpc("save_recipe", { p_recipe: input }))) as string;
+    const row = await unwrap(this.client.from("recipes").select("*, recipe_lines(*)").eq("id", id).maybeSingle());
+    return toRecipe(required(row, "Resep"));
+  }
+
+  async deleteRecipe(id: string): Promise<void> {
+    await unwrap(this.client.rpc("delete_recipe", { p_id: id }));
+  }
+
+  async listPortionSummaries(workspaceId: string): Promise<PortionSummary[]> {
+    const rows = await unwrapRows(
+      this.client.from("portion_summaries").select("*, portion_summary_lines(*)").eq("workspace_id", workspaceId).is("deleted_at", null).order("date_from"),
+    );
+    return rows.map(toPortionSummary);
+  }
+
+  async createPortionSummary(input: PortionSummaryInput): Promise<PortionSummary> {
+    const id = (await unwrap(this.client.rpc("create_portion_summary", { p_summary: input }))) as string;
+    const row = await unwrap(this.client.from("portion_summaries").select("*, portion_summary_lines(*)").eq("id", id).maybeSingle());
+    return toPortionSummary(required(row, "Rekap porsi"));
+  }
+
+  async deletePortionSummary(id: string): Promise<void> {
+    await unwrap(this.client.rpc("delete_portion_summary", { p_id: id }));
+  }
+
+  async listMenuSales(workspaceId: string): Promise<MenuSale[]> {
+    const rows = await fetchAll((from, to) =>
+      this.client
+        .from("menu_sale_lines")
+        .select("*, journal_entries!inner(entry_date, deleted_at)")
+        .eq("workspace_id", workspaceId)
+        .is("journal_entries.deleted_at", null)
+        .order("journal_entry_id")
+        .order("line_no")
+        .range(from, to),
+    );
+    const lines = rows as unknown as SaleLineRow[];
+    const journalIds = [...new Set(lines.map((r) => r.journal_entry_id))];
+    const reversed = new Set<string>();
+    for (let i = 0; i < journalIds.length; i += 200) {
+      const reversals = await unwrapRows(
+        this.client.from("journal_entries").select("reversal_of").in("reversal_of", journalIds.slice(i, i + 200)).eq("status", "posted").is("deleted_at", null),
+      );
+      for (const r of reversals) reversed.add(r.reversal_of as string);
+    }
+    const sales = new Map<string, MenuSale>();
+    for (const row of lines) {
+      if (reversed.has(row.journal_entry_id)) continue;
+      let sale = sales.get(row.journal_entry_id);
+      if (!sale) {
+        sale = { journalEntryId: row.journal_entry_id, workspaceId, entryDate: row.journal_entries.entry_date, lines: [] };
+        sales.set(row.journal_entry_id, sale);
+      }
+      const { lineNo: _lineNo, ...line } = toMenuSaleLine(row); // eslint-disable-line @typescript-eslint/no-unused-vars
+      sale.lines.push(line);
+    }
+    return [...sales.values()].sort((a, b) => a.entryDate.localeCompare(b.entryDate));
+  }
+
+  async postMenuSale(journal: JournalEntryInput, lines: MenuSaleLine[]): Promise<JournalEntry> {
+    const id = (await unwrap(this.client.rpc("post_menu_sale", { p_journal: journal, p_lines: lines }))) as string;
+    return required(await this.journals.getById(id), "Jurnal penjualan menu");
+  }
+}
+
 export class SupabaseAuditLogRepository implements IAuditLogRepository {
   constructor(private readonly client: Client) {}
 
@@ -376,11 +497,13 @@ export class SupabaseAuditLogRepository implements IAuditLogRepository {
 }
 
 export function createSupabaseRepositories(client: Client) {
+  const journals = new SupabaseJournalRepository(client);
   return {
     workspaces: new SupabaseWorkspaceRepository(client),
     accounts: new SupabaseAccountRepository(client),
     periods: new SupabasePeriodRepository(client),
-    journals: new SupabaseJournalRepository(client),
+    journals,
+    menus: new SupabaseMenuRepository(client, journals),
     items: new SupabaseItemRepository(client),
     stockCounts: new SupabaseStockCountRepository(client),
     auditLogs: new SupabaseAuditLogRepository(client),

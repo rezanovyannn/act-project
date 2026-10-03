@@ -12,6 +12,7 @@ import { ItemService } from "@/core/services/item-service";
 import { JournalService } from "@/core/services/journal-service";
 import { PeriodService } from "@/core/services/period-service";
 import { StockCountService } from "@/core/services/stock-count-service";
+import { MenuService } from "@/core/services/menu-service";
 import { TaxService } from "@/core/services/tax-service";
 import { WorkspaceService } from "@/core/services/workspace-service";
 import type { TemplateRegistry } from "@/core/types";
@@ -34,7 +35,7 @@ export interface Container extends AppServices {
   resetMockData?: () => void;
 }
 
-type Repositories = Omit<AppServices, "ownerId" | "workspaceService" | "journalService" | "accountService" | "periodService" | "closingService" | "taxService" | "itemService" | "inventoryService" | "stockCountService">;
+type Repositories = Omit<AppServices, "ownerId" | "workspaceService" | "journalService" | "accountService" | "periodService" | "closingService" | "taxService" | "itemService" | "inventoryService" | "stockCountService" | "menuService">;
 
 function buildServices(repositories: Repositories, ownerId: string): AppServices {
   const journalService = new JournalService(repositories);
@@ -50,6 +51,7 @@ function buildServices(repositories: Repositories, ownerId: string): AppServices
     itemService: new ItemService(repositories),
     inventoryService: new InventoryService({ ...repositories, journalService }),
     stockCountService: new StockCountService(repositories),
+    menuService: new MenuService({ ...repositories, journalService }),
   };
 }
 

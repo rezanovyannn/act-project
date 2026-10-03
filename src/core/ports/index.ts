@@ -14,8 +14,16 @@ import type {
   ItemInput,
   JournalEntry,
   JournalEntryInput,
+  Menu,
+  MenuInput,
+  MenuSale,
+  MenuSaleLine,
   Period,
   PeriodStatus,
+  PortionSummary,
+  PortionSummaryInput,
+  Recipe,
+  RecipeInput,
   StockCount,
   StockCountInput,
   StockValuation,
@@ -67,6 +75,31 @@ export interface IStockCountRepository {
   post(input: StockCountInput, journal: JournalEntryInput | null): Promise<StockCount>;
   /** Membatalkan stok opname aktif terakhir: jurnalnya dibalik pada `reversalDate`. */
   cancel(id: string, reversalDate: IsoDate): Promise<void>;
+}
+
+export type MenuPatch = Partial<MenuInput & { isActive: boolean }>;
+
+/** Menu, resep, rekap porsi, dan penjualan menu (ADR 021). */
+export interface IMenuRepository {
+  listMenus(workspaceId: string): Promise<Menu[]>;
+  getMenu(id: string): Promise<Menu | null>;
+  createMenu(workspaceId: string, input: MenuInput): Promise<Menu>;
+  updateMenu(id: string, patch: MenuPatch): Promise<Menu>;
+  /** Ditolak (MENU_IN_USE) bila menu sudah punya penjualan/rekap aktif. */
+  deleteMenu(id: string): Promise<void>;
+  /** Versi resep aktif, urut menu lalu tanggal berlaku. */
+  listRecipes(workspaceId: string): Promise<Recipe[]>;
+  /** Simpan versi resep; versi lain menu ini dengan tanggal berlaku sama diganti. */
+  saveRecipe(input: RecipeInput): Promise<Recipe>;
+  deleteRecipe(id: string): Promise<void>;
+  listPortionSummaries(workspaceId: string): Promise<PortionSummary[]>;
+  /** Ditolak bila rentangnya bertumpuk dengan rekap aktif lain. */
+  createPortionSummary(input: PortionSummaryInput): Promise<PortionSummary>;
+  deletePortionSummary(id: string): Promise<void>;
+  /** Penjualan menu yang jurnalnya belum di-void. */
+  listMenuSales(workspaceId: string): Promise<MenuSale[]>;
+  /** Atomik: posting jurnal penjualan lalu menyimpan rincian porsi per menu. */
+  postMenuSale(journal: JournalEntryInput, lines: MenuSaleLine[]): Promise<JournalEntry>;
 }
 
 export type ItemPatch = Partial<ItemInput & { isActive: boolean }>;

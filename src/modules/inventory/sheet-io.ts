@@ -57,6 +57,27 @@ export async function downloadCountXlsx(fileName: string, header: readonly strin
   download(fileName, new Blob([buffer], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" }))
 }
 
+/** Tabel sederhana .xlsx: header tebal & beku, kolom isian (`inputColumn`, 1-based) diberi warna. */
+export async function downloadTableXlsx(fileName: string, sheetName: string, rows: readonly (readonly (string | number)[])[], inputColumn: number) {
+  const { default: ExcelJS } = await import("exceljs")
+  const workbook = new ExcelJS.Workbook()
+  const sheet = workbook.addWorksheet(sheetName, { views: [{ state: "frozen", ySplit: 1 }] })
+  rows.forEach((row) => sheet.addRow([...row]))
+  const head = sheet.getRow(1)
+  head.font = { bold: true }
+  head.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFF6F6F3" } }
+  sheet.columns.forEach((column, index) => {
+    const longest = Math.max(...rows.map((r) => String(r[index] ?? "").length))
+    column.width = Math.min(Math.max(longest + 2, 10), 40)
+  })
+  sheet.getColumn(inputColumn).numFmt = "#,##0"
+  for (let r = 2; r <= rows.length; r++) {
+    sheet.getCell(r, inputColumn).fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFFFF7E0" } }
+  }
+  const buffer = await workbook.xlsx.writeBuffer()
+  download(fileName, new Blob([buffer], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" }))
+}
+
 /** Baca file CSV atau .xlsx (lembar pertama) menjadi tabel nilai sel. */
 export async function readSheetFile(file: File): Promise<unknown[][]> {
   if (/\.csv$/i.test(file.name) || file.type === "text/csv") return parseCsv(await file.text())

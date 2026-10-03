@@ -12,6 +12,9 @@ export const AUDIT_ENTITY_LABELS: Record<AuditEntity, string> = {
   period: "Periode",
   journal: "Jurnal",
   item: "Barang",
+  menu: "Menu",
+  recipe: "Resep",
+  portion_summary: "Rekap porsi",
 };
 
 const ACTION_LABELS: Record<string, string> = {
@@ -61,7 +64,12 @@ export function auditSubject(log: Pick<AuditLog, "entityType" | "entityId" | "be
     case "workspace":
       return text("name") ?? log.entityId;
     case "item":
+    case "menu":
       return [text("code"), text("name")].filter(Boolean).join(" ") || log.entityId;
+    case "recipe":
+      return text("effectiveFrom") ? `Berlaku mulai ${text("effectiveFrom")}` : log.entityId;
+    case "portion_summary":
+      return text("dateFrom") ? `${text("dateFrom")} s.d. ${text("dateTo")}` : log.entityId;
   }
 }
 
@@ -70,6 +78,10 @@ const FIELD_LABELS: Record<string, string> = {
   code: "Kode",
   isActive: "Aktif",
   unit: "Satuan",
+  price: "Harga jual",
+  category: "Kategori/section",
+  yieldPortions: "Jumlah porsi resep",
+  effectiveFrom: "Berlaku mulai",
   inventoryMethod: "Metode persediaan",
   isCash: "Akun kas",
   cashFlowCategory: "Kategori arus kas",

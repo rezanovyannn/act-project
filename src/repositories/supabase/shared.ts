@@ -6,7 +6,11 @@ import type {
   Item,
   StockCount,
   JournalEntry,
+  Menu,
+  MenuSaleLine,
   Period,
+  PortionSummary,
+  Recipe,
   Workspace,
 } from "@/core/types";
 
@@ -116,6 +120,49 @@ export const toItem = (r: any): Item => ({
   createdAt: r.created_at,
   updatedAt: r.updated_at,
   deletedAt: r.deleted_at,
+});
+
+const byLineNo = (a: any, b: any) => a.line_no - b.line_no;
+
+export const toMenu = (r: any): Menu => ({
+  id: r.id,
+  workspaceId: r.workspace_id,
+  code: r.code,
+  name: r.name,
+  category: r.category ?? null,
+  price: toAmount(r.price),
+  revenueAccountId: r.revenue_account_id,
+  isActive: r.is_active,
+  createdAt: r.created_at,
+  updatedAt: r.updated_at,
+  deletedAt: r.deleted_at,
+});
+
+export const toRecipe = (r: any): Recipe => ({
+  id: r.id,
+  workspaceId: r.workspace_id,
+  menuId: r.menu_id,
+  effectiveFrom: r.effective_from,
+  yieldPortions: r.yield_portions,
+  createdAt: r.created_at,
+  lines: [...(r.recipe_lines ?? [])].sort(byLineNo).map((l: any) => ({ itemId: l.item_id, quantity: toAmount(l.quantity) })),
+});
+
+export const toPortionSummary = (r: any): PortionSummary => ({
+  id: r.id,
+  workspaceId: r.workspace_id,
+  dateFrom: r.date_from,
+  dateTo: r.date_to,
+  note: r.note ?? null,
+  createdAt: r.created_at,
+  lines: [...(r.portion_summary_lines ?? [])].sort(byLineNo).map((l: any) => ({ menuId: l.menu_id, portions: toAmount(l.portions) })),
+});
+
+export const toMenuSaleLine = (l: any): MenuSaleLine & { lineNo: number } => ({
+  menuId: l.menu_id,
+  portions: toAmount(l.portions),
+  amount: toAmount(l.amount),
+  lineNo: l.line_no,
 });
 
 export const toStockCount = (r: any): StockCount => ({

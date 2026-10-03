@@ -53,6 +53,7 @@ describe("RLS: user B tidak dapat membaca atau menulis data user A", () => {
   let postedA: string;
   let kasA: string;
   let jualA: string;
+  let menuA: string;
 
   const sale = (workspaceId: string, amount: number): JournalEntryInput => ({
     workspaceId,
@@ -75,6 +76,7 @@ describe("RLS: user B tidak dapat membaca atau menulis data user A", () => {
     kasA = accounts.find((a) => a.code === "1-1100")!.id;
     jualA = accounts.find((a) => a.code === "4-1000")!.id;
     postedA = (await userA.repos.journals.postJournal(sale(workspaceA.id, 1000))).id;
+    menuA = (await userA.repos.menus.createMenu(workspaceA.id, { code: "M-1", name: "Rahasia", price: 1000, revenueAccountId: jualA })).id;
   });
 
   it("tidak dapat membaca workspace, akun, periode, jurnal, maupun audit log milik A", async () => {
@@ -87,6 +89,10 @@ describe("RLS: user B tidak dapat membaca atau menulis data user A", () => {
     expect(await b.journals.listByWorkspace(workspaceA.id)).toEqual([]);
     expect(await b.journals.getById(postedA)).toBeNull();
     expect(await b.auditLogs.listByWorkspace(workspaceA.id)).toEqual([]);
+    expect(await b.menus.listMenus(workspaceA.id)).toEqual([]);
+    expect(await b.menus.getMenu(menuA)).toBeNull();
+    expect(await b.menus.listRecipes(workspaceA.id)).toEqual([]);
+    expect(await b.menus.listMenuSales(workspaceA.id)).toEqual([]);
     // Pembanding: A sendiri dapat membacanya.
     expect(await userA.repos.journals.getById(postedA)).not.toBeNull();
   });
@@ -105,6 +111,11 @@ describe("RLS: user B tidak dapat membaca atau menulis data user A", () => {
       ["periode baru", () => b.periods.createMany(workspaceA.id, monthlyPeriodsForYear(2030))],
       ["ganti nama", () => b.workspaces.rename(workspaceA.id, "Diretas")],
       ["hapus workspace", () => b.workspaces.softDelete(workspaceA.id)],
+      ["menu baru", () => b.menus.createMenu(workspaceA.id, { code: "X", name: "Diretas", price: 0, revenueAccountId: null })],
+      ["ubah menu", () => b.menus.updateMenu(menuA, { name: "Diretas" })],
+      ["hapus menu", () => b.menus.deleteMenu(menuA)],
+      ["rekap porsi", () => b.menus.createPortionSummary({ workspaceId: workspaceA.id, dateFrom: "2026-03-01", dateTo: "2026-03-02", note: null, lines: [{ menuId: menuA, portions: 1 }] })],
+      ["penjualan menu", () => b.menus.postMenuSale(sale(workspaceA.id, 1000), [{ menuId: menuA, portions: 1, amount: 1000 }])],
     ];
     for (const [label, attempt] of attempts) {
       const error = await attempt().then(
@@ -128,6 +139,8 @@ describe("RLS: user B tidak dapat membaca atau menulis data user A", () => {
         .from("journal_entries")
         .insert({ workspace_id: workspaceA.id, entry_date: "2026-03-10", status: "draft", source: "manual" }),
       await userA.client.from("workspaces").update({ name: "ubah langsung" }).eq("id", workspaceA.id),
+      await userA.client.from("menus").update({ price: 1 }).eq("id", menuA),
+      await userA.client.from("menu_sale_lines").insert({ journal_entry_id: postedA, workspace_id: workspaceA.id, line_no: 1, menu_id: menuA, portions: 1, amount: 1 }),
     ];
     for (const result of direct) {
       expect(result.error?.code).toBe("42501"); // permission denied

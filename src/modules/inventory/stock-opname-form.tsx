@@ -28,12 +28,16 @@ export function StockOpnameView({
   journalHref,
   itemsHref,
   settingsHref,
+  menusHref,
+  initialTab,
 }: {
   services: AppServices
   workspaceId: string
   journalHref: (entryId: string) => string
   itemsHref: string
   settingsHref: string
+  menusHref: string
+  initialTab?: string | null
 }) {
   const data = useInventoryData(services, workspaceId)
   if (data.loading && !data.data) return <LoadingState />
@@ -50,6 +54,8 @@ export function StockOpnameView({
         journalHref={journalHref}
         itemsHref={itemsHref}
         settingsHref={settingsHref}
+        menusHref={menusHref}
+        initialTab={initialTab}
       />
     )
   }

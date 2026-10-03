@@ -104,6 +104,16 @@ export class JournalService {
     input: JournalEntryInput,
     draftId?: string,
   ): Promise<JournalEntry> {
+    await this.validateForPosting(input);
+    return this.deps.journals.postJournal(input, draftId);
+  }
+
+  /**
+   * Validasi posting tanpa menyimpan (periode, akun, keseimbangan, retur,
+   * pelunasan, saldo awal). Dipakai alur yang menyimpan jurnal bersama data
+   * lain secara atomik di repository, mis. penjualan menu (ADR 021).
+   */
+  async validateForPosting(input: JournalEntryInput): Promise<void> {
     const [accounts, periods, items] = await Promise.all([
       this.deps.accounts.listByWorkspace(input.workspaceId),
       this.deps.periods.listByWorkspace(input.workspaceId),
@@ -132,7 +142,6 @@ export class JournalService {
       }
     }
     assertNoIssues(issues);
-    return this.deps.journals.postJournal(input, draftId);
   }
 
   private async settlementContext(

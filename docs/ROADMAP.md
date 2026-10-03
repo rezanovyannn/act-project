@@ -145,7 +145,7 @@ Satu menu sidebar **Stok Opname & COGS** berisi dua tab. Untuk metode persediaan
 - **Kriteria Selesai (Stop & Review):** Total COGS tabel = HPP penyesuaian di jurnal; import/export bolak-balik tanpa kehilangan data; unit test perhitungan.
 
 ### Sub-fase 6B: Resep & Variance Theoretical vs Actual
-- **Pekerjaan:** menu & resep (bahan per porsi); porsi terjual dari rekap per periode (input/import) dan dari form penjualan per menu; analisa variance per bahan: theoretical (porsi × resep × harga) vs actual (COGS stok opname).
+- **Pekerjaan (ADR 021):** menu & resep berversi (bahan per N porsi, tanggal berlaku); porsi terjual dari rekap per periode (input/import) dan dari form penjualan per menu; analisa variance per bahan: theoretical (porsi × resep × harga) vs actual (COGS stok opname).
 - **Kriteria Selesai (Stop & Review):** Variance per bahan & total terhitung benar dan teruji unit test.
 
 ---
@@ -201,3 +201,7 @@ Satu menu sidebar **Stok Opname & COGS** berisi dua tab. Untuk metode persediaan
 | 46 | Pembelian bahan baku | Per bahan (qty & harga) | ADR 020 |
 | 47 | Jurnal stok opname | Penyesuaian HPP otomatis = saldo buku Persediaan − nilai stok akhir | ADR 020 |
 | 48 | Porsi terjual (theoretical cost) | Keduanya: rekap per periode (input/import) dan form penjualan per menu | ADR 020 |
+| 49 | Form penjualan per menu | Sekaligus membuat jurnal penjualan (pendapatan + PB1, tunai/kredit) dan mencatat porsi | ADR 021 |
+| 50 | Rekap & penjualan menu pada tanggal yang sama | Rekap menggantikan penjualan menu pada tanggal yang dicakupnya | ADR 021 |
+| 51 | Harga bahan theoretical cost | Sama dengan dasar harga stok opname periode itu | ADR 021 |
+| 52 | Perubahan resep | Riwayat per tanggal berlaku; periode lama memakai resep lama | ADR 021 |

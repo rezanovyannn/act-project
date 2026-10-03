@@ -56,6 +56,7 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { cn, errorMessage as coreErrorMessage, useLoader } from "@/lib/utils"
 import { downloadCountXlsx, downloadCsv, readSheetFile } from "./sheet-io"
+import { VarianceView } from "./variance-view"
 
 const VALUATION_LABELS = { average: "harga beli rata-rata", last: "harga beli terakhir" } as const
 
@@ -82,15 +83,19 @@ export function StockCountView({
   journalHref,
   itemsHref,
   settingsHref,
+  menusHref,
+  initialTab,
 }: {
   services: AppServices
   workspaceId: string
   journalHref: (entryId: string) => string
   itemsHref: string
   settingsHref: string
+  menusHref: string
+  initialTab?: string | null
 }) {
   const data = useLoader(() => services.stockCountService.context(workspaceId), [services, workspaceId])
-  const [tab, setTab] = useState("count")
+  const [tab, setTab] = useState(initialTab === "cogs" || initialTab === "variance" ? initialTab : "count")
   const [cogsCountId, setCogsCountId] = useState<string | null>(null)
 
   if (data.loading && !data.data) return <LoadingState />
@@ -112,6 +117,7 @@ export function StockCountView({
         <TabsList>
           <TabsTrigger value="count">Stok Opname</TabsTrigger>
           <TabsTrigger value="cogs">COGS</TabsTrigger>
+          {context.workspace.templateType === "fnb" && <TabsTrigger value="variance">Variance</TabsTrigger>}
         </TabsList>
         <TabsContent value="count">
           <CountForm
@@ -134,6 +140,11 @@ export function StockCountView({
         <TabsContent value="cogs">
           <CogsTable context={context} selectedId={cogsCountId} onSelect={setCogsCountId} journalHref={journalHref} />
         </TabsContent>
+        {context.workspace.templateType === "fnb" && (
+          <TabsContent value="variance">
+            <VarianceView services={services} context={context} selectedId={cogsCountId} onSelect={setCogsCountId} menusHref={menusHref} />
+          </TabsContent>
+        )}
       </Tabs>
     </div>
   )

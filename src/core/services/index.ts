@@ -2,6 +2,7 @@ import type {
   IAccountRepository,
   IAuditLogRepository,
   IItemRepository,
+  IMenuRepository,
   IStockCountRepository,
   IJournalRepository,
   IPeriodRepository,
@@ -11,6 +12,7 @@ import type { AccountService } from "./account-service";
 import type { ClosingService } from "./closing-service";
 import type { InventoryService } from "./inventory-service";
 import type { ItemService } from "./item-service";
+import type { MenuService } from "./menu-service";
 import type { JournalService } from "./journal-service";
 import type { PeriodService } from "./period-service";
 import type { StockCountService } from "./stock-count-service";
@@ -21,6 +23,7 @@ export { AccountService } from "./account-service";
 export { ClosingService } from "./closing-service";
 export { InventoryService } from "./inventory-service";
 export { ItemService } from "./item-service";
+export { MenuService } from "./menu-service";
 export { JournalService } from "./journal-service";
 export { PeriodService } from "./period-service";
 export { StockCountService } from "./stock-count-service";
@@ -43,6 +46,7 @@ export interface AppServices {
   itemService: ItemService;
   inventoryService: InventoryService;
   stockCountService: StockCountService;
+  menuService: MenuService;
   auditLogs: IAuditLogRepository;
   workspaces: IWorkspaceRepository;
   accounts: IAccountRepository;
@@ -50,4 +54,5 @@ export interface AppServices {
   journals: IJournalRepository;
   items: IItemRepository;
   stockCounts: IStockCountRepository;
+  menus: IMenuRepository;
 }

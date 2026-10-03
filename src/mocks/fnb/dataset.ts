@@ -290,6 +290,10 @@ export function buildFnbMockState(): MockState {
     journals: buildJournals(),
     items: [],
     stockCounts: [],
+    menus: [],
+    recipes: [],
+    portionSummaries: [],
+    menuSales: [],
     auditLogs: [],
   };
 }

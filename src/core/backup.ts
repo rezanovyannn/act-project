@@ -3,7 +3,20 @@
  * Nominal tetap integer Rupiah (tanpa pemisah ribuan) agar mudah diolah ulang.
  */
 import { reversedEntryIds } from "./reversal";
-import type { Account, AuditLog, IsoTimestamp, Item, JournalEntry, Period, Workspace } from "./types";
+import type {
+  Account,
+  AuditLog,
+  IsoTimestamp,
+  Item,
+  JournalEntry,
+  Menu,
+  MenuSale,
+  Period,
+  PortionSummary,
+  Recipe,
+  StockCount,
+  Workspace,
+} from "./types";
 
 export const BACKUP_FORMAT = "act-project/workspace-backup";
 export const BACKUP_VERSION = 1;
@@ -18,18 +31,31 @@ export interface WorkspaceBackup {
   journals: JournalEntry[];
   /** Master barang (ADR 017). */
   items: Item[];
+  /** Stok opname sisa bahan (ADR 020). */
+  stockCounts: StockCount[];
+  /** Menu, resep, rekap porsi, penjualan menu (ADR 021). */
+  menus: Menu[];
+  recipes: Recipe[];
+  portionSummaries: PortionSummary[];
+  menuSales: MenuSale[];
   auditLogs: AuditLog[];
   summary: { accounts: number; periods: number; journals: number; journalLines: number; items: number; auditLogs: number };
 }
 
 export function buildBackup(
-  parts: Pick<WorkspaceBackup, "workspace" | "accounts" | "periods" | "journals" | "items" | "auditLogs">,
+  parts: Pick<WorkspaceBackup, "workspace" | "accounts" | "periods" | "journals" | "items" | "auditLogs"> &
+    Partial<Pick<WorkspaceBackup, "stockCounts" | "menus" | "recipes" | "portionSummaries" | "menuSales">>,
   exportedAt: IsoTimestamp,
 ): WorkspaceBackup {
   return {
     format: BACKUP_FORMAT,
     version: BACKUP_VERSION,
     exportedAt,
+    stockCounts: [],
+    menus: [],
+    recipes: [],
+    portionSummaries: [],
+    menuSales: [],
     ...parts,
     summary: {
       accounts: parts.accounts.length,

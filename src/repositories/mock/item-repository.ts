@@ -66,6 +66,9 @@ export class MockItemRepository implements IItemRepository {
       const item = state.items.find((i) => i.id === id && i.deletedAt === null);
       if (!item) fail("ITEM_NOT_FOUND", "Barang tidak ditemukan");
       if (isUsedByJournal(state, id)) fail("ITEM_IN_USE", "Barang sudah dipakai jurnal; nonaktifkan saja, tidak bisa dihapus");
+      if (state.recipes.some((r) => r.deletedAt === null && r.lines.some((l) => l.itemId === id))) {
+        fail("ITEM_IN_USE", "Bahan dipakai resep menu; hapus dari resep dulu atau nonaktifkan saja");
+      }
       item.deletedAt = this.db.now();
       this.db.audit(state, { workspaceId: item.workspaceId, entityType: "item", entityId: id, action: "delete", before: item, after: null });
     });

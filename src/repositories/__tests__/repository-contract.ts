@@ -11,6 +11,7 @@ import type {
   IAccountRepository,
   IAuditLogRepository,
   IItemRepository,
+  IMenuRepository,
   IStockCountRepository,
   IJournalRepository,
   IPeriodRepository,
@@ -29,6 +30,7 @@ export interface ContractRepositories {
   auditLogs: IAuditLogRepository;
   items: IItemRepository;
   stockCounts: IStockCountRepository;
+  menus: IMenuRepository;
 }
 
 async function expectCode(promise: Promise<unknown>, code: ValidationCode) {
@@ -611,6 +613,99 @@ export function describeRepositoryContract(
         const original = (await repos.journals.getById(first.journalEntryId!))!;
         await repos.journals.postJournal(buildReversalInput(original, "2026-04-01"));
         expect(await repos.stockCounts.listByWorkspace(workspace.id)).toEqual([]);
+      });
+    });
+
+    describe("menu, resep, rekap porsi & penjualan menu (ADR 021)", () => {
+      async function setup() {
+        const ayam = await repos.items.create(workspace.id, { code: "BB-1", name: "Ayam", unit: "gram", revenueAccountId: null });
+        const beras = await repos.items.create(workspace.id, { code: "BB-2", name: "Beras", unit: "gram", revenueAccountId: null });
+        const menu = await repos.menus.createMenu(workspace.id, { code: "M-1", name: "Nasi Ayam", category: "Makanan", price: 25_000, revenueAccountId: jualId });
+        return { ayam, beras, menu };
+      }
+      const menuSale = (date: string, amount: number): JournalEntryInput => sale(amount, { entryDate: date });
+
+      it("menu: buat, ubah, kode unik, nonaktif; hapus ditolak bila sudah dipakai", async () => {
+        const { menu } = await setup();
+        expect(menu).toMatchObject({ code: "M-1", name: "Nasi Ayam", category: "Makanan", price: 25_000, revenueAccountId: jualId, isActive: true });
+        await expectCode(repos.menus.createMenu(workspace.id, { code: "M-1", name: "Dobel", price: 0, revenueAccountId: null }), "DUPLICATE_MENU_CODE");
+        const updated = await repos.menus.updateMenu(menu.id, { price: 27_000, category: null, isActive: false });
+        expect(updated).toMatchObject({ price: 27_000, category: null, isActive: false });
+        await expectCode(repos.menus.postMenuSale(menuSale("2026-03-10", 27_000), [{ menuId: menu.id, portions: 1, amount: 27_000 }]), "MENU_INACTIVE");
+        await repos.menus.updateMenu(menu.id, { isActive: true });
+        await repos.menus.postMenuSale(menuSale("2026-03-10", 27_000), [{ menuId: menu.id, portions: 1, amount: 27_000 }]);
+        await expectCode(repos.menus.deleteMenu(menu.id), "MENU_IN_USE");
+        const unused = await repos.menus.createMenu(workspace.id, { code: "M-2", name: "Es Teh", price: 5_000, revenueAccountId: null });
+        await repos.menus.deleteMenu(unused.id);
+        expect((await repos.menus.listMenus(workspace.id)).map((m) => m.code)).toEqual(["M-1"]);
+        expect(await repos.menus.getMenu(unused.id)).toBeNull();
+      });
+
+      it("resep: versi per tanggal berlaku, simpan ulang mengganti, urutan baris tetap, validasi; bahan resep tidak bisa dihapus", async () => {
+        const { ayam, beras, menu } = await setup();
+        const base = { workspaceId: workspace.id, menuId: menu.id };
+        await repos.menus.saveRecipe({ ...base, effectiveFrom: "2026-01-01", yieldPortions: 1, lines: [{ itemId: beras.id, quantity: 150 }, { itemId: ayam.id, quantity: 100 }] });
+        await repos.menus.saveRecipe({ ...base, effectiveFrom: "2026-02-01", yieldPortions: 4, lines: [{ itemId: ayam.id, quantity: 500 }] });
+        const replaced = await repos.menus.saveRecipe({ ...base, effectiveFrom: "2026-02-01", yieldPortions: 2, lines: [{ itemId: ayam.id, quantity: 240 }] });
+        expect(replaced).toMatchObject({ effectiveFrom: "2026-02-01", yieldPortions: 2, lines: [{ itemId: ayam.id, quantity: 240 }] });
+        const recipes = await repos.menus.listRecipes(workspace.id);
+        expect(recipes.map((r) => [r.effectiveFrom, r.yieldPortions, r.lines])).toEqual([
+          ["2026-01-01", 1, [{ itemId: beras.id, quantity: 150 }, { itemId: ayam.id, quantity: 100 }]],
+          ["2026-02-01", 2, [{ itemId: ayam.id, quantity: 240 }]],
+        ]);
+        await expectCode(repos.menus.saveRecipe({ ...base, effectiveFrom: "2026-03-01", yieldPortions: 0, lines: [{ itemId: ayam.id, quantity: 1 }] }), "INVALID_RECIPE");
+        await expectCode(repos.menus.saveRecipe({ ...base, effectiveFrom: "2026-03-01", yieldPortions: 1, lines: [] }), "INVALID_RECIPE");
+        await expectCode(repos.menus.saveRecipe({ ...base, effectiveFrom: "2026-03-01", yieldPortions: 1, lines: [{ itemId: ayam.id, quantity: 0 }] }), "INVALID_QUANTITY");
+        await expectCode(
+          repos.menus.saveRecipe({ ...base, effectiveFrom: "2026-03-01", yieldPortions: 1, lines: [{ itemId: ayam.id, quantity: 1 }, { itemId: ayam.id, quantity: 2 }] }),
+          "INVALID_RECIPE",
+        );
+        await expectCode(repos.items.softDelete(beras.id), "ITEM_IN_USE");
+        await repos.menus.deleteRecipe(recipes[0].id);
+        await repos.items.softDelete(beras.id);
+        expect((await repos.menus.listRecipes(workspace.id)).map((r) => r.effectiveFrom)).toEqual(["2026-02-01"]);
+      });
+
+      it("rekap porsi: simpan & hapus, rentang bertumpuk ditolak", async () => {
+        const { menu } = await setup();
+        const summary = await repos.menus.createPortionSummary({ workspaceId: workspace.id, dateFrom: "2026-03-01", dateTo: "2026-03-15", note: "POS", lines: [{ menuId: menu.id, portions: 120 }] });
+        expect(summary).toMatchObject({ dateFrom: "2026-03-01", dateTo: "2026-03-15", note: "POS", lines: [{ menuId: menu.id, portions: 120 }] });
+        await expectCode(
+          repos.menus.createPortionSummary({ workspaceId: workspace.id, dateFrom: "2026-03-15", dateTo: "2026-03-31", note: null, lines: [{ menuId: menu.id, portions: 1 }] }),
+          "INVALID_PORTION_SUMMARY",
+        );
+        await expectCode(
+          repos.menus.createPortionSummary({ workspaceId: workspace.id, dateFrom: "2026-03-20", dateTo: "2026-03-10", note: null, lines: [{ menuId: menu.id, portions: 1 }] }),
+          "INVALID_DATE",
+        );
+        await expectCode(
+          repos.menus.createPortionSummary({ workspaceId: workspace.id, dateFrom: "2026-04-01", dateTo: "2026-04-30", note: null, lines: [{ menuId: menu.id, portions: 0 }] }),
+          "INVALID_QUANTITY",
+        );
+        await repos.menus.deletePortionSummary(summary.id);
+        expect(await repos.menus.listPortionSummaries(workspace.id)).toEqual([]);
+        await repos.menus.createPortionSummary({ workspaceId: workspace.id, dateFrom: "2026-03-10", dateTo: "2026-03-31", note: null, lines: [{ menuId: menu.id, portions: 1 }] });
+      });
+
+      it("penjualan menu: jurnal + porsi atomik; jurnal tidak valid tidak menyimpan porsi; void mengeluarkannya", async () => {
+        const { menu } = await setup();
+        const entry = await repos.menus.postMenuSale(menuSale("2026-03-10", 50_000), [{ menuId: menu.id, portions: 2, amount: 50_000 }]);
+        expect(entry).toMatchObject({ source: "revenue", status: "posted", entryDate: "2026-03-10" });
+        expect(await repos.menus.listMenuSales(workspace.id)).toEqual([
+          { journalEntryId: entry.id, workspaceId: workspace.id, entryDate: "2026-03-10", lines: [{ menuId: menu.id, portions: 2, amount: 50_000 }] },
+        ]);
+        await expectCode(repos.menus.postMenuSale(menuSale("2026-03-11", 25_000), [{ menuId: menu.id, portions: 0, amount: 25_000 }]), "INVALID_QUANTITY");
+        await expectCode(
+          repos.menus.postMenuSale({ ...menuSale("2026-03-11", 25_000), source: "manual" }, [{ menuId: menu.id, portions: 1, amount: 25_000 }]),
+          "INVALID_ACCOUNT",
+        );
+        // Jurnal tidak seimbang: ditolak dan tidak ada porsi tersimpan.
+        const unbalanced = menuSale("2026-03-11", 25_000);
+        unbalanced.lines[1] = { ...unbalanced.lines[1], credit: 24_000 };
+        await expectCode(repos.menus.postMenuSale(unbalanced, [{ menuId: menu.id, portions: 1, amount: 25_000 }]), "UNBALANCED");
+        expect(await repos.menus.listMenuSales(workspace.id)).toHaveLength(1);
+        await repos.journals.postJournal(buildReversalInput(entry, "2026-03-12"));
+        expect(await repos.menus.listMenuSales(workspace.id)).toEqual([]);
       });
     });
   });

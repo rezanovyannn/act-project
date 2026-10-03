@@ -11,12 +11,13 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { errorMessage } from "@/lib/utils"
 import { ExpenseForm } from "./expense-form"
 import { ItemSaleForm } from "./item-sale-form"
+import { MenuSaleForm } from "./menu-sale-form"
 import { SaleForm } from "./sale-form"
 import { TaxPaymentForm } from "./tax-payment-form"
 import { useWorkspaceData } from "./use-workspace-data"
 import { VatSettlementForm } from "./vat-settlement-form"
 
-export type TransactionTab = "sale" | "item_sale" | "expense" | "tax"
+export type TransactionTab = "sale" | "menu_sale" | "item_sale" | "expense" | "tax"
 
 /** Input Cepat: form transaksi yang otomatis membentuk jurnal. */
 export function TransactionsView({
@@ -24,6 +25,7 @@ export function TransactionsView({
   workspaceId,
   journalHref,
   taxSettingsHref,
+  menusHref,
   initialTab = "sale",
 }: {
   services: AppServices
@@ -31,6 +33,8 @@ export function TransactionsView({
   journalHref: (entryId: string) => string
   /** Pengaturan → Pajak. */
   taxSettingsHref: string
+  /** Menu & Resep (F&B). */
+  menusHref: string
   initialTab?: TransactionTab
 }) {
   const data = useWorkspaceData(services, workspaceId)
@@ -41,6 +45,10 @@ export function TransactionsView({
   }
   const current = data.data!
   const formProps = { services, data: current, journalHref, onPosted: data.reload }
+  // Penjualan per menu (resep & variance) khusus F&B (ADR 021).
+  const menuSales = current.workspace.templateType === "fnb"
+  const tabs: TransactionTab[] = ["sale", "expense", "tax", ...(menuSales ? (["menu_sale"] as const) : []), ...(current.workspace.inventoryMethod === "perpetual" ? (["item_sale"] as const) : [])]
+  const defaultTab = tabs.includes(initialTab) ? initialTab : "sale"
 
   return (
     <div className="grid grid-cols-1 gap-6">
@@ -56,9 +64,10 @@ export function TransactionsView({
           </Button>
         }
       />
-      <Tabs defaultValue={initialTab} className="grid grid-cols-1 gap-4">
+      <Tabs defaultValue={defaultTab} className="grid grid-cols-1 gap-4">
         <TabsList className="w-fit max-w-full flex-wrap">
           <TabsTrigger value="sale">Penjualan</TabsTrigger>
+          {menuSales && <TabsTrigger value="menu_sale">Penjualan menu</TabsTrigger>}
           {current.workspace.inventoryMethod === "perpetual" && <TabsTrigger value="item_sale">Penjualan barang</TabsTrigger>}
           <TabsTrigger value="expense">Beban operasional</TabsTrigger>
           <TabsTrigger value="tax">Setoran {current.workspace.salesTaxLabel}</TabsTrigger>
@@ -70,6 +79,11 @@ export function TransactionsView({
             {...formProps}
           />
         </TabsContent>
+        {menuSales && (
+          <TabsContent value="menu_sale">
+            <MenuSaleForm key={current.workspace.salesTaxMode + current.workspace.salesTaxRateBps + String(current.workspace.salesTaxInclusive)} {...formProps} menusHref={menusHref} />
+          </TabsContent>
+        )}
         {current.workspace.inventoryMethod === "perpetual" && (
           <TabsContent value="item_sale">
             <ItemSaleForm key={current.workspace.salesTaxMode + current.workspace.salesTaxRateBps} {...formProps} />

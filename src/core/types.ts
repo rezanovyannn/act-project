@@ -210,7 +210,7 @@ export interface WorkspaceTemplate {
 
 export type TemplateRegistry = Record<TemplateType, WorkspaceTemplate>;
 
-export type AuditEntity = "workspace" | "account" | "period" | "journal" | "item";
+export type AuditEntity = "workspace" | "account" | "period" | "journal" | "item" | "menu" | "recipe" | "portion_summary";
 
 /** Master barang untuk persediaan perpetual (ADR 017). */
 export interface Item {
@@ -236,6 +236,84 @@ export interface ItemInput {
   unit: string;
   revenueAccountId: string | null;
   category?: string | null;
+}
+
+/** Menu yang dijual (ADR 021). */
+export interface Menu {
+  id: string;
+  workspaceId: string;
+  code: string;
+  name: string;
+  /** Kategori bebas, mis. "Makanan", "Minuman". */
+  category: string | null;
+  /** Harga jual default per porsi (rupiah utuh, sesuai pengaturan PB1 termasuk/belum). */
+  price: number;
+  revenueAccountId: string | null;
+  isActive: boolean;
+  createdAt: IsoTimestamp;
+  updatedAt: IsoTimestamp;
+  deletedAt: IsoTimestamp | null;
+}
+
+export interface MenuInput {
+  code: string;
+  name: string;
+  category?: string | null;
+  price: number;
+  revenueAccountId: string | null;
+}
+
+/** Bahan per resep: qty satuan dasar untuk `yieldPortions` porsi. */
+export interface RecipeLine {
+  itemId: string;
+  quantity: number;
+}
+
+/** Versi resep menu yang berlaku mulai `effectiveFrom` (ADR 021). */
+export interface RecipeInput {
+  workspaceId: string;
+  menuId: string;
+  effectiveFrom: IsoDate;
+  /** Resep untuk N porsi (bilangan bulat ≥ 1); qty per porsi = qty ÷ N. */
+  yieldPortions: number;
+  lines: RecipeLine[];
+}
+
+export interface Recipe extends RecipeInput {
+  id: string;
+  createdAt: IsoTimestamp;
+}
+
+export interface PortionLine {
+  menuId: string;
+  portions: number;
+}
+
+/** Rekap porsi terjual per rentang tanggal (mis. dari laporan POS), ADR 021. */
+export interface PortionSummaryInput {
+  workspaceId: string;
+  dateFrom: IsoDate;
+  dateTo: IsoDate;
+  note: string | null;
+  lines: PortionLine[];
+}
+
+export interface PortionSummary extends PortionSummaryInput {
+  id: string;
+  createdAt: IsoTimestamp;
+}
+
+/** Rincian porsi penjualan menu; `amount` = nominal baris seperti diinput. */
+export interface MenuSaleLine extends PortionLine {
+  amount: number;
+}
+
+/** Penjualan menu aktif (jurnalnya belum di-void), ADR 021. */
+export interface MenuSale {
+  journalEntryId: string;
+  workspaceId: string;
+  entryDate: IsoDate;
+  lines: MenuSaleLine[];
 }
 
 /** Baris stok opname sisa bahan: qty sisa & nilai rupiahnya (ADR 020). */

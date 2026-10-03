@@ -6,7 +6,7 @@
  */
 import { mulDivRound } from "./stock";
 import { compareBySection, sectionOf, valueAtBasis, type CountRow, type QtyValue } from "./stock-count";
-import type { Item } from "./types";
+import type { Item, Menu } from "./types";
 
 export const COUNT_SHEET_HEADER = ["Kode", "Nama Bahan", "Section", "Satuan", "Qty Sisa", "Harga/Satuan (Rp)", "Nilai Sisa (Rp)"] as const;
 
@@ -88,26 +88,55 @@ function parseQty(raw: string): number | null | "invalid" {
   return Number.isSafeInteger(n) ? n : "invalid";
 }
 
-/** Tabel hasil baca CSV/Excel → qty per barang (dicocokkan lewat kode; header opsional). */
-export function parseCountSheet(table: readonly (readonly unknown[])[], items: readonly Item[]): ParsedCount {
-  const byCode = new Map(items.filter((i) => i.deletedAt === null).map((i) => [i.code.trim().toLowerCase(), i]));
+/**
+ * Tabel CSV/Excel → angka per entri (dicocokkan lewat kode, tanpa beda huruf
+ * besar/kecil; header opsional). Kolom kode = header "kode…", kolom angka =
+ * header yang lolos `isValueHeader`; tanpa header dipakai kolom 0 & `defaultCol`.
+ */
+function parseCodeSheet(
+  table: readonly (readonly unknown[])[],
+  entries: readonly { id: string; code: string }[],
+  isValueHeader: (header: string) => boolean,
+  defaultCol: number,
+): ParsedCount {
+  const byCode = new Map(entries.map((e) => [e.code.trim().toLowerCase(), e]));
   const header = table[0]?.map((c) => String(c ?? "").trim().toLowerCase()) ?? [];
-  const hasHeader = header.includes("kode");
-  const codeCol = hasHeader ? header.indexOf("kode") : 0;
-  const qtyCol = hasHeader ? Math.max(header.findIndex((h) => h.startsWith("qty")), 0) : 4;
+  const hasHeader = header.some((h) => h.startsWith("kode"));
+  const codeCol = hasHeader ? header.findIndex((h) => h.startsWith("kode")) : 0;
+  const valueCol = hasHeader ? Math.max(header.findIndex(isValueHeader), 0) : defaultCol;
   const result: ParsedCount = { quantities: new Map(), unknownCodes: [], invalid: [] };
   for (const row of hasHeader ? table.slice(1) : table) {
     const code = String(row[codeCol] ?? "").trim();
     if (code === "" || code.toLowerCase() === "total") continue;
-    const item = byCode.get(code.toLowerCase());
-    const raw = String(row[qtyCol] ?? "");
-    if (!item) {
+    const entry = byCode.get(code.toLowerCase());
+    const raw = String(row[valueCol] ?? "");
+    if (!entry) {
       result.unknownCodes.push(code);
       continue;
     }
     const qty = parseQty(raw);
     if (qty === "invalid") result.invalid.push({ code, value: raw });
-    else if (qty !== null) result.quantities.set(item.id, qty);
+    else if (qty !== null) result.quantities.set(entry.id, qty);
   }
   return result;
+}
+
+/** Tabel hasil baca CSV/Excel → qty sisa per barang. */
+export function parseCountSheet(table: readonly (readonly unknown[])[], items: readonly Item[]): ParsedCount {
+  return parseCodeSheet(table, items.filter((i) => i.deletedAt === null), (h) => h.startsWith("qty"), 4);
+}
+
+// ---------- Rekap porsi (ADR 021) ----------
+
+export const PORTION_SHEET_HEADER = ["Kode Menu", "Nama Menu", "Kategori", "Porsi"] as const;
+
+/** Template rekap porsi: menu aktif urut kategori lalu kode. */
+export function portionSheetRows(menus: readonly Menu[], portions: ReadonlyMap<string, number> = new Map()): (string | number)[][] {
+  const sorted = [...menus].sort((a, b) => compareBySection(a, b));
+  return [[...PORTION_SHEET_HEADER], ...sorted.map((m) => [m.code, m.name, m.category ?? "", portions.get(m.id) ?? ""])];
+}
+
+/** Tabel hasil baca CSV/Excel → porsi per menu. */
+export function parsePortionSheet(table: readonly (readonly unknown[])[], menus: readonly Menu[]): ParsedCount {
+  return parseCodeSheet(table, menus.filter((m) => m.deletedAt === null), (h) => h.startsWith("porsi"), 3);
 }
