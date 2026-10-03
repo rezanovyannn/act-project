@@ -1,18 +1,38 @@
 /**
  * Template import/export stok opname sisa bahan (ADR 020). Format tabel sama
- * untuk CSV dan Excel: Kode | Nama Bahan | Section | Satuan | Qty Sisa.
+ * untuk CSV dan Excel: Kode | Nama Bahan | Section | Satuan | Qty Sisa |
+ * Harga/Satuan | Nilai Sisa. Import hanya membaca Kode & Qty Sisa; dua kolom
+ * terakhir informasi (di Excel berupa rumus sehingga ikut terisi saat qty diketik).
  */
-import { sectionOf, compareBySection } from "./stock-count";
+import { mulDivRound } from "./stock";
+import { compareBySection, sectionOf, valueAtBasis, type CountRow, type QtyValue } from "./stock-count";
 import type { Item } from "./types";
 
-export const COUNT_SHEET_HEADER = ["Kode", "Nama Bahan", "Section", "Satuan", "Qty Sisa"] as const;
+export const COUNT_SHEET_HEADER = ["Kode", "Nama Bahan", "Section", "Satuan", "Qty Sisa", "Harga/Satuan (Rp)", "Nilai Sisa (Rp)"] as const;
 
-/** Baris template (header + satu baris per bahan, urut section). */
-export function countSheetRows(items: readonly Item[], quantities: ReadonlyMap<string, number> = new Map()): (string | number)[][] {
-  return [
-    [...COUNT_SHEET_HEADER],
-    ...[...items].sort(compareBySection).map((i) => [i.code, i.name, sectionOf(i), i.unit, quantities.get(i.id) ?? ""]),
-  ];
+export interface CountSheetLine {
+  cells: (string | number)[];
+  /** Dasar harga (nilai ÷ qty) untuk rumus Excel; null bila belum ada harga. */
+  basis: QtyValue | null;
+}
+
+/** Baris template per bahan (urut section) dari baris stok opname & qty yang sudah diisi. */
+export function countSheetLines(rows: readonly Pick<CountRow, "item" | "basis">[], quantities: ReadonlyMap<string, number> = new Map()): CountSheetLine[] {
+  return [...rows]
+    .sort((a, b) => compareBySection(a.item, b.item))
+    .map(({ item, basis }) => {
+      const qty = quantities.get(item.id);
+      const value = qty === undefined ? null : valueAtBasis(qty, basis);
+      return {
+        cells: [item.code, item.name, sectionOf(item), item.unit, qty ?? "", basis ? mulDivRound(basis.value, 1, basis.qty) : "", value ?? ""],
+        basis,
+      };
+    });
+}
+
+/** Tabel CSV (header + baris); harga satuan dibulatkan ke rupiah. */
+export function countSheetRows(rows: readonly Pick<CountRow, "item" | "basis">[], quantities: ReadonlyMap<string, number> = new Map()): (string | number)[][] {
+  return [[...COUNT_SHEET_HEADER], ...countSheetLines(rows, quantities).map((l) => l.cells)];
 }
 
 /** Parser CSV RFC 4180 (koma atau titik koma, sesuai baris header). */
@@ -78,7 +98,7 @@ export function parseCountSheet(table: readonly (readonly unknown[])[], items: r
   const result: ParsedCount = { quantities: new Map(), unknownCodes: [], invalid: [] };
   for (const row of hasHeader ? table.slice(1) : table) {
     const code = String(row[codeCol] ?? "").trim();
-    if (code === "") continue;
+    if (code === "" || code.toLowerCase() === "total") continue;
     const item = byCode.get(code.toLowerCase());
     const raw = String(row[qtyCol] ?? "");
     if (!item) {

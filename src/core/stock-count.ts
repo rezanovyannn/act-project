@@ -80,6 +80,8 @@ export interface CountRow {
   end: QtyValue;
   /** Stok Awal + Pembelian − Stok Akhir. */
   cogs: QtyValue;
+  /** Dasar harga satuan (nilai ÷ qty) menurut metode; null bila tidak diketahui. */
+  basis: QtyValue | null;
   /** Harga satuan tidak diketahui (nilai sisa = 0). */
   noCost: boolean;
 }
@@ -95,6 +97,28 @@ export function compareBySection(a: Pick<Item, "category" | "code">, b: Pick<Ite
   return a.code.localeCompare(b.code, "id");
 }
 
+/**
+ * Dasar harga satuan menurut metode, sebagai pasangan nilai/qty (harga satuan =
+ * value ÷ qty, tidak disimpan sebagai pecahan); null bila tidak ada dasar harga.
+ */
+export function unitBasis(
+  valuation: StockValuation,
+  begin: QtyValue,
+  purchase: PurchaseSummary | undefined,
+  previousUnit: QtyValue | null,
+): QtyValue | null {
+  if (valuation === "last" && purchase?.last) return purchase.last;
+  const pool = { qty: begin.qty + (purchase?.qty ?? 0), value: begin.value + (purchase?.value ?? 0) };
+  if (valuation === "average" && pool.qty > 0 && pool.value > 0) return pool;
+  return purchase?.last ?? (previousUnit && previousUnit.qty > 0 ? previousUnit : null);
+}
+
+/** Nilai sisa `qty` dari dasar harga (pembulatan setengah menjauhi nol); null bila tanpa dasar harga. */
+export function valueAtBasis(qty: number, basis: QtyValue | null): number | null {
+  if (qty === 0) return 0;
+  return basis ? mulDivRound(basis.value, qty, basis.qty) : null;
+}
+
 /** Nilai sisa `qty` menurut metode; null bila tidak ada dasar harga. */
 export function valueOfRemaining(
   qty: number,
@@ -103,13 +127,7 @@ export function valueOfRemaining(
   purchase: PurchaseSummary | undefined,
   previousUnit: QtyValue | null,
 ): number | null {
-  if (qty === 0) return 0;
-  if (valuation === "last" && purchase?.last) return mulDivRound(purchase.last.value, qty, purchase.last.qty);
-  const poolQty = begin.qty + (purchase?.qty ?? 0);
-  const poolValue = begin.value + (purchase?.value ?? 0);
-  if (valuation === "average" && poolQty > 0 && poolValue > 0) return mulDivRound(poolValue, qty, poolQty);
-  const fallback = purchase?.last ?? (previousUnit && previousUnit.qty > 0 ? previousUnit : null);
-  return fallback ? mulDivRound(fallback.value, qty, fallback.qty) : null;
+  return valueAtBasis(qty, unitBasis(valuation, begin, purchase, previousUnit));
 }
 
 export interface CountContext {
@@ -154,7 +172,8 @@ export function computeCountRows(
     if (qty === undefined || !Number.isSafeInteger(qty) || qty < 0) {
       fail("INVALID_QUANTITY", `${item.code} ${item.name}: isi qty sisa (bilangan bulat ≥ 0, ${item.unit})`);
     }
-    const value = valueOfRemaining(qty, valuation, begin, purchase, priorUnits.get(item.id) ?? null);
+    const basis = unitBasis(valuation, begin, purchase, priorUnits.get(item.id) ?? null);
+    const value = valueAtBasis(qty, basis);
     const end = { qty, value: value ?? 0 };
     const buy = { qty: purchase?.qty ?? 0, value: purchase?.value ?? 0 };
     return {
@@ -163,6 +182,7 @@ export function computeCountRows(
       purchase: buy,
       end,
       cogs: { qty: begin.qty + buy.qty - end.qty, value: begin.value + buy.value - end.value },
+      basis,
       noCost: value === null,
     };
   });

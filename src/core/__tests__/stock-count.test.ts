@@ -12,8 +12,8 @@
  */
 import { beforeEach, describe, expect, it } from "vitest";
 import { AccountingError, type ValidationCode } from "@/core/errors";
-import { buildStockCount, compareBySection, rowsOfSavedCount, sumRows, type CountContext } from "@/core/stock-count";
-import { countSheetRows, parseCountSheet, parseCsv } from "@/core/stock-count-sheet";
+import { buildStockCount, compareBySection, computeCountRows, rowsOfSavedCount, sumRows, type CountContext } from "@/core/stock-count";
+import { countSheetLines, countSheetRows, parseCountSheet, parseCsv } from "@/core/stock-count-sheet";
 import { toCsv } from "@/core/backup";
 import type { Account, Item, StockCount } from "@/core/types";
 import { createFnbWorkspace, createTestEnv } from "./helpers";
@@ -159,9 +159,15 @@ describe("stok opname sisa bahan & COGS", () => {
 
   it("template & import: bolak-balik CSV, kode tak dikenal, qty tidak valid, pemisah ribuan, titik koma", async () => {
     const items = await env.repos.items.listByWorkspace(workspaceId);
-    const rows = countSheetRows(items, new Map([[ayam.id, 2_500]]));
-    expect(rows[0]).toEqual(["Kode", "Nama Bahan", "Section", "Satuan", "Qty Sisa"]);
+    const ctx = await context();
+    const countRows = computeCountRows(ctx, "2026-01-31", new Map(items.map((i) => [i.id, 0])), "average");
+    const rows = countSheetRows(countRows, new Map([[ayam.id, 2_500]]));
+    expect(rows[0]).toEqual(["Kode", "Nama Bahan", "Section", "Satuan", "Qty Sisa", "Harga/Satuan (Rp)", "Nilai Sisa (Rp)"]);
     expect(rows.slice(1).map((r) => r[0])).toEqual(["D-01", "P-01", "X-01"]);
+    // Ayam rata-rata 500.000 / 10.000 g = 50/g → 2.500 g = 125.000; Garam tanpa harga.
+    expect(rows[2].slice(4)).toEqual([2_500, 50, 125_000]);
+    expect(rows[3].slice(4)).toEqual(["", "", ""]);
+    expect(countSheetLines(countRows).find((l) => l.cells[0] === "P-01")?.basis).toEqual({ qty: 10_000, value: 500_000 });
     const back = parseCountSheet(parseCsv(toCsv(rows)), items);
     expect([...back.quantities]).toEqual([[ayam.id, 2_500]]);
 
