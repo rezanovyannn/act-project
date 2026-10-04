@@ -9,7 +9,7 @@ import { formatDate, todayIsoDate } from "@/core/format"
 import { defaultDueDate, INVOICE_STATUS_LABELS, type InvoiceStatus, type InvoiceSummary } from "@/core/invoice"
 import type { AppServices } from "@/core/services"
 import type { InvoiceData } from "@/core/services/invoice-service"
-import type { Invoice } from "@/core/types"
+import type { Invoice, InvoiceKind } from "@/core/types"
 import { Amount } from "@/components/ui/amount"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -30,6 +30,7 @@ import { LoadingState, PageHeader } from "@/components/ui/page-header"
 import { cn, errorMessage, useLoader } from "@/lib/utils"
 import { InvoiceDocument } from "./invoice-document"
 import { InvoiceEditor } from "./invoice-editor"
+import { ReceiptDocument } from "./receipt-document"
 
 export interface InvoiceRoutes {
   list: string
@@ -64,12 +65,32 @@ const FILTERS: { value: Filter; label: string; match: (s: InvoiceStatus) => bool
   { value: "cancelled", label: "Dibatalkan", match: (s) => s === "cancelled" },
 ]
 
+const TEXT = {
+  sale: {
+    title: "Faktur Penjualan",
+    description: "Buat faktur untuk tukar faktur dengan pelanggan; saat diterbitkan, piutang langsung tercatat di jurnal.",
+    party: "Pelanggan",
+    draftTitle: "Draft faktur penjualan",
+    newTitle: "Faktur penjualan baru",
+    editorDescription: "Simpan sebagai draft dan ubah kapan saja; terbitkan untuk memberi nomor dan mencatat piutang.",
+  },
+  purchase: {
+    title: "Faktur Pembelian",
+    description: "Catat faktur dari pemasok dan cetak tanda terimanya untuk tukar faktur; saat diterbitkan, utang langsung tercatat di jurnal.",
+    party: "Pemasok",
+    draftTitle: "Draft faktur pembelian",
+    newTitle: "Faktur pembelian baru",
+    editorDescription: "Isi sesuai faktur dari pemasok; terbitkan untuk memberi nomor internal dan mencatat utang.",
+  },
+} as const
+
 const contactName = (s: InvoiceSummary, data: InvoiceData) =>
   s.invoice.contactSnapshot?.name ?? data.contacts.find((c) => c.id === s.invoice.contactId)?.name ?? "—"
 
-/** Daftar faktur penjualan (ADR 022). */
-export function InvoicesView({ services, workspaceId, routes }: { services: AppServices; workspaceId: string; routes: InvoiceRoutes }) {
-  const data = useLoader(() => services.invoiceService.data(workspaceId, "sale"), [services, workspaceId])
+/** Daftar faktur penjualan/pembelian (ADR 022). */
+export function InvoicesView({ services, kind, workspaceId, routes }: { services: AppServices; kind: InvoiceKind; workspaceId: string; routes: InvoiceRoutes }) {
+  const text = TEXT[kind]
+  const data = useLoader(() => services.invoiceService.data(workspaceId, kind), [services, workspaceId, kind])
   const [filter, setFilter] = useState<Filter>("all")
   const [search, setSearch] = useState("")
 
@@ -87,8 +108,8 @@ export function InvoicesView({ services, workspaceId, routes }: { services: AppS
   return (
     <div className="grid grid-cols-1 gap-5">
       <PageHeader
-        title="Faktur Penjualan"
-        description="Buat faktur untuk tukar faktur dengan pelanggan; saat diterbitkan, piutang langsung tercatat di jurnal."
+        title={text.title}
+        description={text.description}
         actions={
           <Button asChild>
             <Link href={routes.create}><FilePlus2Icon data-icon="inline-start" /> Faktur baru</Link>
@@ -128,7 +149,7 @@ export function InvoicesView({ services, workspaceId, routes }: { services: AppS
               <tr>
                 <th className="px-4 py-2.5">Nomor</th>
                 <th className="px-3 py-2.5">Tanggal</th>
-                <th className="px-3 py-2.5">Pelanggan</th>
+                <th className="px-3 py-2.5">{text.party}</th>
                 <th className="px-3 py-2.5">Jatuh tempo</th>
                 <th className="px-3 py-2.5 text-right">Total</th>
                 <th className="px-3 py-2.5 text-right">Sisa</th>
@@ -176,18 +197,21 @@ function Stat({ label, value, note, alert }: { label: string; value: React.React
 /** Faktur baru atau detail faktur: draft → editor, terbit → dokumen + aksi. */
 export function InvoiceDetailView({
   services,
+  kind,
   workspaceId,
   invoiceId,
   routes,
 }: {
   services: AppServices
   workspaceId: string
+  kind: InvoiceKind
   /** null = faktur baru. */
   invoiceId: string | null
   routes: InvoiceRoutes
 }) {
   const router = useRouter()
-  const data = useLoader(() => services.invoiceService.data(workspaceId, "sale"), [services, workspaceId, invoiceId])
+  const text = TEXT[kind]
+  const data = useLoader(() => services.invoiceService.data(workspaceId, kind), [services, workspaceId, kind, invoiceId])
 
   if (data.loading && !data.data) return <LoadingState />
   if (data.error) return <p role="alert" className="text-sm text-destructive">{errorMessage(data.error)}</p>
@@ -199,13 +223,14 @@ export function InvoiceDetailView({
     return (
       <div className="grid grid-cols-1 gap-5">
         <PageHeader
-          title={invoice ? "Draft faktur penjualan" : "Faktur penjualan baru"}
-          description="Simpan sebagai draft dan ubah kapan saja; terbitkan untuk memberi nomor dan mencatat piutang."
+          title={invoice ? text.draftTitle : text.newTitle}
+          description={text.editorDescription}
           actions={<Button variant="secondary" asChild><Link href={routes.list}>Daftar faktur</Link></Button>}
         />
         <InvoiceEditor
           key={invoice?.updatedAt ?? "baru"}
           services={services}
+          kind={kind}
           data={current}
           invoice={invoice}
           contactsHref={routes.contacts}
@@ -238,8 +263,15 @@ function IssuedInvoice({
   const summary = services.invoiceService.summaries({ ...data, invoices: [invoice] }, today)[0]
   const entry = data.journals.find((j) => j.id === invoice.journalEntryId)
   const role = (id: string) => data.accounts.find((a) => a.id === id)?.systemRole
-  const total = entry?.lines.filter((l) => role(l.accountId) === "accounts_receivable").reduce((t, l) => t + l.debit, 0) ?? summary.total
-  const tax = entry?.lines.filter((l) => role(l.accountId) === "sales_tax_payable").reduce((t, l) => t + l.credit - l.debit, 0) ?? 0
+  const isSale = invoice.kind === "sale"
+  const total = isSale
+    ? entry?.lines.filter((l) => role(l.accountId) === "accounts_receivable").reduce((t, l) => t + l.debit, 0) ?? summary.total
+    : entry?.lines.filter((l) => role(l.accountId) === "accounts_payable").reduce((t, l) => t + l.credit, 0) ?? summary.total
+  const tax = isSale
+    ? entry?.lines.filter((l) => role(l.accountId) === "sales_tax_payable").reduce((t, l) => t + l.credit - l.debit, 0) ?? 0
+    : entry?.lines.filter((l) => role(l.accountId) === "input_vat").reduce((t, l) => t + l.debit - l.credit, 0) ?? 0
+  const [doc, setDoc] = useState<"receipt" | "copy">(isSale ? "copy" : "receipt")
+  const stamp = summary.status === "cancelled" ? "DIBATALKAN" : summary.status === "paid" ? "LUNAS" : null
   const [cancelDate, setCancelDate] = useState(today < invoice.invoiceDate ? invoice.invoiceDate : today)
   const [reason, setReason] = useState("")
   const [busy, setBusy] = useState(false)
@@ -291,7 +323,7 @@ function IssuedInvoice({
           </Button>
           {summary.outstanding > 0 && (
             <Button variant="secondary" asChild>
-              <Link href={routes.credits}><HandCoinsIcon data-icon="inline-start" /> Terima pembayaran</Link>
+              <Link href={routes.credits}><HandCoinsIcon data-icon="inline-start" /> {isSale ? "Terima pembayaran" : "Bayar utang"}</Link>
             </Button>
           )}
           {invoice.journalEntryId && (
@@ -313,7 +345,7 @@ function IssuedInvoice({
                 <DialogHeader>
                   <DialogTitle>Batalkan faktur {invoice.number}?</DialogTitle>
                   <DialogDescription>
-                    Jurnal piutangnya dibalik (void) pada tanggal di bawah. Nomor faktur tetap terpakai; untuk koreksi, salin ke draft baru lalu terbitkan ulang.
+                    Jurnal {isSale ? "piutang" : "utang"}nya dibalik (void) pada tanggal di bawah. Nomor faktur tetap terpakai; untuk koreksi, salin ke draft baru lalu terbitkan ulang.
                   </DialogDescription>
                 </DialogHeader>
                 <div className="grid gap-4 sm:grid-cols-[11rem_1fr]">
@@ -337,17 +369,28 @@ function IssuedInvoice({
         {summary.paid > 0 && summary.status !== "cancelled" && (
           <p className="text-xs text-muted-foreground">Faktur yang sudah ada pembayaran tidak dapat dibatalkan; void pelunasannya dulu di Piutang & Utang.</p>
         )}
+        {!isSale && (
+          <div className="flex flex-wrap items-center gap-2" role="group" aria-label="Dokumen yang dicetak">
+            <span className="text-sm text-muted-foreground">Dokumen:</span>
+            <Button size="sm" variant={doc === "receipt" ? "default" : "secondary"} onClick={() => setDoc("receipt")}>Tanda terima faktur</Button>
+            <Button size="sm" variant={doc === "copy" ? "default" : "secondary"} onClick={() => setDoc("copy")}>Salinan faktur</Button>
+          </div>
+        )}
       </div>
+      {doc === "receipt" ? (
+        <ReceiptDocument invoice={invoice} profile={data.profile} workspaceName={data.workspace.name} total={total} stamp={stamp} />
+      ) : (
       <InvoiceDocument
         invoice={invoice}
         profile={data.profile}
         workspaceName={data.workspace.name}
         contact={invoice.contactSnapshot}
         totals={{ base: total - tax, tax, total }}
-        taxLabel={data.workspace.salesTaxLabel}
-        taxInclusive={data.workspace.salesTaxInclusive}
-        stamp={summary.status === "cancelled" ? "DIBATALKAN" : summary.status === "paid" ? "LUNAS" : null}
+        taxLabel={isSale ? data.workspace.salesTaxLabel : "PPN Masukan"}
+        taxInclusive={isSale && data.workspace.salesTaxInclusive}
+        stamp={stamp}
       />
+      )}
     </div>
   )
 }

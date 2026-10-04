@@ -5,10 +5,10 @@
  */
 import { addDays, isValidIsoDate } from "./dates";
 import { fail } from "./errors";
-import { outflowLines, type PerpetualContext } from "./perpetual";
+import { outflowLines, purchaseCorrections, type PerpetualContext } from "./perpetual";
 import { effectiveTaxSettings, type SalesTaxResult } from "./sales-tax";
 import { listCreditTransactions } from "./settlement";
-import { buildSale } from "./transactions";
+import { buildExpense, buildSale } from "./transactions";
 import type {
   Account,
   BusinessProfileInput,
@@ -25,14 +25,16 @@ import type {
   JournalLineInput,
   Workspace,
 } from "./types";
-import { workspaceTaxSettings } from "./vat";
+import { computeInputVat, workspaceTaxSettings } from "./vat";
 
 const trimOrNull = (value: string | null | undefined) => value?.trim() || null;
 
 // ---------- Profil usaha ----------
 
 export const DEFAULT_INVOICE_PREFIX = "INV";
+export const DEFAULT_PURCHASE_PREFIX = "PB";
 export const LOGO_MAX_LENGTH = 200_000;
+export const PREFIX_PATTERN = /^[A-Z0-9-]{1,12}$/;
 export const LOGO_PATTERN = /^data:image\/(png|jpeg|webp);base64,[A-Za-z0-9+/]+=*$/;
 
 export function defaultProfile(): BusinessProfileInput {
@@ -45,13 +47,17 @@ export function defaultProfile(): BusinessProfileInput {
     bankInfo: null,
     invoiceNotes: null,
     invoicePrefix: DEFAULT_INVOICE_PREFIX,
+    purchasePrefix: DEFAULT_PURCHASE_PREFIX,
     logoDataUrl: null,
   };
 }
 
 export function validateProfile(input: BusinessProfileInput): BusinessProfileInput {
   const prefix = input.invoicePrefix.trim().toUpperCase();
-  if (!/^[A-Z0-9-]{1,12}$/.test(prefix)) fail("INVALID_PROFILE", "Prefix nomor faktur 1–12 karakter: huruf, angka, atau tanda hubung");
+  const purchasePrefix = (input.purchasePrefix ?? DEFAULT_PURCHASE_PREFIX).trim().toUpperCase();
+  if (!PREFIX_PATTERN.test(prefix) || !PREFIX_PATTERN.test(purchasePrefix)) {
+    fail("INVALID_PROFILE", "Prefix nomor faktur 1–12 karakter: huruf, angka, atau tanda hubung");
+  }
   const logo = input.logoDataUrl || null;
   if (logo && (logo.length > LOGO_MAX_LENGTH || !LOGO_PATTERN.test(logo))) {
     fail("INVALID_PROFILE", "Logo harus gambar PNG/JPEG/WebP berukuran kecil");
@@ -67,6 +73,7 @@ export function validateProfile(input: BusinessProfileInput): BusinessProfileInp
     bankInfo: trimOrNull(input.bankInfo),
     invoiceNotes: trimOrNull(input.invoiceNotes),
     invoicePrefix: prefix,
+    purchasePrefix,
     logoDataUrl: logo,
   };
 }
@@ -124,7 +131,9 @@ export function validateDraft(input: InvoiceInput): InvoiceInput {
     lineAmount(line);
     return { description: line.description.trim(), quantity: line.quantity, unit: trimOrNull(line.unit), unitPrice: line.unitPrice, accountId: line.accountId, itemId: line.itemId || null };
   });
-  return { ...input, contactId: input.contactId || null, reference: trimOrNull(input.reference), notes: trimOrNull(input.notes), lines };
+  const taxOverride = input.taxOverride ?? null;
+  if (taxOverride !== null && (!Number.isSafeInteger(taxOverride) || taxOverride < 0)) fail("INVALID_AMOUNT", "PPN Masukan harus bilangan bulat ≥ 0");
+  return { ...input, contactId: input.contactId || null, reference: trimOrNull(input.reference), notes: trimOrNull(input.notes), taxOverride, lines };
 }
 
 // ---------- Terbit ----------
@@ -207,6 +216,86 @@ export function buildSaleInvoice(invoice: InvoiceInput, ctx: InvoiceContext, num
     cost,
     warnings,
   };
+}
+
+/** Akun yang boleh di baris faktur pembelian: aset non-kas (persediaan, perlengkapan, aset tetap) atau beban. */
+export function isPurchaseAccount(a: Account): boolean {
+  if (a.deletedAt !== null) return false;
+  if (a.accountType === "expense") return true;
+  return a.accountType === "asset" && !a.isCash && a.systemRole !== "accounts_receivable" && a.systemRole !== "input_vat";
+}
+
+/**
+ * Syarat terbit faktur pembelian + jurnalnya: Dr akun per baris (barang → Persediaan
+ * dengan qty) [+ PPN Masukan pada mode PPN lengkap] / Cr Utang Usaha; pada metode
+ * perpetual ikut koreksi HPP bila menutup stok minus (ADR 017 & 022).
+ */
+export function buildPurchaseInvoice(invoice: InvoiceInput, ctx: InvoiceContext, number = "(nomor otomatis)"): InvoicePlan {
+  if (invoice.kind !== "purchase") fail("INVALID_INVOICE", "Bukan faktur pembelian");
+  const contact = ctx.contacts.find((c) => c.id === invoice.contactId && c.deletedAt === null);
+  if (!contact) fail("CONTACT_NOT_FOUND", "Pilih pemasok dari daftar kontak");
+  if (!contact.isSupplier) fail("INVALID_INVOICE", `${contact.name} bukan pemasok; aktifkan peran pemasok di Kontak`);
+  if (!invoice.reference?.trim()) fail("INVALID_INVOICE", "Isi nomor faktur dari pemasok");
+  if (!isValidIsoDate(invoice.invoiceDate) || !isValidIsoDate(invoice.dueDate)) fail("INVALID_DATE", "Tanggal faktur/jatuh tempo tidak valid");
+  if (invoice.dueDate < invoice.invoiceDate) fail("INVALID_DATE", "Jatuh tempo tidak boleh sebelum tanggal faktur");
+  if (invoice.lines.length === 0) fail("INVALID_INVOICE", "Faktur minimal berisi satu baris");
+  const inventory = ctx.accounts.find((a) => a.systemRole === "inventory" && a.deletedAt === null) ?? null;
+
+  const lines = invoice.lines.map((line, i) => {
+    const n = i + 1;
+    if (line.description.trim() === "") fail("INVALID_INVOICE", `Baris ${n}: keterangan wajib diisi`);
+    if (!Number.isSafeInteger(line.quantity) || line.quantity <= 0) fail("INVALID_QUANTITY", `Baris ${n}: qty harus bilangan bulat > 0`);
+    if (!Number.isSafeInteger(line.unitPrice) || line.unitPrice <= 0) fail("INVALID_AMOUNT", `Baris ${n}: harga harus lebih dari 0`);
+    const item = line.itemId ? ctx.items.find((it) => it.id === line.itemId && it.deletedAt === null) : null;
+    if (line.itemId && !item) fail("ITEM_NOT_FOUND", `Baris ${n}: barang tidak ditemukan`);
+    // Barang selalu masuk akun Persediaan agar tercatat per bahan (COGS/stok).
+    if (item && !inventory) fail("ACCOUNT_NOT_FOUND", "Akun persediaan belum ada");
+    const accountId = item ? inventory!.id : line.accountId;
+    const account = ctx.accounts.find((a) => a.id === accountId);
+    if (!account || !isPurchaseAccount(account)) fail("INVALID_ACCOUNT", `Baris ${n}: pilih akun persediaan, aset, atau beban`);
+    return { line, item, accountId, amount: lineAmount(line) };
+  });
+
+  const settings = workspaceTaxSettings(ctx.workspace);
+  const subtotal = lines.reduce((t, l) => t + l.amount, 0);
+  const vatApplies = invoice.applyTax && settings.mode === "full_vat" && settings.rateBps > 0;
+  const inputVat = vatApplies ? (invoice.taxOverride ?? computeInputVat(subtotal, settings)) : 0;
+  const base = buildExpense(
+    {
+      workspaceId: invoice.workspaceId,
+      entryDate: invoice.invoiceDate,
+      description: `Faktur pembelian ${number} · ${contact.name} (${invoice.reference!.trim()})`,
+      payment: { kind: "credit", counterparty: contact.name },
+      source: "purchase",
+      inputVat,
+      items: lines.map((l) => ({ accountId: l.accountId, amount: l.amount, description: l.line.description.trim() })),
+    },
+    ctx.accounts,
+  );
+  const entryLines: JournalLineInput[] = base.lines.map((l, index) => {
+    const source = index < lines.length ? lines[index] : null;
+    return source?.item ? { ...l, itemId: source.item.id, quantity: source.line.quantity } : l;
+  });
+  const warnings: string[] = [];
+  const itemLines = lines.filter((l) => l.item).map((l) => ({ itemId: l.item!.id, quantity: l.line.quantity, amount: l.amount }));
+  if (ctx.workspace.inventoryMethod === "perpetual" && itemLines.length > 0) {
+    if (!ctx.perpetual) fail("INVALID_INVOICE", "Data stok barang belum dimuat");
+    const corrections = purchaseCorrections(itemLines, invoice.invoiceDate, ctx.perpetual);
+    entryLines.push(...corrections.lines);
+    warnings.push(...corrections.warnings);
+  }
+  return {
+    entry: { ...base, lines: entryLines },
+    contact,
+    totals: { base: subtotal, tax: inputVat, total: subtotal + inputVat },
+    cost: 0,
+    warnings,
+  };
+}
+
+/** Pembentuk jurnal terbit sesuai jenis faktur. */
+export function buildInvoicePlan(invoice: InvoiceInput, ctx: InvoiceContext, number?: string): InvoicePlan {
+  return invoice.kind === "sale" ? buildSaleInvoice(invoice, ctx, number) : buildPurchaseInvoice(invoice, ctx, number);
 }
 
 // ---------- Nomor ----------

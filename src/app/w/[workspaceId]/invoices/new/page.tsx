@@ -10,5 +10,5 @@ export default function NewInvoicePage() {
   const { workspaceId } = useParams<{ workspaceId: string }>()
   const services = useServices()
   if (!services) return <LoadingState />
-  return <InvoiceDetailView services={services} workspaceId={workspaceId} invoiceId={null} routes={invoiceRoutes(workspaceId)} />
+  return <InvoiceDetailView services={services} kind="sale" workspaceId={workspaceId} invoiceId={null} routes={invoiceRoutes(workspaceId, "sale")} />
 }

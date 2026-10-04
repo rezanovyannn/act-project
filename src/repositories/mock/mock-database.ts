@@ -21,7 +21,7 @@ export class MemoryStorage implements KeyValueStorage {
 }
 
 /** Naikkan bila bentuk data berubah; data lama di browser akan diganti seed. */
-export const MOCK_SCHEMA_VERSION = 10;
+export const MOCK_SCHEMA_VERSION = 11;
 export const MOCK_STORAGE_KEY = "act-project:mock-db";
 
 export interface MockState {

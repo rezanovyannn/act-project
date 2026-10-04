@@ -1,6 +1,6 @@
 import { fail } from "../errors";
 import {
-  buildSaleInvoice,
+  buildInvoicePlan,
   contactSnapshot,
   summarizeInvoices,
   validateContact,
@@ -75,7 +75,7 @@ export class InvoiceService {
     return this.deps.invoices.getProfile(workspaceId);
   }
 
-  saveProfile(workspaceId: string, input: BusinessProfileInput): Promise<BusinessProfile> {
+  async saveProfile(workspaceId: string, input: BusinessProfileInput): Promise<BusinessProfile> {
     return this.deps.invoices.saveProfile(workspaceId, validateProfile(input));
   }
 
@@ -95,7 +95,7 @@ export class InvoiceService {
 
   // ---------- Faktur ----------
 
-  saveDraft(input: InvoiceInput, id?: string): Promise<Invoice> {
+  async saveDraft(input: InvoiceInput, id?: string): Promise<Invoice> {
     return this.deps.invoices.saveDraft(validateDraft(input), id);
   }
 
@@ -114,8 +114,7 @@ export class InvoiceService {
 
   /** Pratinjau jurnal terbit (dipakai form). */
   plan(input: InvoiceInput, data: InvoiceData): InvoicePlan {
-    if (input.kind !== "sale") fail("INVALID_INVOICE", "Faktur pembelian tersedia di Fase 7B");
-    return buildSaleInvoice(input, this.context(data, input.invoiceDate));
+    return buildInvoicePlan(input, this.context(data, input.invoiceDate));
   }
 
   /** Simpan draft terakhir lalu terbitkan: nomor, jurnal kredit, salinan kontak (atomik di repository). */
@@ -124,7 +123,8 @@ export class InvoiceService {
     const data = await this.data(draft.workspaceId);
     const plan = this.plan(draft, data);
     await this.deps.journalService.validateForPosting(plan.entry);
-    return this.deps.invoices.issue(draft.id, plan.entry, contactSnapshot(plan.contact), data.profile.invoicePrefix);
+    const prefix = draft.kind === "sale" ? data.profile.invoicePrefix : data.profile.purchasePrefix;
+    return this.deps.invoices.issue(draft.id, plan.entry, contactSnapshot(plan.contact), prefix);
   }
 
   /** Batalkan faktur terbit = void jurnalnya (jurnal pembalik pada `reversalDate`). */
@@ -135,7 +135,7 @@ export class InvoiceService {
 
   /** Salin faktur (terbit/dibatalkan) menjadi draft baru. */
   duplicate(invoice: Invoice, invoiceDate: IsoDate, dueDate: IsoDate): Promise<Invoice> {
-    const { workspaceId, kind, contactId, reference, notes, applyTax, lines } = invoice;
-    return this.saveDraft({ workspaceId, kind, contactId, invoiceDate, dueDate, reference, notes, applyTax, lines: lines.map((l) => ({ ...l })) });
+    const { workspaceId, kind, contactId, reference, notes, applyTax, taxOverride, lines } = invoice;
+    return this.saveDraft({ workspaceId, kind, contactId, invoiceDate, dueDate, reference, notes, applyTax, taxOverride, lines: lines.map((l) => ({ ...l })) });
   }
 }

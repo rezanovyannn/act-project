@@ -63,7 +63,7 @@ function ProfileForm({
   const [saving, setSaving] = useState(false)
   const fileRef = useRef<HTMLInputElement>(null)
   const set = <K extends keyof BusinessProfileInput>(key: K, value: BusinessProfileInput[K]) => setForm((f) => ({ ...f, [key]: value }))
-  const text = (key: Exclude<keyof BusinessProfileInput, "logoDataUrl" | "invoicePrefix">) => ({
+  const text = (key: Exclude<keyof BusinessProfileInput, "logoDataUrl" | "invoicePrefix" | "purchasePrefix">) => ({
     value: form[key] ?? "",
     onChange: (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => set(key, e.target.value),
   })
@@ -175,6 +175,19 @@ function ProfileForm({
           />
           <p className="text-xs text-muted-foreground">
             Contoh nomor: <strong>{formatInvoiceNumber(form.invoicePrefix || "INV", todayIsoDate(), 1)}</strong> (urut per tahun).
+          </p>
+        </div>
+        <div className="grid content-start gap-2">
+          <Label htmlFor="profile-purchase-prefix">Prefix nomor faktur pembelian</Label>
+          <Input
+            id="profile-purchase-prefix"
+            value={form.purchasePrefix}
+            maxLength={12}
+            onChange={(e) => set("purchasePrefix", e.target.value.toUpperCase().replace(/[^A-Z0-9-]/g, ""))}
+            className="w-40"
+          />
+          <p className="text-xs text-muted-foreground">
+            Nomor internal: <strong>{formatInvoiceNumber(form.purchasePrefix || "PB", todayIsoDate(), 1)}</strong>; nomor faktur pemasok disimpan terpisah.
           </p>
         </div>
       </section>

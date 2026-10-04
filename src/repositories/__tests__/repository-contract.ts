@@ -767,6 +767,7 @@ export function describeRepositoryContract(
           bankInfo: "BCA 123",
           invoiceNotes: "Terima kasih",
           invoicePrefix: "KDA",
+          purchasePrefix: "PBK",
           logoDataUrl: "data:image/png;base64,iVBORw0KGgo=",
         };
         expect(await repos.invoices.saveProfile(workspace.id, profile)).toMatchObject(profile);
@@ -823,6 +824,49 @@ export function describeRepositoryContract(
         await expectCode(repos.invoices.issue(may.id, unbalanced, snapshot, "INV"), "UNBALANCED");
         expect(await repos.invoices.getInvoice(may.id)).toMatchObject({ status: "draft", number: null, journalEntryId: null });
         expect((await repos.journals.listByWorkspace(workspace.id)).filter((j) => j.status === "posted")).toHaveLength(2);
+      });
+
+      it("faktur pembelian: nomor urut terpisah dari penjualan, PPN Masukan koreksi tersimpan, sumber jurnal harus purchase", async () => {
+        const { input, journal } = await setup();
+        const accounts = await repos.accounts.listByWorkspace(workspace.id);
+        const utangId = accounts.find((a) => a.systemRole === "accounts_payable")!.id;
+        const bebanId = accounts.find((a) => a.accountType === "expense")!.id;
+        const supplier = await repos.invoices.createContact(workspace.id, { ...contactInput("CV Pemasok"), isCustomer: false, isSupplier: true });
+        const snapshot = { name: "CV Pemasok", address: null, phone: null, email: null, npwp: null };
+        const sale = await repos.invoices.saveDraft(input("2026-03-10"));
+        await repos.invoices.issue(sale.id, journal("2026-03-10", 50_000), snapshot, "INV");
+        const draft = await repos.invoices.saveDraft({
+          ...input("2026-03-12"),
+          kind: "purchase",
+          contactId: supplier.id,
+          reference: "PS-0091",
+          applyTax: true,
+          taxOverride: 109_999,
+          lines: [{ description: "Servis", quantity: 1, unit: null, unitPrice: 1_000_000, accountId: bebanId, itemId: null }],
+        });
+        expect(draft).toMatchObject({ kind: "purchase", taxOverride: 109_999, reference: "PS-0091" });
+        await expectCode(repos.invoices.saveDraft({ ...input("2026-03-12"), kind: "purchase", taxOverride: -5 }), "INVALID_AMOUNT");
+        const purchaseJournal: JournalEntryInput = {
+          workspaceId: workspace.id,
+          entryDate: "2026-03-12",
+          description: "Faktur pembelian (nomor otomatis) · CV Pemasok (PS-0091)",
+          source: "purchase",
+          counterparty: "CV Pemasok",
+          lines: [
+            { accountId: bebanId, debit: 1_000_000, credit: 0 },
+            { accountId: utangId, debit: 0, credit: 1_000_000 },
+          ],
+        };
+        await expectCode(repos.invoices.issue(draft.id, { ...purchaseJournal, source: "revenue" }, snapshot, "PB"), "INVALID_INVOICE");
+        const issued = await repos.invoices.issue(draft.id, purchaseJournal, snapshot, "PB");
+        expect(issued).toMatchObject({ status: "issued", number: "PB/2026/03/0001", taxOverride: 109_999 });
+        expect((await repos.journals.getById(issued.journalEntryId!))?.description).toBe("Faktur pembelian PB/2026/03/0001 · CV Pemasok (PS-0091)");
+        expect((await repos.invoices.listInvoices(workspace.id, "purchase")).map((i) => i.number)).toEqual(["PB/2026/03/0001"]);
+        expect((await repos.invoices.getProfile(workspace.id)).purchasePrefix).toBe("PB");
+        await expectCode(
+          repos.invoices.saveProfile(workspace.id, { ...(await repos.invoices.getProfile(workspace.id)), purchasePrefix: "pb x" }),
+          "INVALID_PROFILE",
+        );
       });
     });
   });

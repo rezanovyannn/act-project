@@ -80,7 +80,7 @@ describe("RLS: user B tidak dapat membaca atau menulis data user A", () => {
     postedA = (await userA.repos.journals.postJournal(sale(workspaceA.id, 1000))).id;
     menuA = (await userA.repos.menus.createMenu(workspaceA.id, { code: "M-1", name: "Rahasia", price: 1000, revenueAccountId: jualA })).id;
     contactA = (await userA.repos.invoices.createContact(workspaceA.id, { name: "Pelanggan A", isCustomer: true, isSupplier: false, address: null, phone: null, email: null, npwp: null, paymentTermDays: 0, notes: null })).id;
-    await userA.repos.invoices.saveProfile(workspaceA.id, { displayName: "Rahasia", address: null, phone: null, email: null, npwp: null, bankInfo: "BCA 1", invoiceNotes: null, invoicePrefix: "INV", logoDataUrl: null });
+    await userA.repos.invoices.saveProfile(workspaceA.id, { displayName: "Rahasia", address: null, phone: null, email: null, npwp: null, bankInfo: "BCA 1", invoiceNotes: null, invoicePrefix: "INV", purchasePrefix: "PB", logoDataUrl: null });
     invoiceA = (await userA.repos.invoices.saveDraft({ workspaceId: workspaceA.id, kind: "sale", contactId: contactA, invoiceDate: "2026-03-10", dueDate: "2026-03-10", reference: null, notes: null, applyTax: false, lines: [] })).id;
   });
 
@@ -125,7 +125,7 @@ describe("RLS: user B tidak dapat membaca atau menulis data user A", () => {
       ["hapus menu", () => b.menus.deleteMenu(menuA)],
       ["rekap porsi", () => b.menus.createPortionSummary({ workspaceId: workspaceA.id, dateFrom: "2026-03-01", dateTo: "2026-03-02", note: null, lines: [{ menuId: menuA, portions: 1 }] })],
       ["penjualan menu", () => b.menus.postMenuSale(sale(workspaceA.id, 1000), [{ menuId: menuA, portions: 1, amount: 1000 }])],
-      ["profil usaha", () => b.invoices.saveProfile(workspaceA.id, { displayName: "Diretas", address: null, phone: null, email: null, npwp: null, bankInfo: null, invoiceNotes: null, invoicePrefix: "INV", logoDataUrl: null })],
+      ["profil usaha", () => b.invoices.saveProfile(workspaceA.id, { displayName: "Diretas", address: null, phone: null, email: null, npwp: null, bankInfo: null, invoiceNotes: null, invoicePrefix: "INV", purchasePrefix: "PB", logoDataUrl: null })],
       ["kontak baru", () => b.invoices.createContact(workspaceA.id, { name: "X", isCustomer: true, isSupplier: false, address: null, phone: null, email: null, npwp: null, paymentTermDays: 0, notes: null })],
       ["hapus kontak", () => b.invoices.deleteContact(contactA)],
       ["ubah draft faktur", () => b.invoices.saveDraft({ workspaceId: workspaceA.id, kind: "sale", contactId: null, invoiceDate: "2026-03-10", dueDate: "2026-03-10", reference: null, notes: null, applyTax: false, lines: [] }, invoiceA)],

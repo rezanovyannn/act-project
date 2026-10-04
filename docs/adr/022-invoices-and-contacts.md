@@ -22,7 +22,12 @@ User (4 Oktober 2026) membutuhkan faktur penjualan dan faktur pembelian untuk **
    - Faktur terbit **tidak dapat diubah**. Pembatalan = void jurnalnya (jurnal pembalik di periode open); status *Dibatalkan* diturunkan dari jurnal pembalik, sehingga tidak bisa dibatalkan bila sudah ada pelunasan aktif (ADR 012). Koreksi = batalkan lalu *Salin ke draft baru*.
    - **Status pembayaran** diturunkan dari Piutang (ADR 012): Belum dibayar / Dibayar sebagian / Lunas; *Lewat jatuh tempo* bila sisa > 0 setelah tanggal jatuh tempo. Pelunasan memakai halaman Piutang & Utang.
    - **Cetak**: halaman faktur berbentuk kertas A4 (kop + logo + identitas usaha, data pelanggan, rincian, subtotal, pajak, total, terbilang, jatuh tempo, rekening, catatan, tempat tanda tangan); dicetak/disimpan PDF lewat print browser. Draft tercetak dengan tanda DRAFT.
-4. **Faktur pembelian (7B)**: menyimpan nomor faktur pemasok + nomor internal otomatis, baris bebas/barang (barang → pembelian per bahan untuk COGS periodik atau stok perpetual), pajak masukan mengikuti Pengaturan Pajak; terbit = jurnal Dr Persediaan/Beban (+PPN Masukan) / Cr Utang Usaha. Detail diputuskan saat 7B.
+4. **Faktur pembelian (7B)** (ROADMAP Catatan Keputusan 61–62):
+   - Isi sama dengan faktur penjualan, dengan kontak **pemasok** dan **nomor faktur pemasok wajib** (kolom referensi).
+   - Baris: akun **persediaan/aset non-kas atau beban**; baris dengan barang selalu masuk akun Persediaan beserta qty, sehingga tercatat sebagai pembelian per bahan (COGS periodik, ADR 020) atau stok per barang (perpetual, ADR 017; ikut koreksi HPP bila menutup stok minus).
+   - Pajak: hanya mode **PPN lengkap** yang memakai PPN Masukan (dihitung dari subtotal, dapat dikoreksi sesuai faktur pemasok, kolom `tax_override`); mode PB1 tanpa pajak masukan.
+   - Terbit: nomor internal `{prefix pembelian}/{tahun}/{bulan}/{urut}` (default `PB`, urut per tahun, terpisah dari penjualan) + jurnal Dr akun baris [+ PPN Masukan] / Cr Utang Usaha (`source = purchase`, `counterparty` = pemasok). Status pembayaran dari Utang; pembatalan & salin ke draft sama dengan penjualan.
+   - Cetak dua dokumen: **Tanda Terima Faktur** (kop usaha, pemasok, no. faktur pemasok, tanggal, jatuh tempo, jumlah, terbilang, tanda tangan yang menyerahkan & yang menerima) dan **salinan faktur** (rincian, pajak, total).
 5. **Data & keamanan**: tabel `workspace_profiles`, `contacts`, `invoices`, `invoice_lines` ber-`workspace_id`, RLS hanya SELECT untuk pemilik, tulis lewat RPC SECURITY DEFINER. Audit: entitas `contact` dan `invoice`.
 
 ## Konsekuensi

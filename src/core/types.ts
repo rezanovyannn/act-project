@@ -252,6 +252,8 @@ export interface BusinessProfileInput {
   invoiceNotes: string | null;
   /** Prefix nomor faktur penjualan, mis. "INV". */
   invoicePrefix: string;
+  /** Prefix nomor internal faktur pembelian, mis. "PB". */
+  purchasePrefix: string;
   /** Logo kecil sebagai data URL image/png|jpeg|webp. */
   logoDataUrl: string | null;
 }
@@ -306,6 +308,8 @@ export interface InvoiceInput {
   reference: string | null;
   notes: string | null;
   applyTax: boolean;
+  /** Koreksi PPN Masukan sesuai faktur pemasok (pembelian, mode PPN lengkap); null = dihitung. */
+  taxOverride?: number | null;
   lines: InvoiceLine[];
 }
 

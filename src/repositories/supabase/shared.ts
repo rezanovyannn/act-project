@@ -137,6 +137,7 @@ export const toProfile = (r: any): Omit<BusinessProfile, "workspaceId"> & { work
   bankInfo: r.bank_info ?? null,
   invoiceNotes: r.invoice_notes ?? null,
   invoicePrefix: r.invoice_prefix,
+  purchasePrefix: r.purchase_prefix,
   logoDataUrl: r.logo_data_url ?? null,
   updatedAt: r.updated_at,
 });
@@ -168,6 +169,7 @@ export const toInvoice = (r: any): Invoice => ({
   reference: r.reference ?? null,
   notes: r.notes ?? null,
   applyTax: r.apply_tax,
+  taxOverride: r.tax_override === null || r.tax_override === undefined ? null : toAmount(r.tax_override),
   status: r.status,
   number: r.number,
   journalEntryId: r.journal_entry_id,

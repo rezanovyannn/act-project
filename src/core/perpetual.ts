@@ -106,11 +106,25 @@ export function buildItemPurchase(
   const withItems = base.lines.map((line, index) =>
     index < lines.length ? { ...line, itemId: lines[index].itemId, quantity: lines[index].quantity } : line,
   );
+  const { lines: corrections, warnings } = purchaseCorrections(lines, input.entryDate, context);
+  return { entry: { ...base, lines: [...withItems, ...corrections] }, warnings };
+}
+
+/**
+ * Koreksi HPP saat pembelian menutup stok minus (ADR 017): dipakai form
+ * pembelian per barang dan faktur pembelian (ADR 022).
+ */
+export function purchaseCorrections(
+  lines: readonly ItemAmount[],
+  entryDate: IsoDate,
+  context: PerpetualContext,
+): { lines: JournalLineInput[]; warnings: string[] } {
+  const inventory = accountByRole(context.accounts, "inventory");
   const corrections: JournalLineInput[] = [];
   const warnings: string[] = [];
   for (const line of lines) {
     const item = requireItem(context, line.itemId);
-    const correction = negativeStockCorrection(stockOf(context, line.itemId, input.entryDate), line.quantity, line.amount);
+    const correction = negativeStockCorrection(stockOf(context, line.itemId, entryDate), line.quantity, line.amount);
     if (correction === 0) continue;
     const cogs = accountByRole(context.accounts, "cogs").id;
     const text = `Koreksi HPP stok minus ${item.name}`;
@@ -124,7 +138,7 @@ export function buildItemPurchase(
     );
     warnings.push(`${label(item)}: menutup stok minus, HPP dikoreksi ${correction > 0 ? "naik" : "turun"} ${Math.abs(correction)}`);
   }
-  return { entry: { ...base, lines: [...withItems, ...corrections] }, warnings };
+  return { lines: corrections, warnings };
 }
 
 /** Baris keluar Persediaan per barang + total harga pokok. */

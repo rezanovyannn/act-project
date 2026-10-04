@@ -226,3 +226,5 @@ Faktur untuk tukar faktur di semua template. Faktur adalah input transaksi: draf
 | 58 | Pelanggan & pemasok | Daftar kontak | ADR 022 |
 | 59 | Nomor faktur penjualan | INV/2026/10/0001, urut per tahun, prefix dapat diubah | ADR 022 |
 | 60 | Tahapan | 7A penjualan, lalu 7B pembelian | ADR 022 |
+| 61 | Nomor faktur pembelian | Nomor internal PB/2026/10/0001 (prefix dapat diubah) + nomor faktur pemasok | ADR 022 |
+| 62 | Cetak faktur pembelian | Keduanya: Tanda Terima Faktur dan salinan rincian faktur | ADR 022 |

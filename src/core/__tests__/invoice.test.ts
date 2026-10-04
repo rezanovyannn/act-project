@@ -13,6 +13,8 @@ import { beforeEach, describe, expect, it } from "vitest";
 import { AccountingError, type ValidationCode } from "@/core/errors";
 import { formatInvoiceNumber, nextInvoiceSeq, summarizeInvoices, terbilang, validateProfile, defaultProfile } from "@/core/invoice";
 import { buildSettlement } from "@/core/transactions";
+import { FULL_VAT_DEFAULTS } from "@/core/sales-tax";
+import { purchasesByItem } from "@/core/stock-count";
 import type { Account, Contact, Invoice, InvoiceInput } from "@/core/types";
 import { createFnbWorkspace, createTestEnv } from "./helpers";
 
@@ -171,5 +173,102 @@ describe("faktur penjualan, kontak & profil usaha", () => {
     expect(terbilang(115)).toBe("Seratus lima belas rupiah");
     expect(terbilang(2_500_000_000)).toBe("Dua miliar lima ratus juta rupiah");
     expect(terbilang(21_000_019)).toBe("Dua puluh satu juta sembilan belas rupiah");
+  });
+});
+
+/**
+ * Faktur pembelian (ADR 022, Fase 7B). Angka harapan dihitung manual:
+ * CV Pasar Segar, no. faktur PS-0091, 12 Mar 2026:
+ *   Ayam (barang) 10.000 g × 55 = 550.000 → Persediaan (qty 10.000, masuk pembelian per bahan COGS)
+ *   Gas LPG 2 × 25.000 = 50.000 → Beban Listrik & Air
+ *   Mode PB1 (bukan PPN lengkap) → tanpa PPN Masukan; Cr Utang Usaha 600.000.
+ * PPN lengkap 12% × 11/12: Servis mesin 1.000.000 → PPN Masukan 110.000, Utang 1.110.000; koreksi 109.999.
+ */
+describe("faktur pembelian", () => {
+  let env: ReturnType<typeof createTestEnv>;
+  let workspaceId: string;
+  let accounts: Account[];
+  let pasar: Contact;
+  const byCode = (code: string) => accounts.find((a) => a.code === code)!;
+
+  beforeEach(async () => {
+    env = createTestEnv();
+    const ws = await createFnbWorkspace(env);
+    workspaceId = ws.workspace.id;
+    accounts = ws.accounts;
+    pasar = await env.invoiceService.createContact(workspaceId, {
+      name: "CV Pasar Segar", isCustomer: false, isSupplier: true, address: "Pasar Kosambi", phone: null, email: null, npwp: null, paymentTermDays: 7, notes: null,
+    });
+  });
+
+  const purchase = (overrides: Partial<InvoiceInput> = {}): InvoiceInput => ({
+    workspaceId,
+    kind: "purchase",
+    contactId: pasar.id,
+    invoiceDate: "2026-03-12",
+    dueDate: "2026-03-19",
+    reference: "PS-0091",
+    notes: null,
+    applyTax: true,
+    taxOverride: null,
+    lines: [],
+    ...overrides,
+  });
+
+  it("terbit: nomor PB/tahun/bulan/urut, Dr Persediaan (barang+qty) & beban / Cr Utang Usaha, masuk pembelian per bahan", async () => {
+    const ayam = await env.itemService.createItem(workspaceId, { code: "P-01", name: "Ayam", unit: "gram", revenueAccountId: null, category: "Protein" });
+    const issued = await env.invoiceService.issue(
+      purchase({
+        lines: [
+          // Akun baris barang dipaksa ke Persediaan walau diisi akun lain.
+          { description: "Ayam fillet", quantity: 10_000, unit: "gram", unitPrice: 55, accountId: byCode("6-3000").id, itemId: ayam.id },
+          { description: "Gas LPG", quantity: 2, unit: "tabung", unitPrice: 25_000, accountId: byCode("6-3000").id, itemId: null },
+        ],
+      }),
+    );
+    expect(issued).toMatchObject({ status: "issued", number: "PB/2026/03/0001", reference: "PS-0091", contactSnapshot: { name: "CV Pasar Segar" } });
+    const entry = (await env.repos.journals.getById(issued.journalEntryId!))!;
+    expect(entry).toMatchObject({ source: "purchase", counterparty: "CV Pasar Segar", description: "Faktur pembelian PB/2026/03/0001 · CV Pasar Segar (PS-0091)" });
+    expect(entry.lines.map((l) => [l.accountId, l.debit, l.credit, l.itemId ?? null, l.quantity ?? null])).toEqual([
+      [byCode("1-1300").id, 550_000, 0, ayam.id, 10_000],
+      [byCode("6-3000").id, 50_000, 0, null, null],
+      [byCode("2-1100").id, 0, 600_000, null, null],
+    ]);
+    const entries = await env.repos.journals.listByWorkspace(workspaceId);
+    expect(purchasesByItem(entries, accounts, null, "2026-03-31").get(ayam.id)).toMatchObject({ qty: 10_000, value: 550_000 });
+    // Nomor penjualan & pembelian berurutan sendiri-sendiri.
+    expect((await summaries())[0]).toMatchObject({ status: "unpaid", total: 600_000, outstanding: 600_000 });
+  });
+
+  async function summaries(today = "2026-03-15") {
+    const data = await env.invoiceService.data(workspaceId, "purchase");
+    return summarizeInvoices(data.invoices, data.journals, data.accounts, today);
+  }
+
+  it("syarat terbit: pemasok, nomor faktur pemasok, akun aset/beban", async () => {
+    const line = { description: "Gas LPG", quantity: 1, unit: null, unitPrice: 25_000, accountId: byCode("6-3000").id, itemId: null };
+    const customer = await env.invoiceService.createContact(workspaceId, { name: "Pelanggan", isCustomer: true, isSupplier: false, address: null, phone: null, email: null, npwp: null, paymentTermDays: 0, notes: null });
+    await expectCode(env.invoiceService.issue(purchase({ contactId: customer.id, lines: [line] })), "INVALID_INVOICE");
+    await expectCode(env.invoiceService.issue(purchase({ reference: " ", lines: [line] })), "INVALID_INVOICE");
+    await expectCode(env.invoiceService.issue(purchase({ lines: [{ ...line, accountId: byCode("4-1000").id }] })), "INVALID_ACCOUNT");
+    await expectCode(env.invoiceService.issue(purchase({ lines: [{ ...line, accountId: byCode("1-1100").id }] })), "INVALID_ACCOUNT");
+    await expectCode(env.invoiceService.saveDraft(purchase({ taxOverride: -1 })), "INVALID_AMOUNT");
+  });
+
+  it("PPN lengkap: PPN Masukan dihitung 12% × 11/12, bisa dikoreksi sesuai faktur pemasok", async () => {
+    await env.taxService.updateSettings(workspaceId, { mode: "full_vat", label: "PPN", inclusive: false, ...FULL_VAT_DEFAULTS });
+    accounts = await env.repos.accounts.listByWorkspace(workspaceId);
+    const inputVat = accounts.find((a) => a.systemRole === "input_vat")!;
+    const line = { description: "Servis mesin", quantity: 1, unit: null, unitPrice: 1_000_000, accountId: byCode("6-3000").id, itemId: null };
+    const data = await env.invoiceService.data(workspaceId);
+    const plan = env.invoiceService.plan(purchase({ lines: [line] }), data);
+    expect(plan.totals).toEqual({ base: 1_000_000, tax: 110_000, total: 1_110_000 });
+    const issued = await env.invoiceService.issue(purchase({ taxOverride: 109_999, lines: [line] }));
+    const entry = (await env.repos.journals.getById(issued.journalEntryId!))!;
+    expect(entry.lines.map((l) => [l.accountId, l.debit, l.credit])).toEqual([
+      [byCode("6-3000").id, 1_000_000, 0],
+      [inputVat.id, 109_999, 0],
+      [byCode("2-1100").id, 0, 1_109_999],
+    ]);
   });
 });

@@ -1,6 +1,6 @@
 import { isValidIsoDate } from "@/core/dates";
 import { fail } from "@/core/errors";
-import { defaultProfile, formatInvoiceNumber, LOGO_MAX_LENGTH, LOGO_PATTERN, nextInvoiceSeq } from "@/core/invoice";
+import { defaultProfile, formatInvoiceNumber, LOGO_MAX_LENGTH, LOGO_PATTERN, nextInvoiceSeq, PREFIX_PATTERN } from "@/core/invoice";
 import type { IInvoiceRepository } from "@/core/ports";
 import type {
   BusinessProfile,
@@ -51,7 +51,7 @@ export class MockInvoiceRepository implements IInvoiceRepository {
       if (!state.workspaces.some((w) => w.id === workspaceId && w.deletedAt === null)) fail("NOT_FOUND", "Workspace tidak ditemukan");
       // Meniru constraint tabel workspace_profiles.
       const logoOk = !input.logoDataUrl || (input.logoDataUrl.length <= LOGO_MAX_LENGTH && LOGO_PATTERN.test(input.logoDataUrl));
-      if (!/^[A-Z0-9-]{1,12}$/.test(input.invoicePrefix) || !logoOk) fail("INVALID_PROFILE", "Prefix nomor faktur atau logo tidak valid");
+      if (!PREFIX_PATTERN.test(input.invoicePrefix) || !PREFIX_PATTERN.test(input.purchasePrefix) || !logoOk) fail("INVALID_PROFILE", "Prefix nomor faktur atau logo tidak valid");
       const profile: BusinessProfile = { ...input, workspaceId, updatedAt: this.db.now() };
       state.profiles = [...state.profiles.filter((p) => p.workspaceId !== workspaceId), profile];
       return { ...profile };
@@ -117,6 +117,8 @@ export class MockInvoiceRepository implements IInvoiceRepository {
       if (input.kind !== "sale" && input.kind !== "purchase") fail("INVALID_INVOICE", "Jenis faktur tidak dikenal");
       if (!isValidIsoDate(input.invoiceDate) || !isValidIsoDate(input.dueDate)) fail("INVALID_DATE", "Tanggal faktur/jatuh tempo tidak valid");
       if (input.lines.length > 200) fail("INVALID_INVOICE", "Baris faktur tidak valid (maks. 200)");
+      const override = input.taxOverride ?? null;
+      if (override !== null && (!Number.isSafeInteger(override) || override < 0)) fail("INVALID_AMOUNT", "PPN Masukan harus bilangan bulat ≥ 0");
       for (const line of input.lines) {
         const ok = (n: number) => Number.isSafeInteger(n) && n >= 0;
         if (!ok(line.quantity) || !ok(line.unitPrice)) fail("INVALID_QUANTITY", "Qty dan harga harus bilangan bulat ≥ 0");
@@ -138,12 +140,13 @@ export class MockInvoiceRepository implements IInvoiceRepository {
         if (invoice.status !== "draft") fail("INVALID_INVOICE", "Faktur terbit tidak dapat diubah");
         if (invoice.kind !== input.kind) fail("INVALID_INVOICE", "Jenis faktur tidak dapat diubah");
         const before = { ...invoice };
-        Object.assign(invoice, { ...input, lines: input.lines.map((l) => ({ ...l })), updatedAt: now });
+        Object.assign(invoice, { ...input, taxOverride: override, lines: input.lines.map((l) => ({ ...l })), updatedAt: now });
         this.db.audit(state, { workspaceId: invoice.workspaceId, entityType: "invoice", entityId: id, action: "update", before, after: invoice });
         return strip(invoice);
       }
       const invoice: StoredInvoice = {
         ...input,
+        taxOverride: override,
         lines: input.lines.map((l) => ({ ...l })),
         id: this.db.generateId(),
         status: "draft",
