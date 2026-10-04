@@ -9,11 +9,12 @@ import { BackupTab } from "./backup-tab"
 import { ClosingTab } from "./closing-tab"
 import { OpeningBalanceTab } from "./opening-balance-tab"
 import { PeriodsTab } from "./periods-tab"
+import { ProfileTab } from "./profile-tab"
 import { InventoryTab } from "./inventory-tab"
 import { TaxTab } from "./tax-tab"
 
-export type SettingsTab = "accounts" | "periods" | "opening" | "tax" | "inventory" | "closing" | "backup"
-const SETTINGS_TABS: readonly SettingsTab[] = ["accounts", "periods", "opening", "tax", "inventory", "closing", "backup"]
+export type SettingsTab = "accounts" | "periods" | "opening" | "tax" | "inventory" | "profile" | "closing" | "backup"
+const SETTINGS_TABS: readonly SettingsTab[] = ["accounts", "periods", "opening", "tax", "inventory", "profile", "closing", "backup"]
 
 export function SettingsView({
   services,
@@ -47,7 +48,7 @@ export function SettingsView({
 
   return (
     <div className="grid grid-cols-1 gap-6">
-      <PageHeader title="Pengaturan" description="Daftar akun (CoA), periode akuntansi, saldo awal, pajak, persediaan, tutup buku, dan backup data." />
+      <PageHeader title="Pengaturan" description="Daftar akun (CoA), periode akuntansi, saldo awal, pajak, persediaan, profil usaha, tutup buku, dan backup data." />
       <Tabs defaultValue={SETTINGS_TABS.includes(initialTab as SettingsTab) ? (initialTab as SettingsTab) : "accounts"} className="grid grid-cols-1 gap-4">
         <TabsList className="h-auto w-fit max-w-full flex-wrap">
           <TabsTrigger value="accounts">Daftar Akun</TabsTrigger>
@@ -55,6 +56,7 @@ export function SettingsView({
           <TabsTrigger value="opening">Saldo Awal</TabsTrigger>
           <TabsTrigger value="tax">Pajak</TabsTrigger>
           <TabsTrigger value="inventory">Persediaan</TabsTrigger>
+          <TabsTrigger value="profile">Profil Usaha</TabsTrigger>
           <TabsTrigger value="closing">Tutup Buku</TabsTrigger>
           <TabsTrigger value="backup">Backup</TabsTrigger>
         </TabsList>
@@ -79,6 +81,9 @@ export function SettingsView({
         </TabsContent>
         <TabsContent value="inventory">
           <InventoryTab services={services} workspace={workspace} itemsHref={itemsHref} journalHref={journalHref} onSaved={data.reload} />
+        </TabsContent>
+        <TabsContent value="profile">
+          <ProfileTab services={services} workspace={workspace} />
         </TabsContent>
         <TabsContent value="closing">
           <ClosingTab

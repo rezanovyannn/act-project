@@ -31,3 +31,9 @@ export function endOfMonth(date: IsoDate): IsoDate {
   const month = Number(date.slice(5, 7));
   return toIsoDate(year, month, daysInMonth(year, month));
 }
+
+/** Tanggal + `days` hari (boleh negatif). */
+export function addDays(date: IsoDate, days: number): IsoDate {
+  const d = new Date(Date.UTC(yearOf(date), Number(date.slice(5, 7)) - 1, Number(date.slice(8, 10)) + days));
+  return toIsoDate(d.getUTCFullYear(), d.getUTCMonth() + 1, d.getUTCDate());
+}

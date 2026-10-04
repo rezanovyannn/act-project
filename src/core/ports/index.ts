@@ -7,6 +7,14 @@ import type {
   AccountSeed,
   AuditEntity,
   AuditLog,
+  BusinessProfile,
+  BusinessProfileInput,
+  Contact,
+  ContactInput,
+  ContactSnapshot,
+  Invoice,
+  InvoiceInput,
+  InvoiceKind,
   CostMethodPeriod,
   InventoryMethod,
   IsoDate,
@@ -75,6 +83,28 @@ export interface IStockCountRepository {
   post(input: StockCountInput, journal: JournalEntryInput | null): Promise<StockCount>;
   /** Membatalkan stok opname aktif terakhir: jurnalnya dibalik pada `reversalDate`. */
   cancel(id: string, reversalDate: IsoDate): Promise<void>;
+}
+
+/** Profil usaha, kontak, dan faktur (ADR 022). */
+export interface IInvoiceRepository {
+  /** Profil usaha; nilai default bila belum pernah disimpan. */
+  getProfile(workspaceId: string): Promise<BusinessProfile>;
+  saveProfile(workspaceId: string, input: BusinessProfileInput): Promise<BusinessProfile>;
+  listContacts(workspaceId: string): Promise<Contact[]>;
+  createContact(workspaceId: string, input: ContactInput): Promise<Contact>;
+  updateContact(id: string, input: ContactInput): Promise<Contact>;
+  /** Ditolak (CONTACT_IN_USE) bila kontak sudah dipakai faktur. */
+  deleteContact(id: string): Promise<void>;
+  listInvoices(workspaceId: string, kind?: InvoiceKind): Promise<Invoice[]>;
+  getInvoice(id: string): Promise<Invoice | null>;
+  /** Buat (tanpa id) atau ubah draft. */
+  saveDraft(input: InvoiceInput, id?: string): Promise<Invoice>;
+  deleteDraft(id: string): Promise<void>;
+  /**
+   * Atomik: memberi nomor (prefix/tahun/bulan/urut per tahun), posting jurnal,
+   * dan menandai faktur terbit beserta salinan kontaknya.
+   */
+  issue(id: string, journal: JournalEntryInput, contact: ContactSnapshot, prefix: string): Promise<Invoice>;
 }
 
 export type MenuPatch = Partial<MenuInput & { isActive: boolean }>;

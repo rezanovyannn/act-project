@@ -45,7 +45,13 @@ export type ValidationCode =
   | "MENU_IN_USE"
   | "DUPLICATE_MENU_CODE"
   | "INVALID_RECIPE"
-  | "INVALID_PORTION_SUMMARY";
+  | "INVALID_PORTION_SUMMARY"
+  | "CONTACT_NOT_FOUND"
+  | "CONTACT_IN_USE"
+  | "DUPLICATE_CONTACT"
+  | "INVOICE_NOT_FOUND"
+  | "INVALID_INVOICE"
+  | "INVALID_PROFILE";
 
 export interface ValidationIssue {
   code: ValidationCode;

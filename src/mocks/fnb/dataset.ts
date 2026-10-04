@@ -294,6 +294,9 @@ export function buildFnbMockState(): MockState {
     recipes: [],
     portionSummaries: [],
     menuSales: [],
+    profiles: [],
+    contacts: [],
+    invoices: [],
     auditLogs: [],
   };
 }

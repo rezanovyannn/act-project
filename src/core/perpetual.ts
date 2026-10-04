@@ -128,7 +128,7 @@ export function buildItemPurchase(
 }
 
 /** Baris keluar Persediaan per barang + total harga pokok. */
-function outflowLines(
+export function outflowLines(
   lines: readonly ItemQuantity[],
   date: IsoDate,
   context: PerpetualContext,

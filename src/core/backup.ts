@@ -6,6 +6,9 @@ import { reversedEntryIds } from "./reversal";
 import type {
   Account,
   AuditLog,
+  BusinessProfile,
+  Contact,
+  Invoice,
   IsoTimestamp,
   Item,
   JournalEntry,
@@ -38,13 +41,17 @@ export interface WorkspaceBackup {
   recipes: Recipe[];
   portionSummaries: PortionSummary[];
   menuSales: MenuSale[];
+  /** Profil usaha, kontak, faktur (ADR 022). */
+  profile: BusinessProfile | null;
+  contacts: Contact[];
+  invoices: Invoice[];
   auditLogs: AuditLog[];
   summary: { accounts: number; periods: number; journals: number; journalLines: number; items: number; auditLogs: number };
 }
 
 export function buildBackup(
   parts: Pick<WorkspaceBackup, "workspace" | "accounts" | "periods" | "journals" | "items" | "auditLogs"> &
-    Partial<Pick<WorkspaceBackup, "stockCounts" | "menus" | "recipes" | "portionSummaries" | "menuSales">>,
+    Partial<Pick<WorkspaceBackup, "stockCounts" | "menus" | "recipes" | "portionSummaries" | "menuSales" | "profile" | "contacts" | "invoices">>,
   exportedAt: IsoTimestamp,
 ): WorkspaceBackup {
   return {
@@ -56,6 +63,9 @@ export function buildBackup(
     recipes: [],
     portionSummaries: [],
     menuSales: [],
+    profile: null,
+    contacts: [],
+    invoices: [],
     ...parts,
     summary: {
       accounts: parts.accounts.length,

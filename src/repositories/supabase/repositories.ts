@@ -3,11 +3,13 @@
  * Baca: SELECT langsung (dibatasi RLS). Tulis: hanya lewat RPC.
  */
 import type { PeriodRange } from "@/core/periods";
+import { defaultProfile } from "@/core/invoice";
 import type {
   AccountPatch,
   AuditLogFilter,
   IAccountRepository,
   IAuditLogRepository,
+  IInvoiceRepository,
   IItemRepository,
   IMenuRepository,
   MenuPatch,
@@ -27,6 +29,14 @@ import type {
   AuditLog,
   Item,
   ItemInput,
+  BusinessProfile,
+  BusinessProfileInput,
+  Contact,
+  ContactInput,
+  ContactSnapshot,
+  Invoice,
+  InvoiceInput,
+  InvoiceKind,
   Menu,
   MenuInput,
   MenuSale,
@@ -49,8 +59,11 @@ import {
   JOURNAL_SELECT,
   toAccount,
   toAuditLog,
+  toContact,
+  toInvoice,
   toItem,
   toMenu,
+  toProfile,
   toMenuSaleLine,
   toPortionSummary,
   toRecipe,
@@ -377,6 +390,71 @@ export class SupabaseStockCountRepository implements IStockCountRepository {
   }
 }
 
+/** Profil usaha, kontak, faktur (ADR 022): baca SELECT, tulis RPC. */
+export class SupabaseInvoiceRepository implements IInvoiceRepository {
+  constructor(private readonly client: Client) {}
+
+  async getProfile(workspaceId: string): Promise<BusinessProfile> {
+    const row = await unwrap(this.client.from("workspace_profiles").select("*").eq("workspace_id", workspaceId).maybeSingle());
+    return row ? toProfile(row) : { ...defaultProfile(), workspaceId, updatedAt: null };
+  }
+
+  async saveProfile(workspaceId: string, input: BusinessProfileInput): Promise<BusinessProfile> {
+    await unwrap(this.client.rpc("save_business_profile", { p_workspace_id: workspaceId, p_profile: input }));
+    return this.getProfile(workspaceId);
+  }
+
+  async listContacts(workspaceId: string): Promise<Contact[]> {
+    const rows = await unwrapRows(this.client.from("contacts").select("*").eq("workspace_id", workspaceId).is("deleted_at", null).order("name"));
+    return rows.map(toContact);
+  }
+
+  private async getContact(id: string): Promise<Contact | null> {
+    const row = await unwrap(this.client.from("contacts").select("*").eq("id", id).is("deleted_at", null).maybeSingle());
+    return row ? toContact(row) : null;
+  }
+
+  async createContact(workspaceId: string, input: ContactInput): Promise<Contact> {
+    const id = await unwrap(this.client.rpc("create_contact", { p_workspace_id: workspaceId, p_contact: input }));
+    return required(await this.getContact(id as string), "Kontak");
+  }
+
+  async updateContact(id: string, input: ContactInput): Promise<Contact> {
+    await unwrap(this.client.rpc("update_contact", { p_id: id, p_contact: input }));
+    return required(await this.getContact(id), "Kontak");
+  }
+
+  async deleteContact(id: string): Promise<void> {
+    await unwrap(this.client.rpc("delete_contact", { p_id: id }));
+  }
+
+  async listInvoices(workspaceId: string, kind?: InvoiceKind): Promise<Invoice[]> {
+    let query = this.client.from("invoices").select("*, invoice_lines(*)").eq("workspace_id", workspaceId).is("deleted_at", null);
+    if (kind) query = query.eq("kind", kind);
+    const rows = await unwrapRows(query.order("invoice_date", { ascending: false }).order("created_at", { ascending: false }));
+    return rows.map(toInvoice);
+  }
+
+  async getInvoice(id: string): Promise<Invoice | null> {
+    const row = await unwrap(this.client.from("invoices").select("*, invoice_lines(*)").eq("id", id).is("deleted_at", null).maybeSingle());
+    return row ? toInvoice(row) : null;
+  }
+
+  async saveDraft(input: InvoiceInput, id?: string): Promise<Invoice> {
+    const saved = (await unwrap(this.client.rpc("save_invoice_draft", { p_invoice: input, p_id: id ?? null }))) as string;
+    return required(await this.getInvoice(saved), "Faktur");
+  }
+
+  async deleteDraft(id: string): Promise<void> {
+    await unwrap(this.client.rpc("delete_invoice_draft", { p_id: id }));
+  }
+
+  async issue(id: string, journal: JournalEntryInput, contact: ContactSnapshot, prefix: string): Promise<Invoice> {
+    await unwrap(this.client.rpc("issue_invoice", { p_id: id, p_journal: journal, p_contact: contact, p_prefix: prefix }));
+    return required(await this.getInvoice(id), "Faktur");
+  }
+}
+
 type SaleLineRow = { journal_entry_id: string; journal_entries: { entry_date: string } } & Record<string, unknown>;
 
 /** Menu, resep, rekap porsi, penjualan menu (ADR 021): baca SELECT, tulis RPC. */
@@ -504,6 +582,7 @@ export function createSupabaseRepositories(client: Client) {
     periods: new SupabasePeriodRepository(client),
     journals,
     menus: new SupabaseMenuRepository(client, journals),
+    invoices: new SupabaseInvoiceRepository(client),
     items: new SupabaseItemRepository(client),
     stockCounts: new SupabaseStockCountRepository(client),
     auditLogs: new SupabaseAuditLogRepository(client),

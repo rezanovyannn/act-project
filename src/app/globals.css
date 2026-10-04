@@ -120,6 +120,10 @@
     background: #fff;
     print-color-adjust: exact;
   }
+  /* Notifikasi tidak ikut tercetak (faktur, laporan). */
+  [data-sonner-toaster] {
+    display: none !important;
+  }
 }
 
 /*

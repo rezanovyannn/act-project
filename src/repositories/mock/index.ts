@@ -1,5 +1,6 @@
 import { MockAccountRepository } from "./account-repository";
 import { MockAuditLogRepository } from "./audit-log-repository";
+import { MockInvoiceRepository } from "./invoice-repository";
 import { MockItemRepository } from "./item-repository";
 import { MockJournalRepository } from "./journal-repository";
 import { MockMenuRepository } from "./menu-repository";
@@ -19,6 +20,7 @@ export function createMockRepositories(db: MockDatabase) {
     journals,
     stockCounts: new MockStockCountRepository(db, journals),
     menus: new MockMenuRepository(db, journals),
+    invoices: new MockInvoiceRepository(db, journals),
     items: new MockItemRepository(db),
     auditLogs: new MockAuditLogRepository(db),
   };

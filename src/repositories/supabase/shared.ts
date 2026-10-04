@@ -3,6 +3,9 @@ import { AccountingError, type ValidationCode } from "@/core/errors";
 import type {
   Account,
   AuditLog,
+  BusinessProfile,
+  Contact,
+  Invoice,
   Item,
   StockCount,
   JournalEntry,
@@ -123,6 +126,64 @@ export const toItem = (r: any): Item => ({
 });
 
 const byLineNo = (a: any, b: any) => a.line_no - b.line_no;
+
+export const toProfile = (r: any): Omit<BusinessProfile, "workspaceId"> & { workspaceId: string } => ({
+  workspaceId: r.workspace_id,
+  displayName: r.display_name ?? null,
+  address: r.address ?? null,
+  phone: r.phone ?? null,
+  email: r.email ?? null,
+  npwp: r.npwp ?? null,
+  bankInfo: r.bank_info ?? null,
+  invoiceNotes: r.invoice_notes ?? null,
+  invoicePrefix: r.invoice_prefix,
+  logoDataUrl: r.logo_data_url ?? null,
+  updatedAt: r.updated_at,
+});
+
+export const toContact = (r: any): Contact => ({
+  id: r.id,
+  workspaceId: r.workspace_id,
+  name: r.name,
+  isCustomer: r.is_customer,
+  isSupplier: r.is_supplier,
+  address: r.address ?? null,
+  phone: r.phone ?? null,
+  email: r.email ?? null,
+  npwp: r.npwp ?? null,
+  paymentTermDays: r.payment_term_days,
+  notes: r.notes ?? null,
+  createdAt: r.created_at,
+  updatedAt: r.updated_at,
+  deletedAt: r.deleted_at,
+});
+
+export const toInvoice = (r: any): Invoice => ({
+  id: r.id,
+  workspaceId: r.workspace_id,
+  kind: r.kind,
+  contactId: r.contact_id,
+  invoiceDate: r.invoice_date,
+  dueDate: r.due_date,
+  reference: r.reference ?? null,
+  notes: r.notes ?? null,
+  applyTax: r.apply_tax,
+  status: r.status,
+  number: r.number,
+  journalEntryId: r.journal_entry_id,
+  contactSnapshot: r.contact_snapshot ?? null,
+  issuedAt: r.issued_at,
+  createdAt: r.created_at,
+  updatedAt: r.updated_at,
+  lines: [...(r.invoice_lines ?? [])].sort((a: any, b: any) => a.line_no - b.line_no).map((l: any) => ({
+    description: l.description,
+    quantity: toAmount(l.quantity),
+    unit: l.unit ?? null,
+    unitPrice: toAmount(l.unit_price),
+    accountId: l.account_id ?? "",
+    itemId: l.item_id ?? null,
+  })),
+});
 
 export const toMenu = (r: any): Menu => ({
   id: r.id,

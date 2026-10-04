@@ -210,7 +210,7 @@ export interface WorkspaceTemplate {
 
 export type TemplateRegistry = Record<TemplateType, WorkspaceTemplate>;
 
-export type AuditEntity = "workspace" | "account" | "period" | "journal" | "item" | "menu" | "recipe" | "portion_summary";
+export type AuditEntity = "workspace" | "account" | "period" | "journal" | "item" | "menu" | "recipe" | "portion_summary" | "contact" | "invoice";
 
 /** Master barang untuk persediaan perpetual (ADR 017). */
 export interface Item {
@@ -236,6 +236,91 @@ export interface ItemInput {
   unit: string;
   revenueAccountId: string | null;
   category?: string | null;
+}
+
+/** Identitas usaha di kop faktur (ADR 022). */
+export interface BusinessProfileInput {
+  /** Nama di faktur; null = nama workspace. */
+  displayName: string | null;
+  address: string | null;
+  phone: string | null;
+  email: string | null;
+  npwp: string | null;
+  /** Info rekening pembayaran, teks bebas multi-baris. */
+  bankInfo: string | null;
+  /** Catatan kaki default faktur. */
+  invoiceNotes: string | null;
+  /** Prefix nomor faktur penjualan, mis. "INV". */
+  invoicePrefix: string;
+  /** Logo kecil sebagai data URL image/png|jpeg|webp. */
+  logoDataUrl: string | null;
+}
+
+export interface BusinessProfile extends BusinessProfileInput {
+  workspaceId: string;
+  updatedAt: IsoTimestamp | null;
+}
+
+/** Pelanggan/pemasok (ADR 022); nama menjadi counterparty jurnal. */
+export interface ContactInput {
+  name: string;
+  isCustomer: boolean;
+  isSupplier: boolean;
+  address: string | null;
+  phone: string | null;
+  email: string | null;
+  npwp: string | null;
+  /** Termin bayar default (hari). */
+  paymentTermDays: number;
+  notes: string | null;
+}
+
+export interface Contact extends ContactInput {
+  id: string;
+  workspaceId: string;
+  createdAt: IsoTimestamp;
+  updatedAt: IsoTimestamp;
+  deletedAt: IsoTimestamp | null;
+}
+
+export type InvoiceKind = "sale" | "purchase";
+
+/** Baris faktur: nominal = qty × harga satuan (rupiah utuh). */
+export interface InvoiceLine {
+  description: string;
+  quantity: number;
+  unit: string | null;
+  unitPrice: number;
+  /** Akun pendapatan (penjualan) atau persediaan/beban (pembelian); "" = belum dipilih (draft). */
+  accountId: string;
+  itemId: string | null;
+}
+
+export interface InvoiceInput {
+  workspaceId: string;
+  kind: InvoiceKind;
+  contactId: string | null;
+  invoiceDate: IsoDate;
+  dueDate: IsoDate;
+  /** No. PO pelanggan (penjualan) atau no. faktur pemasok (pembelian). */
+  reference: string | null;
+  notes: string | null;
+  applyTax: boolean;
+  lines: InvoiceLine[];
+}
+
+/** Salinan data kontak saat faktur terbit. */
+export type ContactSnapshot = Pick<Contact, "name" | "address" | "phone" | "email" | "npwp">;
+
+export interface Invoice extends InvoiceInput {
+  id: string;
+  status: "draft" | "issued";
+  number: string | null;
+  journalEntryId: string | null;
+  contactSnapshot: ContactSnapshot | null;
+  issuedAt: IsoTimestamp | null;
+  createdAt: IsoTimestamp;
+  updatedAt: IsoTimestamp;
 }
 
 /** Menu yang dijual (ADR 021). */

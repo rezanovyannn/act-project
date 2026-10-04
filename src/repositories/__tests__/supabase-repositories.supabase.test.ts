@@ -54,6 +54,8 @@ describe("RLS: user B tidak dapat membaca atau menulis data user A", () => {
   let kasA: string;
   let jualA: string;
   let menuA: string;
+  let contactA: string;
+  let invoiceA: string;
 
   const sale = (workspaceId: string, amount: number): JournalEntryInput => ({
     workspaceId,
@@ -77,6 +79,9 @@ describe("RLS: user B tidak dapat membaca atau menulis data user A", () => {
     jualA = accounts.find((a) => a.code === "4-1000")!.id;
     postedA = (await userA.repos.journals.postJournal(sale(workspaceA.id, 1000))).id;
     menuA = (await userA.repos.menus.createMenu(workspaceA.id, { code: "M-1", name: "Rahasia", price: 1000, revenueAccountId: jualA })).id;
+    contactA = (await userA.repos.invoices.createContact(workspaceA.id, { name: "Pelanggan A", isCustomer: true, isSupplier: false, address: null, phone: null, email: null, npwp: null, paymentTermDays: 0, notes: null })).id;
+    await userA.repos.invoices.saveProfile(workspaceA.id, { displayName: "Rahasia", address: null, phone: null, email: null, npwp: null, bankInfo: "BCA 1", invoiceNotes: null, invoicePrefix: "INV", logoDataUrl: null });
+    invoiceA = (await userA.repos.invoices.saveDraft({ workspaceId: workspaceA.id, kind: "sale", contactId: contactA, invoiceDate: "2026-03-10", dueDate: "2026-03-10", reference: null, notes: null, applyTax: false, lines: [] })).id;
   });
 
   it("tidak dapat membaca workspace, akun, periode, jurnal, maupun audit log milik A", async () => {
@@ -93,6 +98,10 @@ describe("RLS: user B tidak dapat membaca atau menulis data user A", () => {
     expect(await b.menus.getMenu(menuA)).toBeNull();
     expect(await b.menus.listRecipes(workspaceA.id)).toEqual([]);
     expect(await b.menus.listMenuSales(workspaceA.id)).toEqual([]);
+    expect(await b.invoices.listContacts(workspaceA.id)).toEqual([]);
+    expect(await b.invoices.listInvoices(workspaceA.id)).toEqual([]);
+    expect(await b.invoices.getInvoice(invoiceA)).toBeNull();
+    expect((await b.invoices.getProfile(workspaceA.id)).bankInfo).toBeNull();
     // Pembanding: A sendiri dapat membacanya.
     expect(await userA.repos.journals.getById(postedA)).not.toBeNull();
   });
@@ -116,6 +125,11 @@ describe("RLS: user B tidak dapat membaca atau menulis data user A", () => {
       ["hapus menu", () => b.menus.deleteMenu(menuA)],
       ["rekap porsi", () => b.menus.createPortionSummary({ workspaceId: workspaceA.id, dateFrom: "2026-03-01", dateTo: "2026-03-02", note: null, lines: [{ menuId: menuA, portions: 1 }] })],
       ["penjualan menu", () => b.menus.postMenuSale(sale(workspaceA.id, 1000), [{ menuId: menuA, portions: 1, amount: 1000 }])],
+      ["profil usaha", () => b.invoices.saveProfile(workspaceA.id, { displayName: "Diretas", address: null, phone: null, email: null, npwp: null, bankInfo: null, invoiceNotes: null, invoicePrefix: "INV", logoDataUrl: null })],
+      ["kontak baru", () => b.invoices.createContact(workspaceA.id, { name: "X", isCustomer: true, isSupplier: false, address: null, phone: null, email: null, npwp: null, paymentTermDays: 0, notes: null })],
+      ["hapus kontak", () => b.invoices.deleteContact(contactA)],
+      ["ubah draft faktur", () => b.invoices.saveDraft({ workspaceId: workspaceA.id, kind: "sale", contactId: null, invoiceDate: "2026-03-10", dueDate: "2026-03-10", reference: null, notes: null, applyTax: false, lines: [] }, invoiceA)],
+      ["terbitkan faktur", () => b.invoices.issue(invoiceA, sale(workspaceA.id, 1000), { name: "X", address: null, phone: null, email: null, npwp: null }, "INV")],
     ];
     for (const [label, attempt] of attempts) {
       const error = await attempt().then(
@@ -140,6 +154,8 @@ describe("RLS: user B tidak dapat membaca atau menulis data user A", () => {
         .insert({ workspace_id: workspaceA.id, entry_date: "2026-03-10", status: "draft", source: "manual" }),
       await userA.client.from("workspaces").update({ name: "ubah langsung" }).eq("id", workspaceA.id),
       await userA.client.from("menus").update({ price: 1 }).eq("id", menuA),
+      await userA.client.from("invoices").update({ status: "issued" }).eq("id", invoiceA),
+      await userA.client.from("workspace_profiles").update({ bank_info: "ubah langsung" }).eq("workspace_id", workspaceA.id),
       await userA.client.from("menu_sale_lines").insert({ journal_entry_id: postedA, workspace_id: workspaceA.id, line_no: 1, menu_id: menuA, portions: 1, amount: 1 }),
     ];
     for (const result of direct) {

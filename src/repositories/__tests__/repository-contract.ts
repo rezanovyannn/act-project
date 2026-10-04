@@ -10,6 +10,7 @@ import { buildReversalInput } from "@/core/reversal";
 import type {
   IAccountRepository,
   IAuditLogRepository,
+  IInvoiceRepository,
   IItemRepository,
   IMenuRepository,
   IStockCountRepository,
@@ -17,7 +18,7 @@ import type {
   IPeriodRepository,
   IWorkspaceRepository,
 } from "@/core/ports";
-import type { JournalEntryInput, Workspace } from "@/core/types";
+import type { InvoiceInput, JournalEntryInput, Workspace } from "@/core/types";
 import { FNB_TEMPLATE } from "@/modules/fnb/template";
 import { RETAIL_TEMPLATE } from "@/modules/retail/template";
 import { VAT_ACCOUNT_SEEDS } from "@/core/vat";
@@ -31,6 +32,7 @@ export interface ContractRepositories {
   items: IItemRepository;
   stockCounts: IStockCountRepository;
   menus: IMenuRepository;
+  invoices: IInvoiceRepository;
 }
 
 async function expectCode(promise: Promise<unknown>, code: ValidationCode) {
@@ -706,6 +708,121 @@ export function describeRepositoryContract(
         expect(await repos.menus.listMenuSales(workspace.id)).toHaveLength(1);
         await repos.journals.postJournal(buildReversalInput(entry, "2026-03-12"));
         expect(await repos.menus.listMenuSales(workspace.id)).toEqual([]);
+      });
+    });
+
+    describe("profil usaha, kontak & faktur (ADR 022)", () => {
+      const contactInput = (name: string) => ({
+        name,
+        isCustomer: true,
+        isSupplier: false,
+        address: "Jl. Merdeka 1",
+        phone: null,
+        email: null,
+        npwp: "01.234.567.8-901.000",
+        paymentTermDays: 30,
+        notes: null,
+      });
+      async function setup() {
+        const accounts = await repos.accounts.listByWorkspace(workspace.id);
+        const piutangId = accounts.find((a) => a.systemRole === "accounts_receivable")!.id;
+        const contact = await repos.invoices.createContact(workspace.id, contactInput("PT Maju"));
+        const input = (date: string, overrides: Partial<InvoiceInput> = {}): InvoiceInput => ({
+          workspaceId: workspace.id,
+          kind: "sale",
+          contactId: contact.id,
+          invoiceDate: date,
+          dueDate: date,
+          reference: "PO-1",
+          notes: null,
+          applyTax: false,
+          lines: [
+            { description: "Catering", quantity: 2, unit: "box", unitPrice: 25_000, accountId: jualId, itemId: null },
+            { description: "Belum lengkap", quantity: 0, unit: null, unitPrice: 0, accountId: "", itemId: null },
+          ],
+          ...overrides,
+        });
+        const journal = (date: string, amount: number): JournalEntryInput => ({
+          workspaceId: workspace.id,
+          entryDate: date,
+          description: "Faktur (nomor otomatis) · PT Maju",
+          source: "revenue",
+          counterparty: "PT Maju",
+          lines: [
+            { accountId: piutangId, debit: amount, credit: 0 },
+            { accountId: jualId, debit: 0, credit: amount },
+          ],
+        });
+        return { contact, input, journal };
+      }
+
+      it("profil: default, simpan & ubah, prefix/logo tidak valid ditolak", async () => {
+        expect(await repos.invoices.getProfile(workspace.id)).toMatchObject({ workspaceId: workspace.id, invoicePrefix: "INV", logoDataUrl: null, updatedAt: null });
+        const profile = {
+          displayName: "Kedai A",
+          address: "Jl. A",
+          phone: "0812",
+          email: "a@kedai.id",
+          npwp: "1",
+          bankInfo: "BCA 123",
+          invoiceNotes: "Terima kasih",
+          invoicePrefix: "KDA",
+          logoDataUrl: "data:image/png;base64,iVBORw0KGgo=",
+        };
+        expect(await repos.invoices.saveProfile(workspace.id, profile)).toMatchObject(profile);
+        expect(await repos.invoices.saveProfile(workspace.id, { ...profile, invoicePrefix: "INV", logoDataUrl: null })).toMatchObject({ invoicePrefix: "INV", logoDataUrl: null });
+        await expectCode(repos.invoices.saveProfile(workspace.id, { ...profile, invoicePrefix: "inv/x" }), "INVALID_PROFILE");
+        await expectCode(repos.invoices.saveProfile(workspace.id, { ...profile, logoDataUrl: "data:text/html;base64,AAAA" }), "INVALID_PROFILE");
+      });
+
+      it("kontak: buat, ubah, nama unik tanpa beda huruf, hapus ditolak bila dipakai faktur", async () => {
+        const { contact, input } = await setup();
+        expect(contact).toMatchObject({ name: "PT Maju", isCustomer: true, paymentTermDays: 30, npwp: "01.234.567.8-901.000" });
+        await expectCode(repos.invoices.createContact(workspace.id, contactInput("pt maju")), "DUPLICATE_CONTACT");
+        const updated = await repos.invoices.updateContact(contact.id, { ...contactInput("PT Maju Jaya"), isSupplier: true, paymentTermDays: 14 });
+        expect(updated).toMatchObject({ name: "PT Maju Jaya", isSupplier: true, paymentTermDays: 14 });
+        await repos.invoices.saveDraft(input("2026-03-10"));
+        await expectCode(repos.invoices.deleteContact(contact.id), "CONTACT_IN_USE");
+        const other = await repos.invoices.createContact(workspace.id, contactInput("CV Lain"));
+        await repos.invoices.deleteContact(other.id);
+        expect((await repos.invoices.listContacts(workspace.id)).map((c) => c.name)).toEqual(["PT Maju Jaya"]);
+      });
+
+      it("draft: simpan & ubah (urutan baris, akun kosong), hapus; jenis tidak bisa diubah", async () => {
+        const { input } = await setup();
+        const draft = await repos.invoices.saveDraft(input("2026-03-10"));
+        expect(draft).toMatchObject({ status: "draft", number: null, journalEntryId: null, reference: "PO-1", lines: input("2026-03-10").lines });
+        const changed = await repos.invoices.saveDraft(input("2026-03-11", { applyTax: true, lines: [input("2026-03-11").lines[1], input("2026-03-11").lines[0]] }), draft.id);
+        expect(changed).toMatchObject({ id: draft.id, invoiceDate: "2026-03-11", applyTax: true });
+        expect(changed.lines.map((l) => l.description)).toEqual(["Belum lengkap", "Catering"]);
+        await expectCode(repos.invoices.saveDraft({ ...input("2026-03-11"), kind: "purchase" }, draft.id), "INVALID_INVOICE");
+        await expectCode(repos.invoices.saveDraft(input("2026-03-11", { lines: [{ ...input("2026-03-11").lines[0], quantity: -1 }] })), "INVALID_QUANTITY");
+        expect(await repos.invoices.listInvoices(workspace.id, "purchase")).toEqual([]);
+        await repos.invoices.deleteDraft(draft.id);
+        expect(await repos.invoices.listInvoices(workspace.id)).toEqual([]);
+      });
+
+      it("terbit: nomor urut per tahun lintas bulan, jurnal & salinan kontak atomik; terbit tidak bisa diubah", async () => {
+        const { contact, input, journal } = await setup();
+        const snapshot = { name: contact.name, address: contact.address, phone: null, email: null, npwp: contact.npwp };
+        const march = await repos.invoices.saveDraft(input("2026-03-10"));
+        const issued = await repos.invoices.issue(march.id, journal("2026-03-10", 50_000), snapshot, "INV");
+        expect(issued).toMatchObject({ status: "issued", number: "INV/2026/03/0001", contactSnapshot: snapshot });
+        const entry = await repos.journals.getById(issued.journalEntryId!);
+        expect(entry).toMatchObject({ status: "posted", description: "Faktur INV/2026/03/0001 · PT Maju", counterparty: "PT Maju" });
+        const april = await repos.invoices.saveDraft(input("2026-04-02"));
+        expect((await repos.invoices.issue(april.id, journal("2026-04-02", 50_000), snapshot, "KDA")).number).toBe("KDA/2026/04/0002");
+        await expectCode(repos.invoices.saveDraft(input("2026-03-10"), march.id), "INVALID_INVOICE");
+        await expectCode(repos.invoices.deleteDraft(march.id), "INVALID_INVOICE");
+        await expectCode(repos.invoices.issue(march.id, journal("2026-03-10", 50_000), snapshot, "INV"), "INVALID_INVOICE");
+        // Jurnal tanggal lain atau tidak seimbang: ditolak, faktur tetap draft tanpa nomor.
+        const may = await repos.invoices.saveDraft(input("2026-05-05"));
+        await expectCode(repos.invoices.issue(may.id, journal("2026-05-06", 1_000), snapshot, "INV"), "INVALID_INVOICE");
+        const unbalanced = journal("2026-05-05", 1_000);
+        unbalanced.lines[1] = { ...unbalanced.lines[1], credit: 999 };
+        await expectCode(repos.invoices.issue(may.id, unbalanced, snapshot, "INV"), "UNBALANCED");
+        expect(await repos.invoices.getInvoice(may.id)).toMatchObject({ status: "draft", number: null, journalEntryId: null });
+        expect((await repos.journals.listByWorkspace(workspace.id)).filter((j) => j.status === "posted")).toHaveLength(2);
       });
     });
   });

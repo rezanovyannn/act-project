@@ -150,6 +150,19 @@ Satu menu sidebar **Stok Opname & COGS** berisi dua tab. Untuk metode persediaan
 
 ---
 
+## Fase 7: Faktur Penjualan & Pembelian (ADR 022)
+Faktur untuk tukar faktur di semua template. Faktur adalah input transaksi: draft → terbit (jurnal kredit), dicetak lewat print browser (PDF).
+
+### Sub-fase 7A: Profil Usaha, Kontak & Faktur Penjualan
+- **Pekerjaan:** Pengaturan → Profil Usaha (identitas, rekening, logo, prefix nomor); Daftar Kontak (pelanggan/pemasok, termin); faktur penjualan draft/terbit dengan baris bebas atau barang, pajak sesuai pengaturan, nomor INV/tahun/bulan/urut; status pembayaran dari Piutang; batalkan (void) & salin ke draft; cetak A4.
+- **Kriteria Selesai (Stop & Review):** Jurnal faktur terbit benar (termasuk pajak & HPP perpetual), nomor berurutan & unik, status pembayaran mengikuti pelunasan, cetak rapi; teruji unit, contract (mock & Supabase), dan E2E.
+
+### Sub-fase 7B: Faktur Pembelian
+- **Pekerjaan:** faktur pembelian dengan nomor faktur pemasok, baris bebas/barang (pembelian per bahan/stok), pajak masukan, terbit = jurnal utang; status pembayaran dari Utang; cetak.
+- **Kriteria Selesai (Stop & Review):** Jurnal & stok/COGS benar, teruji unit, contract, dan E2E.
+
+---
+
 ## Catatan Keputusan (dijawab user, 28 September 2026)
 | # | Pertanyaan | Keputusan | Rujukan |
 |---|---|---|---|
@@ -205,3 +218,11 @@ Satu menu sidebar **Stok Opname & COGS** berisi dua tab. Untuk metode persediaan
 | 50 | Rekap & penjualan menu pada tanggal yang sama | Rekap menggantikan penjualan menu pada tanggal yang dicakupnya | ADR 021 |
 | 51 | Harga bahan theoretical cost | Sama dengan dasar harga stok opname periode itu | ADR 021 |
 | 52 | Perubahan resep | Riwayat per tanggal berlaku; periode lama memakai resep lama | ADR 021 |
+| 53 | Faktur & jurnal | Faktur = input transaksi: draft, lalu terbit memposting jurnal kredit | ADR 022 |
+| 54 | Kebutuhan tukar faktur | Cetak faktur (PDF); tanpa status tukar faktur/tanda terima/daftar jatuh tempo | ADR 022 |
+| 55 | Rincian faktur | Baris bebas (keterangan, qty, satuan, harga, akun) + boleh pilih barang | ADR 022 |
+| 56 | Identitas di faktur | Alamat, telepon, email, NPWP, rekening bank, logo | ADR 022 |
+| 57 | Penyimpanan logo | Dikecilkan di browser, disimpan di database (tanpa Storage) | ADR 022 |
+| 58 | Pelanggan & pemasok | Daftar kontak | ADR 022 |
+| 59 | Nomor faktur penjualan | INV/2026/10/0001, urut per tahun, prefix dapat diubah | ADR 022 |
+| 60 | Tahapan | 7A penjualan, lalu 7B pembelian | ADR 022 |
