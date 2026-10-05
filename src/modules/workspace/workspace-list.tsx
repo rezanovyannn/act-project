@@ -12,6 +12,7 @@ import { Input } from "@/components/ui/input"
 import { LoadingState } from "@/components/ui/page-header"
 import { cn, errorMessage, useLoader } from "@/lib/utils"
 import { CreateWorkspaceDialog } from "./create-workspace-dialog"
+import { RestoreBackupDialog } from "./restore-backup-dialog"
 import { TEMPLATE_LABELS } from "./labels"
 
 interface WorkspaceCardData {
@@ -80,16 +81,19 @@ export function WorkspaceList({
             daftar akun, periode, dan laporan sendiri.
           </p>
         </div>
-        <CreateWorkspaceDialog
-          services={services}
-          onCreated={onCreated}
-          trigger={
-            <Button size="lg">
-              <PlusIcon data-icon="inline-start" />
-              Buat workspace baru
-            </Button>
-          }
-        />
+        <div className="flex flex-wrap gap-2">
+          <RestoreBackupDialog services={services} onRestored={onCreated} />
+          <CreateWorkspaceDialog
+            services={services}
+            onCreated={onCreated}
+            trigger={
+              <Button size="lg">
+                <PlusIcon data-icon="inline-start" />
+                Buat workspace baru
+              </Button>
+            }
+          />
+        </div>
       </div>
 
       {data.loading ? (

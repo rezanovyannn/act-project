@@ -87,8 +87,11 @@ export function BackupTab({ services, workspace }: { services: AppServices; work
           <div>
             <h2 className="font-semibold">Backup lengkap (JSON)</h2>
             <p className="text-sm text-muted-foreground">
-              Workspace, daftar akun, periode, semua jurnal beserta barisnya, dan riwayat audit.
-              Nominal dalam Rupiah utuh (integer).
+              Workspace, daftar akun, periode, semua jurnal beserta barisnya, barang, stok opname, menu & resep,
+              kontak, faktur, profil usaha, dan riwayat audit. Nominal dalam Rupiah utuh (integer).
+            </p>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Untuk memulihkan: buka <strong>Workspace Saya → Pulihkan backup</strong>; isinya dipulihkan sebagai workspace baru.
             </p>
           </div>
         </div>

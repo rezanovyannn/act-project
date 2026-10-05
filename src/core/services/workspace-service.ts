@@ -1,3 +1,5 @@
+import type { WorkspaceBackup } from "../backup";
+import { parseBackup, type RestoreSummary } from "../backup-restore";
 import { isValidIsoDate } from "../dates";
 import { assertNoIssues, fail } from "../errors";
 import { monthlyPeriodsUntilYearEnd } from "../periods";
@@ -30,6 +32,18 @@ export class WorkspaceService {
 
   listTemplates(): WorkspaceTemplate[] {
     return Object.values(this.deps.templates);
+  }
+
+  /** Baca & validasi file backup (ADR 023); dilempar INVALID_BACKUP bila rusak. */
+  inspectBackup(raw: unknown): { backup: WorkspaceBackup; summary: RestoreSummary } {
+    return parseBackup(raw, Object.keys(this.deps.templates) as TemplateType[]);
+  }
+
+  /** Pulihkan backup sebagai workspace baru milik `ownerId`. */
+  async restoreBackup(ownerId: string, raw: unknown, name: string): Promise<Workspace> {
+    const { backup } = this.inspectBackup(raw);
+    if (name.trim() === "") fail("EMPTY_NAME", "Nama workspace wajib diisi");
+    return this.deps.workspaces.restoreFromBackup(ownerId, name.trim(), backup);
   }
 
   async createWorkspace(input: Omit<NewWorkspace, "salesTax">): Promise<Workspace> {

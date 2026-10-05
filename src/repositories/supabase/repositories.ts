@@ -3,6 +3,7 @@
  * Baca: SELECT langsung (dibatasi RLS). Tulis: hanya lewat RPC.
  */
 import type { PeriodRange } from "@/core/periods";
+import type { WorkspaceBackup } from "@/core/backup";
 import { defaultProfile } from "@/core/invoice";
 import type {
   AccountPatch,
@@ -132,6 +133,12 @@ export class SupabaseWorkspaceRepository implements IWorkspaceRepository {
 
   async softDelete(id: string): Promise<void> {
     await unwrap(this.client.rpc("delete_workspace", { p_id: id }));
+  }
+
+  async restoreFromBackup(_ownerId: string, name: string, backup: WorkspaceBackup): Promise<Workspace> {
+    // Pemilik = user yang login (auth.uid() di RPC), ADR 023.
+    const id = (await unwrap(this.client.rpc("restore_workspace", { p_backup: backup, p_name: name }))) as string;
+    return required(await this.getById(id), "Workspace pulihan");
   }
 }
 

@@ -7,6 +7,7 @@ import { AccountingError, type ValidationCode } from "@/core/errors";
 import { buildClosingPlan } from "@/core/closing";
 import { monthlyPeriodsForYear } from "@/core/periods";
 import { buildReversalInput } from "@/core/reversal";
+import { buildBackup, type WorkspaceBackup } from "@/core/backup";
 import type {
   IAccountRepository,
   IAuditLogRepository,
@@ -867,6 +868,100 @@ export function describeRepositoryContract(
           repos.invoices.saveProfile(workspace.id, { ...(await repos.invoices.getProfile(workspace.id)), purchasePrefix: "pb x" }),
           "INVALID_PROFILE",
         );
+      });
+    });
+
+    describe("pulihkan backup (ADR 023)", () => {
+      async function backupOf(id: string): Promise<WorkspaceBackup> {
+        const [ws, accounts, periods, journals, items, auditLogs, stockCounts, menus, recipes, portionSummaries, menuSales, profile, contacts, invoices] =
+          await Promise.all([
+            repos.workspaces.getById(id),
+            repos.accounts.listByWorkspace(id),
+            repos.periods.listByWorkspace(id),
+            repos.journals.listByWorkspace(id),
+            repos.items.listByWorkspace(id),
+            repos.auditLogs.listByWorkspace(id),
+            repos.stockCounts.listByWorkspace(id),
+            repos.menus.listMenus(id),
+            repos.menus.listRecipes(id),
+            repos.menus.listPortionSummaries(id),
+            repos.menus.listMenuSales(id),
+            repos.invoices.getProfile(id),
+            repos.invoices.listContacts(id),
+            repos.invoices.listInvoices(id),
+          ]);
+        return JSON.parse(JSON.stringify(buildBackup(
+          { workspace: ws!, accounts, periods, journals, items, auditLogs, stockCounts, menus, recipes, portionSummaries, menuSales, profile, contacts, invoices },
+          "2026-10-05T08:00:00.000Z",
+        )));
+      }
+
+      it("memulihkan ke workspace baru: nomor jurnal, pelunasan, void, periode terkunci, barang, faktur, audit", async () => {
+        const accounts = await repos.accounts.listByWorkspace(workspace.id);
+        const role = (r: string) => accounts.find((a) => a.systemRole === r)!.id;
+        const item = await repos.items.create(workspace.id, { code: "BB-1", name: "Tepung", unit: "gram", revenueAccountId: null });
+        const credit = await repos.journals.postJournal(sale(500_000, { counterparty: "PT A", lines: [
+          { accountId: role("accounts_receivable"), debit: 500_000, credit: 0 },
+          { accountId: jualId, debit: 0, credit: 500_000 },
+        ] }));
+        await repos.journals.postJournal({
+          workspaceId: workspace.id, entryDate: "2026-03-12", description: "Terima", source: "settlement", counterparty: "PT A", settlementOf: credit.id,
+          lines: [{ accountId: kasId, debit: 200_000, credit: 0 }, { accountId: role("accounts_receivable"), debit: 0, credit: 200_000 }],
+        });
+        const voided = await repos.journals.postJournal(sale(1_000, { entryDate: "2026-03-13" }));
+        await repos.journals.postJournal(buildReversalInput(voided, "2026-03-14"));
+        await repos.journals.postJournal({
+          workspaceId: workspace.id, entryDate: "2026-03-15", description: "Beli", source: "purchase",
+          lines: [{ accountId: role("inventory"), debit: 10_000, credit: 0, itemId: item.id, quantity: 1_000 }, { accountId: kasId, debit: 0, credit: 10_000 }],
+        });
+        const contact = await repos.invoices.createContact(workspace.id, { name: "PT F", isCustomer: true, isSupplier: false, address: null, phone: null, email: null, npwp: null, paymentTermDays: 0, notes: null });
+        const draft = await repos.invoices.saveDraft({ workspaceId: workspace.id, kind: "sale", contactId: contact.id, invoiceDate: "2026-03-16", dueDate: "2026-03-16", reference: null, notes: null, applyTax: false,
+          lines: [{ description: "Jasa", quantity: 1, unit: null, unitPrice: 75_000, accountId: jualId, itemId: null }] });
+        await repos.invoices.issue(draft.id, {
+          workspaceId: workspace.id, entryDate: "2026-03-16", description: "Faktur (nomor otomatis)", source: "revenue", counterparty: "PT F",
+          lines: [{ accountId: role("accounts_receivable"), debit: 75_000, credit: 0 }, { accountId: jualId, debit: 0, credit: 75_000 }],
+        }, { name: "PT F", address: null, phone: null, email: null, npwp: null }, "INV");
+        const periods = await repos.periods.listByWorkspace(workspace.id);
+        await repos.periods.setStatus(periods.find((p) => p.startDate === "2026-02-01")!.id, "closed");
+
+        const backup = await backupOf(workspace.id);
+        const restored = await repos.workspaces.restoreFromBackup(actors.owner.ownerId, "Kedai A (pulihan)", backup);
+        expect(restored).toMatchObject({ name: "Kedai A (pulihan)", templateType: "fnb", salesTaxRateBps: workspace.salesTaxRateBps, ownerId: actors.owner.ownerId });
+        expect(restored.id).not.toBe(workspace.id);
+
+        const summary = async (id: string) => {
+          const accs = await repos.accounts.listByWorkspace(id);
+          const code = new Map(accs.map((a) => [a.id, a.code]));
+          const journals = await repos.journals.listByWorkspace(id);
+          const byNumber = new Map(journals.map((j) => [j.id, j.entryNumber]));
+          return journals
+            .map((j) => [j.entryNumber, j.entryDate, j.source, byNumber.get(j.settlementOf ?? "") ?? null, byNumber.get(j.reversalOf ?? "") ?? null,
+              j.lines.map((l) => [code.get(l.accountId), l.debit, l.credit, l.quantity ?? null])])
+            .sort((a, b) => String(a[0]).localeCompare(String(b[0])));
+        };
+        expect(await summary(restored.id)).toEqual(await summary(workspace.id));
+        expect((await repos.periods.listByWorkspace(restored.id)).find((p) => p.startDate === "2026-02-01")?.status).toBe("closed");
+        expect((await repos.items.listByWorkspace(restored.id)).map((i) => i.code)).toEqual(["BB-1"]);
+        const [inv] = await repos.invoices.listInvoices(restored.id);
+        expect(inv).toMatchObject({ number: "INV/2026/03/0001", status: "issued", lines: [{ description: "Jasa", unitPrice: 75_000 }] });
+        expect((await repos.journals.getById(inv.journalEntryId!))?.entryNumber).toBe((await repos.journals.getById((await repos.invoices.listInvoices(workspace.id))[0].journalEntryId!))?.entryNumber);
+        const logs = await repos.auditLogs.listByWorkspace(restored.id);
+        expect(logs.filter((l) => l.action === "restore")).toHaveLength(1);
+        expect(logs.length).toBe(backup.auditLogs.length + 1);
+        // Nomor jurnal berikutnya di workspace pulihan melanjutkan urutan.
+        const next = await repos.journals.postJournal({ ...sale(5_000, { entryDate: "2026-03-20" }), workspaceId: restored.id,
+          lines: [{ accountId: (await repos.accounts.listByWorkspace(restored.id)).find((a) => a.code === "1-1100")!.id, debit: 5_000, credit: 0 },
+            { accountId: (await repos.accounts.listByWorkspace(restored.id)).find((a) => a.code === "4-1000")!.id, debit: 0, credit: 5_000 }] });
+        expect(next.entryNumber).toBe(`JU-2026-${String(backup.journals.filter((j) => j.status === "posted").length + 1).padStart(4, "0")}`);
+      });
+
+      it("backup tidak seimbang ditolak tanpa membuat workspace", async () => {
+        await repos.journals.postJournal(sale(10_000));
+        const backup = await backupOf(workspace.id);
+        backup.journals[0].lines[0].debit += 1;
+        const before = (await repos.workspaces.listByOwner(actors.owner.ownerId)).length;
+        await expectCode(repos.workspaces.restoreFromBackup(actors.owner.ownerId, "Rusak", backup), "INVALID_BACKUP");
+        expect((await repos.workspaces.listByOwner(actors.owner.ownerId)).length).toBe(before);
       });
     });
   });

@@ -163,6 +163,22 @@ Faktur untuk tukar faktur di semua template. Faktur adalah input transaksi: draf
 
 ---
 
+## Fase 8: Pulihkan Backup, Diskon Faktur & Laporan per Menu
+
+### Sub-fase 8A: Pulihkan dari Backup (ADR 023)
+- **Pekerjaan:** validasi file backup JSON di browser; pulihkan ke workspace baru secara atomik dengan isi persis (nomor jurnal, status periode, tutup buku, faktur, stok opname, menu); riwayat audit lama ikut + catatan pemulihan.
+- **Kriteria Selesai (Stop & Review):** laporan workspace pulihan identik dengan sumber; backup rusak ditolak tanpa menulis data; teruji unit, contract (mock & Supabase), dan E2E.
+
+### Sub-fase 8B: Diskon di Faktur
+- **Pekerjaan:** diskon per faktur (% atau Rp); pajak dihitung setelah diskon; penjualan → akun kontra Potongan Penjualan, pembelian → mengurangi harga pokok/beban.
+- **Kriteria Selesai (Stop & Review):** jurnal & dokumen faktur benar, teruji unit, contract, dan E2E.
+
+### Sub-fase 8C: Laporan per Menu
+- **Pekerjaan:** tab laporan per menu di Laporan Keuangan: porsi, pendapatan, biaya bahan (resep × harga akhir periode), margin; urut paling laku/paling untung; ekspor CSV.
+- **Kriteria Selesai (Stop & Review):** angka per menu teruji unit test dan E2E.
+
+---
+
 ## Catatan Keputusan (dijawab user, 28 September 2026)
 | # | Pertanyaan | Keputusan | Rujukan |
 |---|---|---|---|
@@ -228,3 +244,10 @@ Faktur untuk tukar faktur di semua template. Faktur adalah input transaksi: draf
 | 60 | Tahapan | 7A penjualan, lalu 7B pembelian | ADR 022 |
 | 61 | Nomor faktur pembelian | Nomor internal PB/2026/10/0001 (prefix dapat diubah) + nomor faktur pemasok | ADR 022 |
 | 62 | Cetak faktur pembelian | Keduanya: Tanda Terima Faktur dan salinan rincian faktur | ADR 022 |
+| 63 | Tujuan pulihkan backup | Workspace baru; workspace lain tidak ditimpa | ADR 023 |
+| 64 | Isi yang dipulihkan | Persis: nomor & tanggal jurnal, posted/void, periode terkunci, tutup buku; audit lama ikut + catatan pemulihan | ADR 023 |
+| 65 | Bentuk diskon faktur | Per faktur saja (% atau Rp) | Fase 8B |
+| 66 | Jurnal diskon | Penjualan: akun kontra Potongan Penjualan; pembelian: mengurangi harga pokok/beban; pajak dari harga setelah diskon | Fase 8B |
+| 67 | Pendapatan porsi rekap (laporan menu) | Porsi × harga jual menu (estimasi, ditandai) | Fase 8C |
+| 68 | Biaya bahan laporan menu | Resep berlaku pada tanggal jual × harga bahan pada akhir periode laporan | Fase 8C |
+| 69 | Lokasi laporan menu | Tab di Laporan Keuangan | Fase 8C |

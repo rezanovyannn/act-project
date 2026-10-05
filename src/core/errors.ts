@@ -51,7 +51,8 @@ export type ValidationCode =
   | "DUPLICATE_CONTACT"
   | "INVOICE_NOT_FOUND"
   | "INVALID_INVOICE"
-  | "INVALID_PROFILE";
+  | "INVALID_PROFILE"
+  | "INVALID_BACKUP";
 
 export interface ValidationIssue {
   code: ValidationCode;

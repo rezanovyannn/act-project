@@ -33,6 +33,7 @@ const ACTION_LABELS: Record<string, string> = {
   update_tax_settings: "Pengaturan pajak diubah",
   update_inventory_settings: "Pengaturan persediaan diubah",
   issue: "Diterbitkan",
+  restore: "Dipulihkan dari backup",
 };
 
 export function auditActionLabel(action: string): string {

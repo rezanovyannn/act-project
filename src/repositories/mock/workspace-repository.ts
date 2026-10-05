@@ -2,6 +2,8 @@ import { fail } from "@/core/errors";
 import type { PeriodRange } from "@/core/periods";
 import type { InventorySettings, IWorkspaceRepository, NewWorkspace } from "@/core/ports";
 import { assertValidTaxSettings, type WorkspaceTaxSettings } from "@/core/sales-tax";
+import type { WorkspaceBackup } from "@/core/backup";
+import { parseBackup } from "@/core/backup-restore";
 import type { AccountSeed, Workspace } from "@/core/types";
 import type { MockDatabase } from "./mock-database";
 
@@ -129,6 +131,93 @@ export class MockWorkspaceRepository implements IWorkspaceRepository {
       if (!workspace) fail("NOT_FOUND", "Workspace tidak ditemukan");
       workspace.deletedAt = this.db.now();
       this.db.audit(state, { workspaceId: id, entityType: "workspace", entityId: id, action: "delete", before: null, after: workspace });
+    });
+  }
+
+  /** Meniru RPC restore_workspace (ADR 023): validasi ulang, ID baru, isi persis, atomik. */
+  async restoreFromBackup(ownerId: string, name: string, raw: WorkspaceBackup): Promise<Workspace> {
+    const { backup } = parseBackup(raw, ["fnb", "retail"]);
+    if (name.trim() === "") fail("EMPTY_NAME", "Nama workspace wajib diisi");
+    return this.db.write((state) => {
+      const ids = new Map<string, string>();
+      const id = (old: string) => {
+        let mapped = ids.get(old);
+        if (!mapped) ids.set(old, (mapped = this.db.generateId()));
+        return mapped;
+      };
+      const ref = (old: string | null | undefined) => (old ? id(old) : null);
+      const now = this.db.now();
+      const source = backup.workspace;
+      const workspace: Workspace = { ...source, id: id(source.id), ownerId, name: name.trim(), createdAt: now, updatedAt: now, deletedAt: null };
+      const wsId = workspace.id;
+      state.workspaces.push(workspace);
+      state.accounts.push(...backup.accounts.map((a) => ({ ...a, id: id(a.id), workspaceId: wsId })));
+      state.periods.push(...backup.periods.map((p) => ({ ...p, id: id(p.id), workspaceId: wsId })));
+      state.items.push(...backup.items.map((i) => ({ ...i, id: id(i.id), workspaceId: wsId, revenueAccountId: ref(i.revenueAccountId) })));
+      state.journals.push(
+        ...backup.journals.map((j) => ({
+          ...j,
+          id: id(j.id),
+          workspaceId: wsId,
+          settlementOf: ref(j.settlementOf),
+          reversalOf: ref(j.reversalOf),
+          correctionOf: ref(j.correctionOf),
+          returnOf: ref(j.returnOf),
+          lines: j.lines.map((l) => ({ ...l, id: id(l.id), accountId: l.accountId ? id(l.accountId) : l.accountId, itemId: ref(l.itemId) })),
+        })),
+      );
+      state.stockCounts.push(
+        ...backup.stockCounts.map((c) => ({
+          ...c,
+          id: id(c.id),
+          workspaceId: wsId,
+          journalEntryId: ref(c.journalEntryId),
+          lines: c.lines.map((l) => ({ ...l, itemId: id(l.itemId) })),
+          deletedAt: null,
+        })),
+      );
+      state.menus.push(...backup.menus.map((m) => ({ ...m, id: id(m.id), workspaceId: wsId, revenueAccountId: ref(m.revenueAccountId) })));
+      state.recipes.push(
+        ...backup.recipes.map((r) => ({ ...r, id: id(r.id), workspaceId: wsId, menuId: id(r.menuId), lines: r.lines.map((l) => ({ ...l, itemId: id(l.itemId) })), deletedAt: null })),
+      );
+      state.portionSummaries.push(
+        ...backup.portionSummaries.map((p) => ({ ...p, id: id(p.id), workspaceId: wsId, lines: p.lines.map((l) => ({ ...l, menuId: id(l.menuId) })), deletedAt: null })),
+      );
+      state.menuSales.push(
+        ...backup.menuSales.map((m) => ({ journalEntryId: id(m.journalEntryId), workspaceId: wsId, lines: m.lines.map((l) => ({ ...l, menuId: id(l.menuId) })) })),
+      );
+      if (backup.profile) state.profiles.push({ ...backup.profile, workspaceId: wsId });
+      state.contacts.push(...backup.contacts.map((c) => ({ ...c, id: id(c.id), workspaceId: wsId })));
+      state.invoices.push(
+        ...backup.invoices.map((inv) => ({
+          ...inv,
+          id: id(inv.id),
+          workspaceId: wsId,
+          contactId: ref(inv.contactId),
+          journalEntryId: ref(inv.journalEntryId),
+          lines: inv.lines.map((l) => ({ ...l, accountId: l.accountId ? id(l.accountId) : "", itemId: ref(l.itemId) })),
+          deletedAt: null,
+        })),
+      );
+      // Riwayat audit lama ikut, entity_id dipetakan; lalu satu catatan pemulihan.
+      state.auditLogs.push(
+        ...backup.auditLogs.map((log) => ({
+          ...log,
+          id: this.db.generateId(),
+          workspaceId: wsId,
+          entityId: log.entityType === "workspace" ? wsId : ids.get(log.entityId) ?? log.entityId,
+        })),
+      );
+      this.db.audit(state, {
+        workspaceId: wsId,
+        entityType: "workspace",
+        entityId: wsId,
+        action: "restore",
+        before: null,
+        after: workspace,
+        reason: `Dipulihkan dari backup "${source.name}" (${backup.exportedAt})`,
+      });
+      return workspace;
     });
   }
 }

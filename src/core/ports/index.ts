@@ -38,6 +38,7 @@ import type {
   TemplateType,
   Workspace,
 } from "../types";
+import type { WorkspaceBackup } from "../backup";
 import type { PeriodRange } from "../periods";
 import type { WorkspaceTaxSettings } from "../sales-tax";
 
@@ -63,6 +64,11 @@ export interface IWorkspaceRepository {
   /** Metode persediaan & riwayat metode biaya (ADR 017). */
   updateInventorySettings(id: string, settings: InventorySettings): Promise<Workspace>;
   softDelete(id: string): Promise<void>;
+  /**
+   * Pulihkan backup sebagai workspace baru milik `ownerId` (ADR 023), atomik:
+   * ID baru, isi persis (nomor jurnal, status periode, faktur, dll.).
+   */
+  restoreFromBackup(ownerId: string, name: string, backup: WorkspaceBackup): Promise<Workspace>;
 }
 
 export interface InventorySettings {
