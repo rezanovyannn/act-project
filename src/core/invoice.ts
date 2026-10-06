@@ -6,9 +6,10 @@
 import { addDays, isValidIsoDate } from "./dates";
 import { fail } from "./errors";
 import { outflowLines, purchaseCorrections, type PerpetualContext } from "./perpetual";
-import { effectiveTaxSettings, type SalesTaxResult } from "./sales-tax";
+import { allocateProportionally, computeSalesTax, effectiveTaxSettings, type SalesTaxResult } from "./sales-tax";
 import { listCreditTransactions } from "./settlement";
-import { buildExpense, buildSale } from "./transactions";
+import { mulDivRound } from "./stock";
+import { accountByRole, buildExpense, buildSale } from "./transactions";
 import type {
   Account,
   BusinessProfileInput,
@@ -16,6 +17,7 @@ import type {
   ContactInput,
   ContactSnapshot,
   Invoice,
+  InvoiceDiscount,
   InvoiceInput,
   InvoiceLine,
   IsoDate,
@@ -133,7 +135,60 @@ export function validateDraft(input: InvoiceInput): InvoiceInput {
   });
   const taxOverride = input.taxOverride ?? null;
   if (taxOverride !== null && (!Number.isSafeInteger(taxOverride) || taxOverride < 0)) fail("INVALID_AMOUNT", "PPN Masukan harus bilangan bulat ≥ 0");
-  return { ...input, contactId: input.contactId || null, reference: trimOrNull(input.reference), notes: trimOrNull(input.notes), taxOverride, lines };
+  const discount = validateDiscount(input.discount ?? null);
+  return { ...input, contactId: input.contactId || null, reference: trimOrNull(input.reference), notes: trimOrNull(input.notes), taxOverride, discount, lines };
+}
+
+// ---------- Diskon (Fase 8B) ----------
+
+/** Rapikan diskon: nilai 0 = tanpa diskon; persen 0,01–100% (basis poin), rupiah bilangan bulat. */
+export function validateDiscount(discount: InvoiceDiscount | null): InvoiceDiscount | null {
+  if (!discount) return null;
+  if (discount.kind !== "percent" && discount.kind !== "amount") fail("INVALID_INVOICE", "Jenis diskon tidak dikenal");
+  if (!Number.isSafeInteger(discount.value) || discount.value < 0) fail("INVALID_AMOUNT", "Diskon harus bilangan bulat ≥ 0");
+  if (discount.kind === "percent" && discount.value > 10_000) fail("INVALID_AMOUNT", "Diskon persen maksimal 100%");
+  return discount.value === 0 ? null : { kind: discount.kind, value: discount.value };
+}
+
+/** Nominal diskon dari subtotal (persen dibulatkan ke rupiah terdekat). */
+export function discountAmount(subtotal: number, discount: InvoiceDiscount | null | undefined): number {
+  if (!discount || discount.value === 0 || subtotal === 0) return 0;
+  return discount.kind === "percent" ? mulDivRound(subtotal, discount.value, 10_000) : discount.value;
+}
+
+/** "12,5%" / "12.5" → 1250 basis poin; null bila tidak valid (maks. 2 desimal). */
+export function parsePercentBps(text: string): number | null {
+  const t = text.trim().replace(",", ".");
+  if (!/^\d{1,3}(\.\d{1,2})?$/.test(t)) return null;
+  const [whole, frac = ""] = t.split(".");
+  return Number(whole) * 100 + Number(frac.padEnd(2, "0"));
+}
+
+/** 1250 → "12,5%". */
+export const formatPercentBps = (bps: number) => `${(bps / 100).toLocaleString("id-ID", { maximumFractionDigits: 2 })}%`;
+
+/** Akun kontra diskon penjualan (peran sales_returns); placeholder bila belum dibuat (dibuat otomatis saat terbit). */
+export const PENDING_DISCOUNT_ACCOUNT_ID = "__sales_discount__";
+export function withDiscountAccount(accounts: readonly Account[]): Account[] {
+  if (accounts.some((a) => a.systemRole === "sales_returns" && a.deletedAt === null)) return [...accounts];
+  return [
+    ...accounts,
+    {
+      id: PENDING_DISCOUNT_ACCOUNT_ID,
+      workspaceId: accounts[0]?.workspaceId ?? "",
+      code: "4-1900",
+      name: "Retur & Potongan Penjualan",
+      accountType: "revenue",
+      normalBalance: "debit",
+      cashFlowCategory: "operating",
+      isCash: false,
+      systemRole: "sales_returns",
+      isActive: true,
+      createdAt: "",
+      updatedAt: "",
+      deletedAt: null,
+    },
+  ];
 }
 
 // ---------- Terbit ----------
@@ -179,7 +234,12 @@ export function buildSaleInvoice(invoice: InvoiceInput, ctx: InvoiceContext, num
   });
 
   const settings = workspaceTaxSettings(ctx.workspace);
-  const sale = buildSale(
+  const subtotal = lines.reduce((t, l) => t + l.amount, 0);
+  const discount = discountAmount(subtotal, validateDiscount(invoice.discount ?? null));
+  if (discount > 0 && discount >= subtotal) fail("INVALID_AMOUNT", "Diskon harus lebih kecil dari subtotal");
+  const sale = discount > 0
+    ? discountedSale(invoice, ctx.accounts, number, contact.name, lines.map((l) => ({ amount: l.amount, accountId: l.line.accountId, description: l.line.description.trim() })), discount, invoice.applyTax && settings.rateBps > 0 ? effectiveTaxSettings(settings) : null, ctx.workspace.salesTaxLabel)
+    : buildSale(
     {
       workspaceId: invoice.workspaceId,
       entryDate: invoice.invoiceDate,
@@ -215,6 +275,61 @@ export function buildSaleInvoice(invoice: InvoiceInput, ctx: InvoiceContext, num
     totals: { base: sale.base, tax: sale.tax, total: sale.total },
     cost,
     warnings,
+  };
+}
+
+/**
+ * Penjualan dengan diskon faktur: pendapatan per baris bruto, diskon didebit ke
+ * akun Retur & Potongan Penjualan, pajak dari harga setelah diskon. Pada harga
+ * termasuk pajak, pajak bruto dibagi ke baris dan selisihnya mengurangi diskon,
+ * sehingga pendapatan & diskon sama-sama tanpa pajak (Fase 8B).
+ */
+function discountedSale(
+  invoice: InvoiceInput,
+  accounts: readonly Account[],
+  number: string,
+  counterparty: string,
+  lines: { amount: number; accountId: string; description: string }[],
+  discount: number,
+  tax: ReturnType<typeof effectiveTaxSettings> | null,
+  taxLabel: string,
+): SalesTaxResult & { entry: JournalEntryInput } {
+  const subtotal = lines.reduce((t, l) => t + l.amount, 0);
+  const net = subtotal - discount;
+  const discountAccount = accounts.find((a) => a.systemRole === "sales_returns" && a.deletedAt === null);
+  if (!discountAccount) fail("ACCOUNT_NOT_FOUND", "Akun Retur & Potongan Penjualan belum ada");
+  let revenue = lines.map((l) => l.amount);
+  let discountBase = discount;
+  let taxAmount = 0;
+  let total = net;
+  if (tax && !tax.inclusive) {
+    taxAmount = computeSalesTax(net, tax).tax;
+    total = net + taxAmount;
+  } else if (tax) {
+    const grossTax = computeSalesTax(subtotal, tax).tax;
+    taxAmount = computeSalesTax(net, tax).tax;
+    const shares = allocateProportionally(grossTax, revenue);
+    revenue = revenue.map((amount, i) => amount - shares[i]);
+    discountBase = discount - (grossTax - taxAmount);
+  }
+  const entryLines: JournalLineInput[] = [
+    { accountId: accountByRole(accounts, "accounts_receivable").id, debit: total, credit: 0 },
+    ...lines.map((l, i) => ({ accountId: l.accountId, description: l.description, debit: 0, credit: revenue[i] })),
+    ...(discountBase > 0 ? [{ accountId: discountAccount.id, description: "Diskon faktur", debit: discountBase, credit: 0 }] : []),
+    ...(taxAmount > 0 ? [{ accountId: accountByRole(accounts, "sales_tax_payable").id, description: taxLabel, debit: 0, credit: taxAmount }] : []),
+  ];
+  return {
+    base: total - taxAmount,
+    tax: taxAmount,
+    total,
+    entry: {
+      workspaceId: invoice.workspaceId,
+      entryDate: invoice.invoiceDate,
+      description: `Faktur ${number} · ${counterparty}`,
+      source: "revenue",
+      counterparty,
+      lines: entryLines,
+    },
   };
 }
 
@@ -257,7 +372,16 @@ export function buildPurchaseInvoice(invoice: InvoiceInput, ctx: InvoiceContext,
   });
 
   const settings = workspaceTaxSettings(ctx.workspace);
-  const subtotal = lines.reduce((t, l) => t + l.amount, 0);
+  const gross = lines.reduce((t, l) => t + l.amount, 0);
+  const discount = discountAmount(gross, validateDiscount(invoice.discount ?? null));
+  if (discount > 0 && discount >= gross) fail("INVALID_AMOUNT", "Diskon harus lebih kecil dari subtotal");
+  // Diskon pembelian mengurangi harga pokok/beban tiap baris secara proporsional.
+  const shares = allocateProportionally(discount, lines.map((l) => l.amount));
+  lines.forEach((l, i) => {
+    l.amount -= shares[i];
+    if (l.amount <= 0) fail("INVALID_AMOUNT", `Baris ${i + 1}: diskon melebihi nominal baris`);
+  });
+  const subtotal = gross - discount;
   const vatApplies = invoice.applyTax && settings.mode === "full_vat" && settings.rateBps > 0;
   const inputVat = vatApplies ? (invoice.taxOverride ?? computeInputVat(subtotal, settings)) : 0;
   const base = buildExpense(

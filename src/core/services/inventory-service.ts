@@ -115,17 +115,22 @@ export class InventoryService {
   }
 
   /** Membuat akun Retur & Potongan Penjualan bila belum ada (kode dicari yang kosong). */
-  async ensureSalesReturnsAccount(workspaceId: string): Promise<Account> {
-    let accounts = await this.deps.accounts.listByWorkspace(workspaceId);
-    const existing = accounts.find((a) => a.systemRole === "sales_returns");
-    if (existing) return existing;
-    const codes = new Set(accounts.map((a) => a.code));
-    let code = SALES_RETURNS_SEED.code;
-    for (let i = 1; codes.has(code); i++) code = `${SALES_RETURNS_SEED.code}-${i}`;
-    await this.deps.accounts.create(workspaceId, { ...SALES_RETURNS_SEED, code });
-    accounts = await this.deps.accounts.listByWorkspace(workspaceId);
-    return accounts.find((a) => a.systemRole === "sales_returns")!;
+  ensureSalesReturnsAccount(workspaceId: string): Promise<Account> {
+    return ensureSalesReturnsAccount(this.deps.accounts, workspaceId);
   }
+}
+
+/** Akun Retur & Potongan Penjualan (dipakai retur & diskon faktur); dibuat bila belum ada. */
+export async function ensureSalesReturnsAccount(repo: IAccountRepository, workspaceId: string): Promise<Account> {
+  let accounts = await repo.listByWorkspace(workspaceId);
+  const existing = accounts.find((a) => a.systemRole === "sales_returns");
+  if (existing) return existing;
+  const codes = new Set(accounts.map((a) => a.code));
+  let code = SALES_RETURNS_SEED.code;
+  for (let i = 1; codes.has(code); i++) code = `${SALES_RETURNS_SEED.code}-${i}`;
+  await repo.create(workspaceId, { ...SALES_RETURNS_SEED, code });
+  accounts = await repo.listByWorkspace(workspaceId);
+  return accounts.find((a) => a.systemRole === "sales_returns")!;
 }
 
 /** Snapshot dari data yang sudah dimuat (dipakai UI tanpa memuat ulang). */

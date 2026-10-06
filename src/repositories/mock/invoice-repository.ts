@@ -119,6 +119,10 @@ export class MockInvoiceRepository implements IInvoiceRepository {
       if (input.lines.length > 200) fail("INVALID_INVOICE", "Baris faktur tidak valid (maks. 200)");
       const override = input.taxOverride ?? null;
       if (override !== null && (!Number.isSafeInteger(override) || override < 0)) fail("INVALID_AMOUNT", "PPN Masukan harus bilangan bulat ≥ 0");
+      const discount = input.discount ?? null;
+      if (discount && (!["percent", "amount"].includes(discount.kind) || !Number.isSafeInteger(discount.value) || discount.value < 0 || (discount.kind === "percent" && discount.value > 10_000))) {
+        fail("INVALID_AMOUNT", "Diskon faktur tidak valid");
+      }
       for (const line of input.lines) {
         const ok = (n: number) => Number.isSafeInteger(n) && n >= 0;
         if (!ok(line.quantity) || !ok(line.unitPrice)) fail("INVALID_QUANTITY", "Qty dan harga harus bilangan bulat ≥ 0");
@@ -140,13 +144,14 @@ export class MockInvoiceRepository implements IInvoiceRepository {
         if (invoice.status !== "draft") fail("INVALID_INVOICE", "Faktur terbit tidak dapat diubah");
         if (invoice.kind !== input.kind) fail("INVALID_INVOICE", "Jenis faktur tidak dapat diubah");
         const before = { ...invoice };
-        Object.assign(invoice, { ...input, taxOverride: override, lines: input.lines.map((l) => ({ ...l })), updatedAt: now });
+        Object.assign(invoice, { ...input, taxOverride: override, discount, lines: input.lines.map((l) => ({ ...l })), updatedAt: now });
         this.db.audit(state, { workspaceId: invoice.workspaceId, entityType: "invoice", entityId: id, action: "update", before, after: invoice });
         return strip(invoice);
       }
       const invoice: StoredInvoice = {
         ...input,
         taxOverride: override,
+        discount,
         lines: input.lines.map((l) => ({ ...l })),
         id: this.db.generateId(),
         status: "draft",

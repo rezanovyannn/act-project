@@ -170,6 +170,7 @@ export const toInvoice = (r: any): Invoice => ({
   notes: r.notes ?? null,
   applyTax: r.apply_tax,
   taxOverride: r.tax_override === null || r.tax_override === undefined ? null : toAmount(r.tax_override),
+  discount: r.discount_kind ? { kind: r.discount_kind, value: toAmount(r.discount_value) } : null,
   status: r.status,
   number: r.number,
   journalEntryId: r.journal_entry_id,

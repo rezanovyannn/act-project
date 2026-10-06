@@ -5,11 +5,21 @@ import Link from "next/link"
 import { EyeIcon, InfoIcon, PencilIcon, PlusIcon, Trash2Icon, TriangleAlertIcon, UserPlusIcon } from "lucide-react"
 import { toast } from "sonner"
 import { formatDate, todayIsoDate } from "@/core/format"
-import { defaultDueDate, isPurchaseAccount, safeLineAmount, type InvoicePlan } from "@/core/invoice"
+import {
+  defaultDueDate,
+  discountAmount,
+  formatPercentBps,
+  isPurchaseAccount,
+  parsePercentBps,
+  PENDING_DISCOUNT_ACCOUNT_ID,
+  safeLineAmount,
+  withDiscountAccount,
+  type InvoicePlan,
+} from "@/core/invoice"
 import { formatTaxSettings } from "@/core/sales-tax"
 import type { AppServices } from "@/core/services"
 import type { InvoiceData } from "@/core/services/invoice-service"
-import type { Contact, Invoice, InvoiceInput, InvoiceKind } from "@/core/types"
+import type { Contact, Invoice, InvoiceDiscount, InvoiceInput, InvoiceKind } from "@/core/types"
 import { computeInputVat, workspaceTaxSettings } from "@/core/vat"
 import { Amount } from "@/components/ui/amount"
 import { AmountInput } from "@/components/ui/amount-input"
@@ -25,6 +35,7 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
+import { InputGroup, InputGroupAddon, InputGroupInput, InputGroupText } from "@/components/ui/input-group"
 import { JournalPreview } from "@/components/ui/journal-preview"
 import { Label } from "@/components/ui/label"
 import {
@@ -111,6 +122,11 @@ export function InvoiceEditor({
   const [notes, setNotes] = useState(invoice?.notes ?? "")
   const [applyTax, setApplyTax] = useState(invoice?.applyTax ?? taxAvailable)
   const [taxOverride, setTaxOverride] = useState<number | null>(invoice?.taxOverride ?? null)
+  const [discountKind, setDiscountKind] = useState<"none" | InvoiceDiscount["kind"]>(invoice?.discount?.kind ?? "none")
+  const [discountPercent, setDiscountPercent] = useState(
+    invoice?.discount?.kind === "percent" ? formatPercentBps(invoice.discount.value).replace("%", "") : "",
+  )
+  const [discountRupiah, setDiscountRupiah] = useState<number | null>(invoice?.discount?.kind === "amount" ? invoice.discount.value : null)
   const [lines, setLines] = useState<LineState[]>(() => (invoice?.lines.length ? invoice.lines.map(toState) : [newLine()]))
   const [addingContact, setAddingContact] = useState(false)
   const [preview, setPreview] = useState(false)
@@ -142,6 +158,9 @@ export function InvoiceEditor({
   }
 
   const qtyOf = (l: LineState) => (/^\d+$/.test(l.quantity) ? Number(l.quantity) : 0)
+  const percentBps = discountKind === "percent" ? parsePercentBps(discountPercent || "0") : null
+  const discount: InvoiceDiscount | null =
+    discountKind === "percent" && percentBps ? { kind: "percent", value: percentBps } : discountKind === "amount" && discountRupiah ? { kind: "amount", value: discountRupiah } : null
   const input: InvoiceInput = {
     workspaceId: workspace.id,
     kind,
@@ -152,6 +171,7 @@ export function InvoiceEditor({
     notes,
     applyTax: applyTax && taxAvailable,
     taxOverride: isSale ? null : taxOverride,
+    discount,
     lines: lines
       .filter((l) => l.description.trim() || l.unitPrice || l.itemId)
       .map((l) => ({ description: l.description, quantity: qtyOf(l), unit: l.unit, unitPrice: l.unitPrice ?? 0, accountId: l.accountId, itemId: l.itemId })),
@@ -164,7 +184,10 @@ export function InvoiceEditor({
     planError = errorMessage(e)
   }
   const subtotal = input.lines.reduce((t, l) => t + safeLineAmount(l), 0)
-  const suggestedVat = !isSale && taxAvailable ? computeInputVat(subtotal, taxSettings) : 0
+  const discountRp = discountAmount(subtotal, discount)
+  const suggestedVat = !isSale && taxAvailable ? computeInputVat(Math.max(subtotal - discountRp, 0), taxSettings) : 0
+  const previewAccounts = isSale ? withDiscountAccount(accounts) : accounts
+  const pendingDiscountAccount = plan?.entry.lines.some((l) => l.accountId === PENDING_DISCOUNT_ACCOUNT_ID) ?? false
 
   async function save() {
     setBusy("save")
@@ -326,6 +349,44 @@ export function InvoiceEditor({
           </Button>
         </fieldset>
 
+        <div className="grid gap-2 sm:grid-cols-[12rem_10rem] sm:items-end">
+          <div className="grid gap-1.5">
+            <Label htmlFor="invoice-discount-kind">Diskon faktur</Label>
+            <Select value={discountKind} onValueChange={(v) => setDiscountKind(v as typeof discountKind)}>
+              <SelectTrigger id="invoice-discount-kind" className="w-full bg-background"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="none">Tanpa diskon</SelectItem>
+                <SelectItem value="percent">Persen (%)</SelectItem>
+                <SelectItem value="amount">Rupiah</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          {discountKind === "percent" && (
+            <InputGroup>
+              <InputGroupInput
+                aria-label="Diskon persen"
+                inputMode="decimal"
+                placeholder="0"
+                value={discountPercent}
+                onChange={(e) => setDiscountPercent(e.target.value.replace(/[^\d.,]/g, ""))}
+                className="text-right tabular-nums"
+              />
+              <InputGroupAddon align="inline-end"><InputGroupText>%</InputGroupText></InputGroupAddon>
+            </InputGroup>
+          )}
+          {discountKind === "amount" && <AmountInput aria-label="Diskon rupiah" value={discountRupiah} onValueChange={setDiscountRupiah} />}
+          {discountKind === "percent" && discountPercent && percentBps === null && (
+            <p className="text-xs text-destructive sm:col-span-2">Persen 0–100 dengan maks. 2 desimal, mis. 12,5</p>
+          )}
+          {discountRp > 0 && (
+            <p className="text-xs text-muted-foreground sm:col-span-2">
+              {isSale
+                ? `Pajak dihitung dari harga setelah diskon; diskon dicatat ke akun Retur & Potongan Penjualan.`
+                : `Diskon mengurangi harga pokok/beban tiap baris secara proporsional.`}
+            </p>
+          )}
+        </div>
+
         {isSale ? (
           <label className="flex items-center gap-3 text-sm">
             <Switch checked={applyTax} onCheckedChange={setApplyTax} disabled={!taxAvailable} />
@@ -362,24 +423,35 @@ export function InvoiceEditor({
             <dt className="text-muted-foreground">Subtotal</dt>
             <dd><Amount value={subtotal} /></dd>
           </div>
+          {discountRp > 0 && (
+            <div className="flex justify-between">
+              <dt className="text-muted-foreground">Diskon{discount?.kind === "percent" ? ` ${formatPercentBps(discount.value)}` : ""}</dt>
+              <dd><Amount value={-discountRp} /></dd>
+            </div>
+          )}
           <div className="flex justify-between">
             <dt className="text-muted-foreground">{isSale ? workspace.salesTaxLabel : "PPN Masukan"}</dt>
             <dd><Amount value={plan?.totals.tax ?? 0} /></dd>
           </div>
           <div className="flex justify-between border-t pt-2 font-bold text-ink">
             <dt>Total {isSale ? "piutang" : "utang"}</dt>
-            <dd><Amount value={plan?.totals.total ?? subtotal} /></dd>
+            <dd><Amount value={plan?.totals.total ?? subtotal - discountRp} /></dd>
           </div>
           <p className="text-xs text-muted-foreground">Jatuh tempo {dueDate ? formatDate(dueDate) : "—"}</p>
         </dl>
         {plan ? (
-          <JournalPreview lines={plan.entry.lines} accounts={accounts} title="Jurnal saat diterbitkan" />
+          <JournalPreview lines={plan.entry.lines} accounts={previewAccounts} title="Jurnal saat diterbitkan" />
         ) : (
           planError && (
             <p className="flex gap-2 rounded-2xl bg-card px-4 py-3 text-sm text-ink">
               <InfoIcon className="mt-0.5 size-4 shrink-0" /> Sebelum terbit: {planError}
             </p>
           )
+        )}
+        {pendingDiscountAccount && (
+          <p className="flex gap-2 text-xs text-muted-foreground">
+            <InfoIcon className="mt-0.5 size-3.5 shrink-0" /> Akun 4-1900 Retur & Potongan Penjualan dibuat otomatis saat faktur diterbitkan.
+          </p>
         )}
         {plan?.warnings.map((w) => (
           <p key={w} className="flex gap-2 text-sm text-ink"><TriangleAlertIcon className="mt-0.5 size-4 shrink-0" />{w}</p>

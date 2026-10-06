@@ -11,7 +11,7 @@
  */
 import { beforeEach, describe, expect, it } from "vitest";
 import { AccountingError, type ValidationCode } from "@/core/errors";
-import { formatInvoiceNumber, nextInvoiceSeq, summarizeInvoices, terbilang, validateProfile, defaultProfile } from "@/core/invoice";
+import { discountAmount, formatInvoiceNumber, formatPercentBps, nextInvoiceSeq, parsePercentBps, summarizeInvoices, terbilang, validateProfile, defaultProfile } from "@/core/invoice";
 import { buildSettlement } from "@/core/transactions";
 import { FULL_VAT_DEFAULTS } from "@/core/sales-tax";
 import { purchasesByItem } from "@/core/stock-count";
@@ -270,5 +270,104 @@ describe("faktur pembelian", () => {
       [inputVat.id, 109_999, 0],
       [byCode("2-1100").id, 0, 1_109_999],
     ]);
+  });
+});
+
+/**
+ * Diskon faktur (Fase 8B). Angka harapan dihitung manual:
+ * A. PB1 10% belum termasuk: 1.250.000 + 250.000 = 1.500.000, diskon 10% = 150.000 → dasar 1.350.000,
+ *    PB1 135.000, piutang 1.485.000; Dr Retur & Potongan Penjualan 150.000.
+ * B. PB1 termasuk: 1 × 110.000, diskon Rp 11.000 → bayar 99.000; PB1 bruto 10.000, PB1 neto 9.000;
+ *    pendapatan 100.000, diskon tanpa pajak 11.000 − 1.000 = 10.000.
+ * C. Pembelian 550.000 (Ayam) + 50.000 (LPG), diskon Rp 60.000 dibagi 55.000 : 5.000 → 495.000 & 45.000, utang 540.000.
+ */
+describe("diskon faktur", () => {
+  let env: ReturnType<typeof createTestEnv>;
+  let workspaceId: string;
+  let accounts: Account[];
+  let customer: Contact;
+  const byCode = (code: string) => accounts.find((a) => a.code === code)!;
+  const contactBase = { address: null, phone: null, email: null, npwp: null, paymentTermDays: 0, notes: null };
+
+  beforeEach(async () => {
+    env = createTestEnv();
+    const ws = await createFnbWorkspace(env);
+    workspaceId = ws.workspace.id;
+    accounts = ws.accounts;
+    customer = await env.invoiceService.createContact(workspaceId, { ...contactBase, name: "PT Diskon", isCustomer: true, isSupplier: false });
+  });
+
+  const sale = (overrides: Partial<InvoiceInput>): InvoiceInput => ({
+    workspaceId, kind: "sale", contactId: customer.id, invoiceDate: "2026-03-15", dueDate: "2026-03-15", reference: null, notes: null, applyTax: true,
+    lines: [
+      { description: "Catering", quantity: 50, unit: "box", unitPrice: 25_000, accountId: byCode("4-1000").id, itemId: null },
+      { description: "Es teh", quantity: 50, unit: "gelas", unitPrice: 5_000, accountId: byCode("4-2000").id, itemId: null },
+    ],
+    ...overrides,
+  });
+
+  it("penjualan PB1 belum termasuk: pajak dari harga setelah diskon, diskon ke akun Retur & Potongan Penjualan (dibuat otomatis)", async () => {
+    expect(accounts.some((a) => a.systemRole === "sales_returns")).toBe(false);
+    const preview = env.invoiceService.plan(sale({ discount: { kind: "percent", value: 1000 } }), await env.invoiceService.data(workspaceId));
+    expect(preview.totals).toEqual({ base: 1_350_000, tax: 135_000, total: 1_485_000 });
+    const issued = await env.invoiceService.issue(sale({ discount: { kind: "percent", value: 1000 } }));
+    expect(issued.discount).toEqual({ kind: "percent", value: 1000 });
+    accounts = await env.repos.accounts.listByWorkspace(workspaceId);
+    const contra = accounts.find((a) => a.systemRole === "sales_returns")!;
+    expect(contra).toMatchObject({ code: "4-1900", name: "Retur & Potongan Penjualan" });
+    const entry = (await env.repos.journals.getById(issued.journalEntryId!))!;
+    expect(entry.lines.map((l) => [l.accountId, l.debit, l.credit])).toEqual([
+      [byCode("1-1400").id, 1_485_000, 0],
+      [byCode("4-1000").id, 0, 1_250_000],
+      [byCode("4-2000").id, 0, 250_000],
+      [contra.id, 150_000, 0],
+      [byCode("2-1200").id, 0, 135_000],
+    ]);
+  });
+
+  it("penjualan PB1 termasuk: pendapatan & diskon tanpa pajak, PB1 dari harga setelah diskon", async () => {
+    await env.taxService.updateSettings(workspaceId, { mode: "simple", label: "PB1", rateBps: 1000, inclusive: true, dppNumerator: 1, dppDenominator: 1 });
+    const issued = await env.invoiceService.issue(sale({
+      discount: { kind: "amount", value: 11_000 },
+      lines: [{ description: "Paket", quantity: 1, unit: null, unitPrice: 110_000, accountId: byCode("4-1000").id, itemId: null }],
+    }));
+    accounts = await env.repos.accounts.listByWorkspace(workspaceId);
+    const entry = (await env.repos.journals.getById(issued.journalEntryId!))!;
+    expect(entry.lines.map((l) => [accounts.find((a) => a.id === l.accountId)!.code, l.debit, l.credit])).toEqual([
+      ["1-1400", 99_000, 0],
+      ["4-1000", 0, 100_000],
+      ["4-1900", 10_000, 0],
+      ["2-1200", 0, 9_000],
+    ]);
+  });
+
+  it("pembelian: diskon dibagi proporsional ke baris (harga pokok bahan turun), utang setelah diskon", async () => {
+    const supplier = await env.invoiceService.createContact(workspaceId, { ...contactBase, name: "CV Diskon", isCustomer: false, isSupplier: true });
+    const ayam = await env.itemService.createItem(workspaceId, { code: "P-01", name: "Ayam", unit: "gram", revenueAccountId: null });
+    const issued = await env.invoiceService.issue({
+      workspaceId, kind: "purchase", contactId: supplier.id, invoiceDate: "2026-03-12", dueDate: "2026-03-12", reference: "S-1", notes: null, applyTax: false,
+      discount: { kind: "amount", value: 60_000 },
+      lines: [
+        { description: "Ayam", quantity: 10_000, unit: "gram", unitPrice: 55, accountId: "", itemId: ayam.id },
+        { description: "Gas LPG", quantity: 2, unit: null, unitPrice: 25_000, accountId: byCode("6-3000").id, itemId: null },
+      ],
+    });
+    const entry = (await env.repos.journals.getById(issued.journalEntryId!))!;
+    expect(entry.lines.map((l) => [l.accountId, l.debit, l.credit, l.quantity ?? null])).toEqual([
+      [byCode("1-1300").id, 495_000, 0, 10_000],
+      [byCode("6-3000").id, 45_000, 0, null],
+      [byCode("2-1100").id, 0, 540_000, null],
+    ]);
+    const entries = await env.repos.journals.listByWorkspace(workspaceId);
+    expect(purchasesByItem(entries, accounts, null, "2026-03-31").get(ayam.id)).toMatchObject({ qty: 10_000, value: 495_000 });
+  });
+
+  it("validasi & format diskon", async () => {
+    await expectCode(env.invoiceService.issue(sale({ discount: { kind: "amount", value: 1_500_000 } })), "INVALID_AMOUNT");
+    await expectCode(env.invoiceService.saveDraft(sale({ discount: { kind: "percent", value: 10_001 } })), "INVALID_AMOUNT");
+    expect((await env.invoiceService.saveDraft(sale({ discount: { kind: "amount", value: 0 } }))).discount).toBeNull();
+    expect(discountAmount(1_500_000, { kind: "percent", value: 1250 })).toBe(187_500);
+    expect([parsePercentBps("12,5"), parsePercentBps("10"), parsePercentBps("100"), parsePercentBps("12,345"), parsePercentBps("abc")]).toEqual([1250, 1000, 10_000, null, null]);
+    expect(formatPercentBps(1250)).toBe("12,5%");
   });
 });

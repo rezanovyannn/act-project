@@ -827,6 +827,17 @@ export function describeRepositoryContract(
         expect((await repos.journals.listByWorkspace(workspace.id)).filter((j) => j.status === "posted")).toHaveLength(2);
       });
 
+      it("diskon faktur: persen/rupiah tersimpan, diskon kosong = null, nilai tidak valid ditolak", async () => {
+        const { input } = await setup();
+        const percent = await repos.invoices.saveDraft({ ...input("2026-03-10"), discount: { kind: "percent", value: 1250 } });
+        expect(percent.discount).toEqual({ kind: "percent", value: 1250 });
+        const amount = await repos.invoices.saveDraft({ ...input("2026-03-10"), discount: { kind: "amount", value: 7_500 } }, percent.id);
+        expect(amount.discount).toEqual({ kind: "amount", value: 7_500 });
+        expect((await repos.invoices.saveDraft({ ...input("2026-03-10"), discount: null }, percent.id)).discount).toBeNull();
+        await expectCode(repos.invoices.saveDraft({ ...input("2026-03-10"), discount: { kind: "percent", value: 10_001 } }), "INVALID_AMOUNT");
+        await expectCode(repos.invoices.saveDraft({ ...input("2026-03-10"), discount: { kind: "amount", value: -1 } }), "INVALID_AMOUNT");
+      });
+
       it("faktur pembelian: nomor urut terpisah dari penjualan, PPN Masukan koreksi tersimpan, sumber jurnal harus purchase", async () => {
         const { input, journal } = await setup();
         const accounts = await repos.accounts.listByWorkspace(workspace.id);
@@ -916,6 +927,7 @@ export function describeRepositoryContract(
         });
         const contact = await repos.invoices.createContact(workspace.id, { name: "PT F", isCustomer: true, isSupplier: false, address: null, phone: null, email: null, npwp: null, paymentTermDays: 0, notes: null });
         const draft = await repos.invoices.saveDraft({ workspaceId: workspace.id, kind: "sale", contactId: contact.id, invoiceDate: "2026-03-16", dueDate: "2026-03-16", reference: null, notes: null, applyTax: false,
+          discount: { kind: "amount", value: 5_000 },
           lines: [{ description: "Jasa", quantity: 1, unit: null, unitPrice: 75_000, accountId: jualId, itemId: null }] });
         await repos.invoices.issue(draft.id, {
           workspaceId: workspace.id, entryDate: "2026-03-16", description: "Faktur (nomor otomatis)", source: "revenue", counterparty: "PT F",
@@ -943,7 +955,7 @@ export function describeRepositoryContract(
         expect((await repos.periods.listByWorkspace(restored.id)).find((p) => p.startDate === "2026-02-01")?.status).toBe("closed");
         expect((await repos.items.listByWorkspace(restored.id)).map((i) => i.code)).toEqual(["BB-1"]);
         const [inv] = await repos.invoices.listInvoices(restored.id);
-        expect(inv).toMatchObject({ number: "INV/2026/03/0001", status: "issued", lines: [{ description: "Jasa", unitPrice: 75_000 }] });
+        expect(inv).toMatchObject({ number: "INV/2026/03/0001", status: "issued", discount: { kind: "amount", value: 5_000 }, lines: [{ description: "Jasa", unitPrice: 75_000 }] });
         expect((await repos.journals.getById(inv.journalEntryId!))?.entryNumber).toBe((await repos.journals.getById((await repos.invoices.listInvoices(workspace.id))[0].journalEntryId!))?.entryNumber);
         const logs = await repos.auditLogs.listByWorkspace(restored.id);
         expect(logs.filter((l) => l.action === "restore")).toHaveLength(1);

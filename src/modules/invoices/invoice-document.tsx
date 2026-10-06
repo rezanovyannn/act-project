@@ -1,7 +1,7 @@
 "use client"
 
 import { formatDate, formatNumber } from "@/core/format"
-import { lineAmount, terbilang } from "@/core/invoice"
+import { discountAmount, formatPercentBps, lineAmount, terbilang } from "@/core/invoice"
 import type { BusinessProfile, ContactSnapshot, Invoice } from "@/core/types"
 import { cn } from "@/lib/utils"
 
@@ -36,6 +36,7 @@ export function InvoiceDocument({
 }) {
   const name = profile.displayName || workspaceName
   const subtotal = invoice.lines.reduce((t, l) => t + lineAmount(l), 0)
+  const discount = discountAmount(subtotal, invoice.discount)
   const title = invoice.kind === "sale" ? "FAKTUR PENJUALAN" : "FAKTUR PEMBELIAN"
 
   return (
@@ -145,6 +146,12 @@ export function InvoiceDocument({
             <dt className="text-neutral-600">Subtotal</dt>
             <dd className="tabular-nums">{rupiah(subtotal)}</dd>
           </div>
+          {discount > 0 && (
+            <div className="flex justify-between gap-4">
+              <dt className="text-neutral-600">Diskon{invoice.discount?.kind === "percent" ? ` ${formatPercentBps(invoice.discount.value)}` : ""}</dt>
+              <dd className="tabular-nums">−{rupiah(discount)}</dd>
+            </div>
+          )}
           {totals.tax > 0 && (
             <div className="flex justify-between gap-4">
               <dt className="text-neutral-600">{taxLabel}{taxInclusive ? " (termasuk)" : ""}</dt>

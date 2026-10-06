@@ -6,6 +6,7 @@ import {
   validateContact,
   validateDraft,
   validateProfile,
+  withDiscountAccount,
   type InvoiceContext,
   type InvoicePlan,
   type InvoiceSummary,
@@ -25,7 +26,7 @@ import type {
   JournalEntry,
   Workspace,
 } from "../types";
-import { buildSnapshot } from "./inventory-service";
+import { buildSnapshot, ensureSalesReturnsAccount } from "./inventory-service";
 import type { JournalService } from "./journal-service";
 
 export interface InvoiceData {
@@ -112,16 +113,25 @@ export class InvoiceService {
     return { workspace: data.workspace, accounts: data.accounts, items: data.items, contacts: data.contacts, perpetual };
   }
 
-  /** Pratinjau jurnal terbit (dipakai form). */
+  /**
+   * Pratinjau jurnal terbit (dipakai form). Bila akun Retur & Potongan Penjualan
+   * belum ada, diskon penjualan memakai akun sementara (dibuat saat terbit).
+   */
   plan(input: InvoiceInput, data: InvoiceData): InvoicePlan {
-    return buildInvoicePlan(input, this.context(data, input.invoiceDate));
+    const ctx = this.context(data, input.invoiceDate);
+    return buildInvoicePlan(input, input.kind === "sale" ? { ...ctx, accounts: withDiscountAccount(ctx.accounts) } : ctx);
   }
 
   /** Simpan draft terakhir lalu terbitkan: nomor, jurnal kredit, salinan kontak (atomik di repository). */
   async issue(input: InvoiceInput, id?: string): Promise<Invoice> {
     const draft = await this.saveDraft(input, id);
-    const data = await this.data(draft.workspaceId);
-    const plan = this.plan(draft, data);
+    let data = await this.data(draft.workspaceId);
+    this.plan(draft, data);
+    if (draft.kind === "sale" && draft.discount && !data.accounts.some((a) => a.systemRole === "sales_returns" && a.deletedAt === null)) {
+      await ensureSalesReturnsAccount(this.deps.accounts, draft.workspaceId);
+      data = await this.data(draft.workspaceId);
+    }
+    const plan = buildInvoicePlan(draft, this.context(data, draft.invoiceDate));
     await this.deps.journalService.validateForPosting(plan.entry);
     const prefix = draft.kind === "sale" ? data.profile.invoicePrefix : data.profile.purchasePrefix;
     return this.deps.invoices.issue(draft.id, plan.entry, contactSnapshot(plan.contact), prefix);
@@ -135,7 +145,7 @@ export class InvoiceService {
 
   /** Salin faktur (terbit/dibatalkan) menjadi draft baru. */
   duplicate(invoice: Invoice, invoiceDate: IsoDate, dueDate: IsoDate): Promise<Invoice> {
-    const { workspaceId, kind, contactId, reference, notes, applyTax, taxOverride, lines } = invoice;
-    return this.saveDraft({ workspaceId, kind, contactId, invoiceDate, dueDate, reference, notes, applyTax, taxOverride, lines: lines.map((l) => ({ ...l })) });
+    const { workspaceId, kind, contactId, reference, notes, applyTax, taxOverride, discount, lines } = invoice;
+    return this.saveDraft({ workspaceId, kind, contactId, invoiceDate, dueDate, reference, notes, applyTax, taxOverride, discount, lines: lines.map((l) => ({ ...l })) });
   }
 }

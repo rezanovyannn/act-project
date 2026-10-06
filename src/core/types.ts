@@ -287,6 +287,12 @@ export interface Contact extends ContactInput {
 
 export type InvoiceKind = "sale" | "purchase";
 
+/** Diskon faktur: persen dalam basis poin (1250 = 12,5%) atau nominal rupiah. */
+export interface InvoiceDiscount {
+  kind: "percent" | "amount";
+  value: number;
+}
+
 /** Baris faktur: nominal = qty × harga satuan (rupiah utuh). */
 export interface InvoiceLine {
   description: string;
@@ -310,6 +316,8 @@ export interface InvoiceInput {
   applyTax: boolean;
   /** Koreksi PPN Masukan sesuai faktur pemasok (pembelian, mode PPN lengkap); null = dihitung. */
   taxOverride?: number | null;
+  /** Diskon per faktur (ROADMAP Fase 8B); null = tanpa diskon. */
+  discount?: InvoiceDiscount | null;
   lines: InvoiceLine[];
 }
 
