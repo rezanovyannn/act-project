@@ -16,7 +16,7 @@
  */
 import { beforeEach, describe, expect, it } from "vitest";
 import { AccountingError, type ValidationCode } from "@/core/errors";
-import { fractionValue, portionsForPeriod, recipeAt } from "@/core/menu";
+import { fractionValue, menuReport, portionsForPeriod, recipeAt } from "@/core/menu";
 import type { MenuSaleInput } from "@/core/menu";
 import { parseCsv, parsePortionSheet, portionSheetRows } from "@/core/stock-count-sheet";
 import { toCsv } from "@/core/backup";
@@ -188,5 +188,37 @@ describe("menu, resep & variance theoretical vs actual", () => {
     const edited = parsePortionSheet(parseCsv("Kode Menu;Nama Menu;Kategori;Porsi\r\nb-01;Kopi;Minuman;1.200\r\nZZ;Asing;;3\r\n"), menus);
     expect([...edited.quantities]).toEqual([[kopi.id, 1_200]]);
     expect(edited.unknownCodes).toEqual(["ZZ"]);
+  });
+
+  it("laporan per menu: porsi, pendapatan (aktual + estimasi rekap), biaya bahan per akhir periode, margin", async () => {
+    // Penjualan 15 Jan: NG 20 (500.000) & TD 4 (40.000); 25 Jan: NG 30 (750.000) & TD 5 (50.000);
+    // rekap 26–28 Jan: NG 10 & TD 3 → estimasi 10 × 25.000 = 250.000 dan 3 × 10.000 = 30.000; penjualan 27 Jan NG 99 diabaikan.
+    // Harga per 31 Jan (rata-rata pembelian): Ayam 50, Beras 15, Telur 2.000.
+    // NG: Ayam 20×100 + 40×120 = 6.800 g (340.000), Beras 60×150 = 9.000 g (135.000), Telur 60 (120.000) → 595.000.
+    // TD: Telur 12 × 2/3 = 8 → 16.000.
+    await env.menuService.postSale(sale("2026-01-15", [{ menu: nasiGoreng, portions: 20 }, { menu: telurDadar, portions: 4 }]));
+    await env.menuService.postSale(sale("2026-01-25", [{ menu: nasiGoreng, portions: 30 }, { menu: telurDadar, portions: 5 }]));
+    await env.menuService.postSale(sale("2026-01-27", [{ menu: nasiGoreng, portions: 99 }]));
+    await env.menuService.createPortionSummary({ workspaceId, dateFrom: "2026-01-26", dateTo: "2026-01-28", note: null, lines: [{ menuId: nasiGoreng.id, portions: 10 }, { menuId: telurDadar.id, portions: 3 }] });
+    const ctx = await env.menuService.context(workspaceId);
+    const report = menuReport(ctx, "2026-01-01", "2026-01-31", { valuation: "average", tax: null });
+    expect(report.rows.map((r) => [r.menu?.name, r.portions, r.salePortions, r.summaryPortions, r.revenue, r.estimatedRevenue, r.cost, r.margin])).toEqual([
+      ["Nasi Goreng", 60, 50, 10, 1_500_000, 250_000, 595_000, 905_000],
+      ["Telur Dadar", 12, 9, 3, 120_000, 30_000, 16_000, 104_000],
+    ]);
+    expect(report.totals).toEqual({ portions: 72, revenue: 1_620_000, estimatedRevenue: 280_000, cost: 611_000, margin: 1_009_000 });
+    expect(report.warnings).toEqual([]);
+
+    // Periode 16–31 Jan: penjualan 15 Jan keluar; NG 40 porsi resep v2.
+    const late = menuReport(ctx, "2026-01-16", "2026-01-31", { valuation: "average", tax: null });
+    expect(late.rows[0]).toMatchObject({ portions: 40, revenue: 1_000_000, cost: 410_000 });
+
+    // Pajak termasuk: pendapatan penjualan diambil dari jurnal (tanpa pajak), estimasi rekap dikurangi pajak.
+    const withTax = await env.menuService.postSale(sale("2026-02-02", [{ menu: nasiGoreng, portions: 1 }], { applyTax: true, tax: { rateBps: 1000, inclusive: true } }));
+    expect(withTax).toBeTruthy();
+    await env.menuService.createPortionSummary({ workspaceId, dateFrom: "2026-02-03", dateTo: "2026-02-04", note: null, lines: [{ menuId: nasiGoreng.id, portions: 2 }] });
+    const feb = menuReport(await env.menuService.context(workspaceId), "2026-02-01", "2026-02-28", { valuation: "average", tax: { rateBps: 1000, inclusive: true } });
+    // 25.000 termasuk PB1 → 22.727; rekap 2 × 25.000 = 50.000 termasuk PB1 → 45.455.
+    expect(feb.rows[0]).toMatchObject({ portions: 3, revenue: 22_727 + 45_455, estimatedRevenue: 45_455 });
   });
 });

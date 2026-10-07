@@ -23,6 +23,8 @@ Keputusan tercatat di ROADMAP Catatan Keputusan 49–52.
 8. **Tampilan:** menu sidebar *Menu & Resep* (tab Menu & Resep dan Rekap Porsi; biaya bahan/porsi & food cost hari ini sebagai estimasi), tab *Penjualan menu* di Input Transaksi, dan tab *Variance* di Stok Opname & COGS (per bahan per section, ringkasan, dan theoretical cost per menu).
 9. **Data & keamanan:** tabel `menus`, `recipes`, `recipe_lines`, `portion_summaries`, `portion_summary_lines`, `menu_sale_lines` ber-`workspace_id`, RLS hanya SELECT untuk pemilik; semua tulis lewat RPC SECURITY DEFINER (`create_menu`, `update_menu`, `delete_menu`, `save_recipe`, `delete_recipe`, `create_portion_summary`, `delete_portion_summary`, `post_menu_sale`). Audit: entitas `menu`, `recipe`, `portion_summary`. Backup JSON menyertakan stok opname, menu, resep, rekap, dan penjualan menu.
 
+10. **Laporan per menu (Fase 8C, ROADMAP Catatan Keputusan 67–69):** tab *Per Menu* di Laporan Keuangan (khusus F&B) untuk rentang tanggal laporan. Porsi memakai aturan butir 5 (penjualan menu di periode yang tidak dicakup rekap + rekap yang tanggal akhirnya di periode). Pendapatan penjualan menu diambil dari baris pendapatan jurnalnya (tanpa pajak); porsi rekap dinilai porsi × harga jual menu saat ini (dikurangi pajak bila harga termasuk pajak) dan ditandai estimasi. Biaya bahan = resep berlaku pada tanggal jual × harga bahan per tanggal akhir laporan (dasar harga sama dengan stok opname), pecahan eksak. Ditampilkan margin kotor, margin %, food cost %, paling laku/paling untung, urutan, dan ekspor CSV.
+
 ## Konsekuensi
 ### Positif:
 - Variance menunjukkan bahan mana yang boros/susut beserta nilainya, dengan harga yang konsisten dengan COGS.

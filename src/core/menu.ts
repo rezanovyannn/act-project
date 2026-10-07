@@ -6,7 +6,7 @@
  */
 import { isValidIsoDate } from "./dates";
 import { fail } from "./errors";
-import type { SalesTaxSettings } from "./sales-tax";
+import { computeSalesTax, type SalesTaxSettings } from "./sales-tax";
 import {
   compareBySection,
   computeCountRows,
@@ -374,4 +374,131 @@ function varianceRow(item: Item, basis: QtyValue | null, qty: Fraction, actual: 
     variance: { qty: actual.qty - fractionToNumber(qty), value: variance },
     ratio: value === 0 ? null : variance / value,
   };
+}
+
+// ---------- Laporan per menu (Fase 8C) ----------
+
+export interface MenuReportRow {
+  menu: Menu | null;
+  menuId: string;
+  portions: number;
+  salePortions: number;
+  summaryPortions: number;
+  /** Pendapatan tanpa pajak: penjualan menu (aktual) + rekap porsi (estimasi). */
+  revenue: number;
+  /** Bagian pendapatan yang diestimasi dari rekap porsi × harga jual menu. */
+  estimatedRevenue: number;
+  /** Biaya bahan teoritis: resep berlaku pada tanggal jual × harga bahan per akhir periode. */
+  cost: number;
+  margin: number;
+  /** Porsi tanpa resep berlaku (biayanya tidak terhitung). */
+  noRecipePortions: number;
+}
+
+export interface MenuReport {
+  rows: MenuReportRow[];
+  totals: { portions: number; revenue: number; estimatedRevenue: number; cost: number; margin: number };
+  warnings: string[];
+}
+
+/**
+ * Penjualan, biaya bahan, dan margin per menu dalam [from, to] (ROADMAP 8C).
+ * Porsi: penjualan menu bertanggal di periode yang tidak dicakup rekap + rekap
+ * yang tanggal akhirnya di periode (aturan sama dengan variance, ADR 021).
+ */
+export function menuReport(
+  ctx: MenuContext,
+  from: IsoDate,
+  to: IsoDate,
+  options: { valuation: StockValuation; tax: SalesTaxSettings | null },
+): MenuReport {
+  const inRange = (d: IsoDate) => d >= from && d <= to;
+  const covered = (d: IsoDate) => ctx.summaries.some((s) => s.dateFrom <= d && d <= s.dateTo);
+  const bases = basesAt(ctx, to, options.valuation);
+  const journals = new Map(ctx.entries.map((e) => [e.id, e]));
+  const rows = new Map<string, MenuReportRow & { perItem: Map<string, Fraction> }>();
+  const row = (menuId: string) => {
+    let r = rows.get(menuId);
+    if (!r) {
+      r = {
+        menu: ctx.menus.find((m) => m.id === menuId) ?? null,
+        menuId,
+        portions: 0,
+        salePortions: 0,
+        summaryPortions: 0,
+        revenue: 0,
+        estimatedRevenue: 0,
+        cost: 0,
+        margin: 0,
+        noRecipePortions: 0,
+        perItem: new Map(),
+      };
+      rows.set(menuId, r);
+    }
+    return r;
+  };
+  const addUsage = (r: MenuReportRow & { perItem: Map<string, Fraction> }, portions: number, date: IsoDate) => {
+    const recipe = recipeAt(ctx.recipes, r.menuId, date);
+    if (!recipe) {
+      r.noRecipePortions += portions;
+      return;
+    }
+    for (const line of recipe.lines) {
+      const used = { n: BigInt(portions) * BigInt(line.quantity), d: BigInt(recipe.yieldPortions) };
+      r.perItem.set(line.itemId, addFraction(r.perItem.get(line.itemId) ?? ZERO_FRACTION, used));
+    }
+  };
+
+  for (const sale of ctx.sales) {
+    if (!inRange(sale.entryDate) || covered(sale.entryDate)) continue;
+    const entry = journals.get(sale.journalEntryId);
+    sale.lines.forEach((line, i) => {
+      const r = row(line.menuId);
+      r.portions += line.portions;
+      r.salePortions += line.portions;
+      // Baris pendapatan jurnal penjualan menu (setelah baris kas/piutang) = nominal tanpa pajak.
+      const credit = entry?.lines[i + 1]?.credit;
+      r.revenue += credit && credit > 0 ? credit : line.amount;
+      addUsage(r, line.portions, sale.entryDate);
+    });
+  }
+  for (const summary of ctx.summaries) {
+    if (!inRange(summary.dateTo)) continue;
+    for (const line of summary.lines) {
+      const r = row(line.menuId);
+      r.portions += line.portions;
+      r.summaryPortions += line.portions;
+      const gross = line.portions * (r.menu?.price ?? 0);
+      const estimate = options.tax && options.tax.inclusive && options.tax.rateBps > 0 ? computeSalesTax(gross, options.tax).base : gross;
+      r.revenue += estimate;
+      r.estimatedRevenue += estimate;
+      addUsage(r, line.portions, summary.dateTo);
+    }
+  }
+
+  const warnings: string[] = [];
+  const result = [...rows.values()].map(({ perItem, ...r }) => {
+    let cost = 0;
+    let missing = 0;
+    for (const [itemId, qty] of perItem) {
+      const basis = bases.get(itemId) ?? null;
+      if (!basis) missing += 1;
+      cost += fractionValue(qty, basis);
+    }
+    if (r.noRecipePortions > 0) warnings.push(`${r.menu?.name ?? "Menu terhapus"}: ${r.noRecipePortions} porsi tanpa resep berlaku (biaya bahan tidak terhitung)`);
+    if (missing > 0) warnings.push(`${r.menu?.name ?? "Menu terhapus"}: ${missing} bahan belum ada harga per ${to}`);
+    return { ...r, cost, margin: r.revenue - cost };
+  });
+  result.sort((a, b) => b.portions - a.portions || (a.menu?.name ?? "").localeCompare(b.menu?.name ?? "", "id"));
+  const totals = result.reduce(
+    (t, r) => ({
+      portions: t.portions + r.portions,
+      revenue: t.revenue + r.revenue,
+      estimatedRevenue: t.estimatedRevenue + r.estimatedRevenue,
+      cost: t.cost + r.cost,
+      margin: t.margin + r.margin,
+    }),
+    { portions: 0, revenue: 0, estimatedRevenue: 0, cost: 0, margin: 0 },
+  );
+  return { rows: result, totals, warnings };
 }

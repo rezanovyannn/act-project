@@ -32,11 +32,13 @@ import {
 } from "@/components/ui/table"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { errorMessage, useLoader } from "@/lib/utils"
+import { MenuReportTab } from "./menu-report"
 import { InvariantCheck, StatementTable, sectionRows, type StatementRow } from "./statement-table"
 
 interface ReportData {
   workspaceName: string
   perpetual: boolean
+  fnb: boolean
   accounts: Account[]
   journals: JournalEntry[]
   periods: Period[]
@@ -54,7 +56,7 @@ function presets(today: string): { label: string; range: DateRange }[] {
   ]
 }
 
-const REPORT_TABS = ["trial", "income", "balance", "equity", "cash"] as const
+const REPORT_TABS = ["trial", "income", "balance", "equity", "cash", "menu"] as const
 
 export function ReportsView({
   services,
@@ -73,12 +75,14 @@ export function ReportsView({
       services.journals.listByWorkspace(workspaceId, { status: "posted" }),
       services.periods.listByWorkspace(workspaceId),
     ])
-    return { workspaceName: workspace?.name ?? "", perpetual: workspace?.inventoryMethod === "perpetual", accounts, journals, periods }
+    return { workspaceName: workspace?.name ?? "", perpetual: workspace?.inventoryMethod === "perpetual", fnb: workspace?.templateType === "fnb", accounts, journals, periods }
   }, [services, workspaceId])
 
   const today = todayIsoDate()
   const [range, setRange] = useState<DateRange>(() => presets(today)[0].range)
   const [printAll, setPrintAll] = useState(false)
+  // Tab disimpan di sini agar tetap terpilih walau rentang tanggal sempat tidak valid saat diketik.
+  const [tab, setTab] = useState(REPORT_TABS.includes(initialTab as (typeof REPORT_TABS)[number]) ? initialTab! : "income")
 
   // Cetak lewat dialog browser (bisa "Simpan sebagai PDF"); mode "semua" merender kelima laporan.
   function print(all: boolean) {
@@ -89,7 +93,7 @@ export function ReportsView({
 
   if (data.loading) return <LoadingState />
   if (data.error) return <p role="alert" className="text-sm text-destructive">{errorMessage(data.error)}</p>
-  const { workspaceName, perpetual, accounts, journals, periods } = data.data!
+  const { workspaceName, perpetual, fnb, accounts, journals, periods } = data.data!
   const validRange = range.fromDate !== "" && range.toDate !== "" && range.fromDate <= range.toDate
 
   return (
@@ -139,14 +143,17 @@ export function ReportsView({
       {!validRange ? (
         <p role="alert" className="text-sm text-destructive">Tanggal awal harus sebelum atau sama dengan tanggal akhir.</p>
       ) : (
-        <Reports initialTab={REPORT_TABS.includes(initialTab as (typeof REPORT_TABS)[number]) ? initialTab! : "income"} workspaceName={workspaceName} perpetual={perpetual} accounts={accounts} journals={journals} periods={periods} range={range} printAll={printAll} />
+        <Reports tab={tab === "menu" && !fnb ? "income" : tab} onTabChange={setTab} workspaceName={workspaceName} perpetual={perpetual} accounts={accounts} journals={journals} periods={periods} range={range} printAll={printAll}
+          menuReport={fnb ? <MenuReportTab services={services} workspaceId={workspaceId} workspaceName={workspaceName} range={range} /> : null}
+        />
       )}
     </div>
   )
 }
 
 function Reports({
-  initialTab,
+  tab,
+  onTabChange: setTab,
   workspaceName,
   perpetual,
   accounts,
@@ -154,8 +161,10 @@ function Reports({
   periods,
   range,
   printAll,
+  menuReport,
 }: {
-  initialTab: string
+  tab: string
+  onTabChange: (tab: string) => void
   workspaceName: string
   perpetual: boolean
   accounts: Account[]
@@ -163,8 +172,9 @@ function Reports({
   periods: Period[]
   range: DateRange
   printAll: boolean
+  /** Tab laporan per menu (F&B, ROADMAP 8C). */
+  menuReport: React.ReactNode | null
 }) {
-  const [tab, setTab] = useState(initialTab)
   const tb = trialBalance(accounts, journals, range.toDate)
   const is = incomeStatement(accounts, journals, range)
   const bs = balanceSheet(accounts, journals, range.toDate)
@@ -294,7 +304,13 @@ function Reports({
         <TabsTrigger value="balance">Neraca</TabsTrigger>
         <TabsTrigger value="equity">Perubahan Modal</TabsTrigger>
         <TabsTrigger value="cash">Arus Kas</TabsTrigger>
+        {menuReport && <TabsTrigger value="menu">Per Menu</TabsTrigger>}
       </TabsList>
+      {menuReport && (
+        <TabsContent value="menu" className="grid gap-4">
+          {menuReport}
+        </TabsContent>
+      )}
 
       <TabsContent value="trial" className="grid gap-4">
         <InvariantCheck
