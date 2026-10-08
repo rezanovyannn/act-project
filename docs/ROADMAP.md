@@ -179,11 +179,11 @@ Faktur untuk tukar faktur di semua template. Faktur adalah input transaksi: draf
 
 ---
 
-## Fase 9 (Siap dikerjakan): Progressive Web App (PWA)
+## Fase 9: Progressive Web App (PWA)
 Aplikasi dapat dipasang (install) di desktop (Chrome/Edge) dan HP (Android; iPhone lewat Safari → "Tambahkan ke Layar Utama"), terbuka seperti aplikasi tersendiri tanpa bilah alamat.
 
 ### Sub-fase 9A: Installable App
-- **Pekerjaan (usulan):** web app manifest (nama, ikon berbagai ukuran termasuk maskable & ikon Apple, warna tema, `display: standalone`, start URL ke Workspace Saya); service worker untuk cache aset statis (shell aplikasi) agar cepat dibuka; tombol/petunjuk "Pasang aplikasi" (Android/desktop memakai prompt bawaan, iPhone memakai petunjuk manual); tampilan aman untuk *safe area* HP (notch) dan navigasi mobile.
+- **Pekerjaan:** web app manifest (`src/app/manifest.ts`: nama, ikon 192/512 + maskable + ikon Apple, warna tema, `display: standalone`, start URL ke Workspace Saya); service worker manual `public/sw.js` (halaman selalu dari jaringan dengan cadangan `public/offline.html`, aset statis Next & ikon cache-first, data/Supabase tidak pernah di-cache; didaftarkan hanya di build production); banner "Anda sedang offline" di dalam aplikasi; layar offline memuat ulang otomatis begitu server terjangkau lagi; tombol "Pasang aplikasi" di sidebar workspace & Workspace Saya (prompt bawaan Android/desktop, petunjuk manual iPhone/iPad, tersembunyi bila sudah terpasang); header keamanan (`nosniff`, `X-Frame-Options`, `Referrer-Policy`) & header khusus `sw.js`; padding *safe area* HP.
 - **Kriteria Selesai (Stop & Review):** lolos pemeriksaan installability Chrome (Lighthouse PWA), terpasang & terbuka standalone di desktop dan Android; iPhone diuji lewat Safari; data tetap dari Supabase (tidak ada data akuntansi yang disimpan offline).
 
 ### Keputusan (dijawab user, 8 Oktober 2026 — Catatan Keputusan 70–73)

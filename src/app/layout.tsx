@@ -1,6 +1,7 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Inter } from "next/font/google";
 import { Toaster } from "@/components/ui/sonner";
+import { PwaRuntime } from "@/app/_components/pwa";
 import { configurationError } from "@/lib/supabase/config";
 import "./globals.css";
 
@@ -12,6 +13,15 @@ const inter = Inter({
 export const metadata: Metadata = {
   title: "Pembukuan",
   description: "Akuntansi pribadi multi-workspace berbasis akrual (SAK EMKM)",
+  applicationName: "Pembukuan",
+  // Dapat dipasang di layar utama iPhone/iPad (ROADMAP Fase 9).
+  appleWebApp: { capable: true, title: "Pembukuan", statusBarStyle: "default" },
+  icons: { apple: "/icons/apple-touch-icon.png" },
+};
+
+export const viewport: Viewport = {
+  themeColor: "#fbfbf9",
+  viewportFit: "cover",
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
@@ -32,6 +42,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
           children
         )}
         <Toaster position="top-right" richColors={false} />
+        <PwaRuntime />
       </body>
     </html>
   );

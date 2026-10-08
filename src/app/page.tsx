@@ -19,6 +19,7 @@ import { WorkspaceList } from "@/modules/workspace/workspace-list"
 import { routes } from "@/app/_components/routes"
 import { useServices } from "@/app/_components/use-services"
 import { AccountBar } from "@/app/_components/account-bar"
+import { InstallAppButton } from "@/app/_components/pwa"
 import { AppLogo } from "@/components/ui/app-logo"
 
 export default function WorkspacesPage() {
@@ -38,7 +39,12 @@ export default function WorkspacesPage() {
               </span>
             )}
           </div>
-          {services && <AccountBar services={services} className="w-full max-w-xs" />}
+          {services && (
+            <div className="flex w-full max-w-md flex-wrap items-center justify-end gap-2 sm:w-auto">
+              <InstallAppButton className="w-auto" />
+              <AccountBar services={services} className="w-full max-w-xs" />
+            </div>
+          )}
         </div>
       </header>
     <main className="mx-auto w-full max-w-7xl flex-1 px-4 py-10 sm:px-6 lg:px-8 lg:py-12">

@@ -27,6 +27,7 @@ import {
 } from "lucide-react"
 import type { Container } from "@/lib/container"
 import { AccountBar } from "@/app/_components/account-bar"
+import { InstallAppButton } from "@/app/_components/pwa"
 import { openClaimCounts } from "@/core/dashboard-insights"
 import { capitalizeWords, todayIsoDate } from "@/core/format"
 import type { TemplateType, WorkspaceTemplate } from "@/core/types"
@@ -168,7 +169,10 @@ function Navigation({
           </div>
         ))}
       </nav>
-      <AccountBar services={services} className="mt-auto" />
+      <div className="mt-auto grid gap-2">
+        <InstallAppButton />
+        <AccountBar services={services} />
+      </div>
     </div>
   )
 }
