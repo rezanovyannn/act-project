@@ -179,18 +179,18 @@ Faktur untuk tukar faktur di semua template. Faktur adalah input transaksi: draf
 
 ---
 
-## Fase 9 (Rencana — belum dikerjakan): Progressive Web App (PWA)
+## Fase 9 (Siap dikerjakan): Progressive Web App (PWA)
 Aplikasi dapat dipasang (install) di desktop (Chrome/Edge) dan HP (Android; iPhone lewat Safari → "Tambahkan ke Layar Utama"), terbuka seperti aplikasi tersendiri tanpa bilah alamat.
 
 ### Sub-fase 9A: Installable App
 - **Pekerjaan (usulan):** web app manifest (nama, ikon berbagai ukuran termasuk maskable & ikon Apple, warna tema, `display: standalone`, start URL ke Workspace Saya); service worker untuk cache aset statis (shell aplikasi) agar cepat dibuka; tombol/petunjuk "Pasang aplikasi" (Android/desktop memakai prompt bawaan, iPhone memakai petunjuk manual); tampilan aman untuk *safe area* HP (notch) dan navigasi mobile.
 - **Kriteria Selesai (Stop & Review):** lolos pemeriksaan installability Chrome (Lighthouse PWA), terpasang & terbuka standalone di desktop dan Android; iPhone diuji lewat Safari; data tetap dari Supabase (tidak ada data akuntansi yang disimpan offline).
 
-### Keputusan yang perlu dijawab user sebelum 9A
-1. **Perilaku saat offline:** (a) hanya layar "Anda sedang offline" + coba lagi, (b) bisa melihat data terakhir (baca saja), atau (c) bisa input transaksi offline lalu disinkronkan (paling rumit: risiko nomor jurnal ganda/konflik periode).
-2. **Nama & ikon aplikasi:** nama pendek di layar HP (mis. "Pembukuan") dan ikon (pakai logo app saat ini atau desain baru).
-3. **Notifikasi push** (mis. pengingat jatuh tempo/setoran pajak): ikut di 9A atau terpisah (butuh server pengirim terjadwal).
-4. **Dependency:** service worker ditulis manual (tanpa library baru) atau memakai library PWA (perlu persetujuan).
+### Keputusan (dijawab user, 8 Oktober 2026 — Catatan Keputusan 70–73)
+1. **Offline:** layar "Anda sedang offline" + coba lagi; shell aplikasi tetap terbuka cepat, tidak ada data akuntansi yang disimpan/diinput offline.
+2. **Nama & ikon:** "Pembukuan" dengan logo aplikasi saat ini (dibuat ukuran ikon yang dibutuhkan, termasuk ikon iPhone & maskable Android).
+3. **Notifikasi push:** tidak di Fase 9; dikerjakan terpisah bersama pengingat pajak (Fase 10).
+4. **Service worker:** ditulis manual tanpa library baru.
 
 ---
 
@@ -298,3 +298,7 @@ Aplikasi dapat dipasang (install) di desktop (Chrome/Edge) dan HP (Android; iPho
 | 67 | Pendapatan porsi rekap (laporan menu) | Porsi × harga jual menu (estimasi, ditandai) | Fase 8C |
 | 68 | Biaya bahan laporan menu | Resep berlaku pada tanggal jual × harga bahan pada akhir periode laporan | Fase 8C |
 | 69 | Lokasi laporan menu | Tab di Laporan Keuangan | Fase 8C |
+| 70 | PWA saat offline | Layar "Anda offline" + coba lagi; tanpa data/input offline | Fase 9 |
+| 71 | Nama & ikon PWA | "Pembukuan" + logo aplikasi saat ini | Fase 9 |
+| 72 | Notifikasi push | Fase terpisah bersama pengingat pajak (Fase 10) | Fase 9 |
+| 73 | Service worker | Manual, tanpa library baru | Fase 9 |
