@@ -179,6 +179,53 @@ Faktur untuk tukar faktur di semua template. Faktur adalah input transaksi: draf
 
 ---
 
+## Fase 9 (Rencana — belum dikerjakan): Progressive Web App (PWA)
+Aplikasi dapat dipasang (install) di desktop (Chrome/Edge) dan HP (Android; iPhone lewat Safari → "Tambahkan ke Layar Utama"), terbuka seperti aplikasi tersendiri tanpa bilah alamat.
+
+### Sub-fase 9A: Installable App
+- **Pekerjaan (usulan):** web app manifest (nama, ikon berbagai ukuran termasuk maskable & ikon Apple, warna tema, `display: standalone`, start URL ke Workspace Saya); service worker untuk cache aset statis (shell aplikasi) agar cepat dibuka; tombol/petunjuk "Pasang aplikasi" (Android/desktop memakai prompt bawaan, iPhone memakai petunjuk manual); tampilan aman untuk *safe area* HP (notch) dan navigasi mobile.
+- **Kriteria Selesai (Stop & Review):** lolos pemeriksaan installability Chrome (Lighthouse PWA), terpasang & terbuka standalone di desktop dan Android; iPhone diuji lewat Safari; data tetap dari Supabase (tidak ada data akuntansi yang disimpan offline).
+
+### Keputusan yang perlu dijawab user sebelum 9A
+1. **Perilaku saat offline:** (a) hanya layar "Anda sedang offline" + coba lagi, (b) bisa melihat data terakhir (baca saja), atau (c) bisa input transaksi offline lalu disinkronkan (paling rumit: risiko nomor jurnal ganda/konflik periode).
+2. **Nama & ikon aplikasi:** nama pendek di layar HP (mis. "Pembukuan") dan ikon (pakai logo app saat ini atau desain baru).
+3. **Notifikasi push** (mis. pengingat jatuh tempo/setoran pajak): ikut di 9A atau terpisah (butuh server pengirim terjadwal).
+4. **Dependency:** service worker ditulis manual (tanpa library baru) atau memakai library PWA (perlu persetujuan).
+
+---
+
+## Fase 10 (Rencana): Pajak UMKM
+- **PPh Final 0,5% (PP 55/2022):** omzet bruto per bulan dari jurnal pendapatan, PPh terutang 0,5%, pengingat setor (tanggal 15 bulan berikutnya), pemantauan batas omzet bebas pajak Rp 500 juta/tahun untuk WP orang pribadi, dan jurnal pembayaran PPh Final.
+- **Rekap setoran PB1 bulanan:** pajak dipungut vs disetor per periode, siap untuk pelaporan ke Bapenda.
+- **Perlu keputusan:** WP orang pribadi atau badan (batas Rp 500 juta hanya untuk orang pribadi), PPh Final dicatat sebagai beban atau prive, masa berlaku tarif (batas tahun pemakaian PP 55/2022).
+
+## Fase 11 (Rencana): Operasional Harian di HP
+- **Foto nota/bukti transaksi** dilampirkan ke jurnal, faktur, dan pembelian (kamera HP lewat PWA). Butuh penyimpanan file (Supabase Storage) dan kebijakan akses per pemilik.
+- **Transaksi berulang:** templat sewa, gaji, langganan; dibuat otomatis sebagai draft setiap periode untuk ditinjau lalu diposting.
+- **Perlu keputusan:** batas ukuran/jenis file, kompresi foto, transaksi berulang dibuat saat aplikasi dibuka atau terjadwal di server.
+
+## Fase 12 (Rencana): Keamanan & Data
+- **Verifikasi 2 langkah (2FA, TOTP)** dengan aplikasi autentikator (Supabase MFA), kode pemulihan.
+- **Backup otomatis terjadwal** (mis. mingguan) ke email atau Google Drive, memakai format backup yang sudah bisa dipulihkan (ADR 023).
+- **Ganti kata sandi dari Pengaturan** dan riwayat login.
+- **Perlu keputusan:** tujuan backup otomatis, frekuensi, 2FA wajib atau opsional.
+
+## Fase 13 (Rencana): Laporan Lanjutan
+- **Perbandingan periode** (bulan ini vs bulan lalu / tahun lalu) di Laba Rugi dan Dashboard.
+- **Laporan umur piutang/utang (aging)** 0–30, 31–60, 61–90, > 90 hari.
+- **Ekspor Excel** untuk semua laporan keuangan.
+
+## Backlog Ide (belum dijadwalkan)
+- Status tukar faktur & daftar jatuh tempo; kirim faktur lewat tautan/WhatsApp.
+- Rekonsiliasi bank (impor mutasi CSV); pencatatan susut/waste bahan.
+- Anggaran vs realisasi; tren harga bahan & penjualan per menu.
+- Impor laporan POS (Moka, Majoo, ESB) ke Rekap Porsi; penjualan GoFood/GrabFood (bruto, komisi, dana cair).
+- Multi-outlet (transfer bahan antar workspace, laporan gabungan).
+- Multi-pengguna/staf dengan peran terbatas (perubahan arsitektur besar, butuh ADR & RLS baru).
+- CI (tes otomatis di GitHub setiap push), optimasi performa data besar, mode gelap.
+
+---
+
 ## Catatan Keputusan (dijawab user, 28 September 2026)
 | # | Pertanyaan | Keputusan | Rujukan |
 |---|---|---|---|
