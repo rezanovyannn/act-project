@@ -189,28 +189,72 @@ Aplikasi dapat dipasang (install) di desktop (Chrome/Edge) dan HP (Android; iPho
 ### Keputusan (dijawab user, 8 Oktober 2026 — Catatan Keputusan 70–73)
 1. **Offline:** layar "Anda sedang offline" + coba lagi; shell aplikasi tetap terbuka cepat, tidak ada data akuntansi yang disimpan/diinput offline.
 2. **Nama & ikon:** "Pembukuan" dengan logo aplikasi saat ini (dibuat ukuran ikon yang dibutuhkan, termasuk ikon iPhone & maskable Android).
-3. **Notifikasi push:** tidak di Fase 9; dikerjakan terpisah bersama pengingat pajak (Fase 10).
+3. **Notifikasi push:** tidak di Fase 9; dikerjakan terpisah bersama pengingat pajak (Fase 11).
 4. **Service worker:** ditulis manual tanpa library baru.
 
 ---
 
-## Fase 10 (Rencana): Pajak UMKM
+## Fase 10 (Siap dikerjakan): Template Katering
+Template ketiga `catering` untuk usaha katering: acara (nikahan, syukuran), nasi box/kantor, dan langganan harian. F&B dan Retail ditahan dulu (tidak ada fitur baru) selama fase ini (user, 10 Oktober 2026). Engine jurnal, laporan, persediaan, faktur, kontak, pajak penjualan, PWA, dan backup dipakai ulang.
+
+**Catatan pajak (riset):** jasa boga/katering bukan objek PPN (UU PPN Pasal 4A; kriteria PMK 70/2022). Yang berlaku adalah PBJT makanan & minuman (UU HKPD, tarif per daerah, maksimal 10%), sama mekanismenya dengan PB1 (ADR 012). Pelanggan badan dapat memotong PPh 23 sebesar 2% kecuali penyedia menyerahkan Suket PP 55/2022.
+
+### Sub-fase 10A: Template, Pesanan, DP, Quotation & Invoice
+- **Pekerjaan:**
+  - **Template & CoA Katering:** Kas, Bank, Persediaan Bahan, Piutang Usaha, Uang Muka Pelanggan (utang), PPh 23 Dibayar Dimuka, Peralatan Katering + Akumulasi Penyusutan, Utang Usaha, Utang PBJT, Pendapatan Katering, Pendapatan Lain (ongkir/sewa alat), Pendapatan Pembatalan, HPP Bahan, Beban Tenaga Lepas, Beban Sewa Alat, Beban Transport/Pengiriman, Beban Kemasan, beban umum, Prive & ekuitas standar.
+  - **Pengaturan pajak:** PBJT tersedia tetapi nonaktif (belum memungut; tarif dapat diisi kelak). PPh 23 dipotong pelanggan tersedia sebagai opsi pengaturan (nonaktif dulu).
+  - **Pesanan/Acara:** pelanggan (kontak), jenis (acara / nasi box / langganan), tanggal & jam acara, lokasi, jumlah pax, baris menu/paket × harga, biaya tambahan, catatan. Status: Penawaran → Dikonfirmasi → Selesai → Lunas, atau Dibatalkan. Ada kalender pesanan.
+  - **Quotation:** dokumen penawaran yang dapat dicetak/PDF dengan masa berlaku. Bila diterima, menjadi pesanan.
+  - **Invoice ke klien:** tagihan DP dan tagihan pelunasan yang dapat dicetak, memakai profil usaha & faktur penjualan (ADR 022).
+  - **DP & pengakuan pendapatan (akrual):** DP diterima → Kas pada Uang Muka Pelanggan. Pendapatan diakui saat acara/pengiriman (Uang Muka + Piutang pada Pendapatan [+ PBJT]). Pelunasan memakai mekanisme pelunasan yang sudah ada.
+  - **Daftar DP & sisa tagihan per klien:** total pesanan, DP diterima, sisa yang belum dibayar, jatuh tempo, dan pesanan mendatang yang sudah ber-DP.
+  - **Pembatalan:** kebijakan dipilih per klien (default di kontak) dan dapat diubah per pesanan: DP dikembalikan penuh, hangus sebagian (%), atau hangus seluruhnya. Bagian yang hangus diakui sebagai Pendapatan Pembatalan.
+- **Kriteria Selesai (Stop & Review):** jurnal DP, pengakuan pendapatan, pelunasan, dan pembatalan benar serta seimbang; daftar DP & sisa tagihan cocok dengan Neraca (Uang Muka Pelanggan, Piutang); quotation & invoice tercetak rapi; teruji unit, contract (mock & Supabase), dan E2E.
+
+### Sub-fase 10B: Biaya & Laba per Pesanan
+- **Pekerjaan:** biaya ditandai ke pesanan. Mode biaya dapat dipilih di pengaturan: **detail** (bahan, tenaga lepas, sewa alat, transport, kemasan, lain-lain) atau **bahan baku saja**. Laporan laba kotor per pesanan & per pax, estimasi (saat penawaran) vs realisasi. Pencatatan PPh 23 dipotong pelanggan saat pelunasan bila opsi pengaturan diaktifkan.
+- **Kriteria Selesai (Stop & Review):** angka laba per pesanan teruji unit & E2E dan totalnya cocok dengan Laba Rugi.
+
+### Sub-fase 10C: Paket Menu per Pax & Daftar Belanja
+- **Pekerjaan:** paket menu dengan resep per pax (memakai ulang Menu & Resep, ADR 021); daftar belanja bahan per tanggal dari pesanan yang dikonfirmasi (beberapa pesanan dalam satu hari digabung); estimasi biaya bahan di quotation.
+- **Kriteria Selesai (Stop & Review):** kebutuhan bahan = resep × pax teruji unit; daftar belanja dapat dicetak/diekspor.
+
+### Sub-fase 10D: Katering Langganan & Sewa Alat
+- **Pekerjaan:** kontrak langganan bulanan (porsi harian, harga per porsi), dengan draft invoice otomatis akhir bulan; sewa/peminjaman alat ke klien beserta deposit jaminan (utang sampai dikembalikan).
+- **Kriteria Selesai (Stop & Review):** tagihan langganan & jurnal jaminan benar; teruji unit dan E2E.
+
+### Keputusan (dijawab user, 10 Oktober 2026 — Catatan Keputusan 74–81)
+1. **Jenis katering:** semuanya (acara, nasi box/kantor, langganan).
+2. **Pendapatan:** diakui saat acara/pengiriman; DP sebagai utang (Uang Muka Pelanggan) sampai saat itu; disertai daftar DP & sisa pembayaran klien.
+3. **Pembatalan:** opsi dipilih per klien karena bisa berbeda-beda.
+4. **PPh 23:** dicantumkan dulu sebagai pengaturan untuk ke depannya.
+5. **Biaya per pesanan:** boleh detail, dengan opsi hanya bahan baku.
+6. **PBJT:** belum memungut; tetap tersedia di pengaturan.
+7. **Urutan:** 10A → 10B → 10C → 10D.
+8. **Dokumen:** Quotation dan Invoice ke klien.
+
+### Masih perlu dikonfirmasi sebelum coding 10A
+- Format nomor quotation (usulan `QUO/2026/10/0001`, prefix dapat diubah di profil usaha seperti faktur).
+- Invoice DP: hanya dokumen tagihan, dengan jurnal baru dibuat saat uang DP diterima (usulan), atau langsung dicatat sebagai piutang saat invoice diterbitkan.
+- Penandaan biaya ke pesanan (10B) butuh kolom opsional pada baris jurnal (mis. `order_id`). Ini perubahan model data jurnal (ADR 011) dan akan diajukan di ADR baru.
+
+## Fase 11 (Rencana): Pajak UMKM
 - **PPh Final 0,5% (PP 55/2022):** omzet bruto per bulan dari jurnal pendapatan, PPh terutang 0,5%, pengingat setor (tanggal 15 bulan berikutnya), pemantauan batas omzet bebas pajak Rp 500 juta/tahun untuk WP orang pribadi, dan jurnal pembayaran PPh Final.
 - **Rekap setoran PB1 bulanan:** pajak dipungut vs disetor per periode, siap untuk pelaporan ke Bapenda.
 - **Perlu keputusan:** WP orang pribadi atau badan (batas Rp 500 juta hanya untuk orang pribadi), PPh Final dicatat sebagai beban atau prive, masa berlaku tarif (batas tahun pemakaian PP 55/2022).
 
-## Fase 11 (Rencana): Operasional Harian di HP
+## Fase 12 (Rencana): Operasional Harian di HP
 - **Foto nota/bukti transaksi** dilampirkan ke jurnal, faktur, dan pembelian (kamera HP lewat PWA). Butuh penyimpanan file (Supabase Storage) dan kebijakan akses per pemilik.
 - **Transaksi berulang:** templat sewa, gaji, langganan; dibuat otomatis sebagai draft setiap periode untuk ditinjau lalu diposting.
 - **Perlu keputusan:** batas ukuran/jenis file, kompresi foto, transaksi berulang dibuat saat aplikasi dibuka atau terjadwal di server.
 
-## Fase 12 (Rencana): Keamanan & Data
+## Fase 13 (Rencana): Keamanan & Data
 - **Verifikasi 2 langkah (2FA, TOTP)** dengan aplikasi autentikator (Supabase MFA), kode pemulihan.
 - **Backup otomatis terjadwal** (mis. mingguan) ke email atau Google Drive, memakai format backup yang sudah bisa dipulihkan (ADR 023).
 - **Ganti kata sandi dari Pengaturan** dan riwayat login.
 - **Perlu keputusan:** tujuan backup otomatis, frekuensi, 2FA wajib atau opsional.
 
-## Fase 13 (Rencana): Laporan Lanjutan
+## Fase 14 (Rencana): Laporan Lanjutan
 - **Perbandingan periode** (bulan ini vs bulan lalu / tahun lalu) di Laba Rugi dan Dashboard.
 - **Laporan umur piutang/utang (aging)** 0–30, 31–60, 61–90, > 90 hari.
 - **Ekspor Excel** untuk semua laporan keuangan.
@@ -300,5 +344,13 @@ Aplikasi dapat dipasang (install) di desktop (Chrome/Edge) dan HP (Android; iPho
 | 69 | Lokasi laporan menu | Tab di Laporan Keuangan | Fase 8C |
 | 70 | PWA saat offline | Layar "Anda offline" + coba lagi; tanpa data/input offline | Fase 9 |
 | 71 | Nama & ikon PWA | "Pembukuan" + logo aplikasi saat ini | Fase 9 |
-| 72 | Notifikasi push | Fase terpisah bersama pengingat pajak (Fase 10) | Fase 9 |
+| 72 | Notifikasi push | Fase terpisah bersama pengingat pajak (Fase 11) | Fase 9 |
 | 73 | Service worker | Manual, tanpa library baru | Fase 9 |
+| 74 | Jenis katering | Acara, nasi box/kantor, dan langganan | Fase 10 |
+| 75 | Pengakuan pendapatan katering | Saat acara/pengiriman; DP = Uang Muka Pelanggan (utang); ada daftar DP & sisa tagihan klien | Fase 10A |
+| 76 | Pembatalan pesanan | Kebijakan dipilih per klien (DP kembali penuh / hangus sebagian / hangus seluruhnya), dapat diubah per pesanan | Fase 10A |
+| 77 | PPh 23 dipotong pelanggan | Opsi di pengaturan (nonaktif dulu), dipakai ke depannya | Fase 10A–10B |
+| 78 | Biaya per pesanan | Detail, dengan opsi hanya bahan baku | Fase 10B |
+| 79 | PBJT katering | Belum memungut; tersedia di pengaturan | Fase 10A |
+| 80 | Urutan katering | 10A → 10B → 10C → 10D; F&B & Retail ditahan | Fase 10 |
+| 81 | Dokumen klien katering | Quotation & Invoice dapat dicetak | Fase 10A |
