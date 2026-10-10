@@ -241,7 +241,7 @@ Template ketiga `catering` untuk usaha katering: acara (nikahan, syukuran), nasi
    - acara selesai / invoice pelunasan diterbitkan → Uang Muka + Piutang pada Pendapatan;
    - pelunasan dibayar → Kas/Bank pada Piutang.
 
-   Setiap penerimaan (DP maupun pelunasan) dan pengembalian DP memilih **akun kas/bank tujuan** (semua akun aktif `is_cash`, mis. Kas, Bank BCA, Bank Mandiri); pilihan terakhir diingat sebagai default.
+   Setiap penerimaan (DP maupun pelunasan) dan pengembalian DP memilih **akun kas/bank tujuan** (semua akun aktif `is_cash`, mis. Kas, Bank BCA, Bank Mandiri). Rekening **dipilih setiap kali** (tidak ada default otomatis dari pilihan terakhir), karena rekening yang dipakai bisa berubah-ubah.
 3. **Penandaan biaya ke pesanan (10B):** kolom opsional pada baris jurnal (mis. `order_id`) disetujui; dicatat di ADR baru (mengubah ADR 011).
 
 ## Fase 11 (Rencana): Pajak UMKM
@@ -363,4 +363,4 @@ Template ketiga `catering` untuk usaha katering: acara (nikahan, syukuran), nasi
 | 82 | Nomor quotation | Dua pilihan prefix: QUO atau SPH (PREFIX/yyyy/mm/0001) | Fase 10A |
 | 83 | Invoice DP & jurnal | Invoice DP = dokumen saja; jurnal otomatis dari daftar tagihan saat DP dibayar, acara selesai/invoice pelunasan, dan pelunasan dibayar | Fase 10A |
 | 84 | Tag pesanan di jurnal | Kolom opsional di baris jurnal untuk laba per pesanan (ADR baru) | Fase 10B |
-| 85 | Rekening penerimaan | Setiap penerimaan/pengembalian DP & pelunasan memilih akun kas/bank tujuan | Fase 10A |
+| 85 | Rekening penerimaan | Setiap penerimaan/pengembalian DP & pelunasan memilih akun kas/bank tujuan setiap kali, tanpa default dari pilihan terakhir | Fase 10A |
