@@ -233,10 +233,14 @@ Template ketiga `catering` untuk usaha katering: acara (nikahan, syukuran), nasi
 7. **Urutan:** 10A → 10B → 10C → 10D.
 8. **Dokumen:** Quotation dan Invoice ke klien.
 
-### Masih perlu dikonfirmasi sebelum coding 10A
-- Format nomor quotation (usulan `QUO/2026/10/0001`, prefix dapat diubah di profil usaha seperti faktur).
-- Invoice DP: hanya dokumen tagihan, dengan jurnal baru dibuat saat uang DP diterima (usulan), atau langsung dicatat sebagai piutang saat invoice diterbitkan.
-- Penandaan biaya ke pesanan (10B) butuh kolom opsional pada baris jurnal (mis. `order_id`). Ini perubahan model data jurnal (ADR 011) dan akan diajukan di ADR baru.
+### Keputusan lanjutan (dijawab user, 10 Oktober 2026 — Catatan Keputusan 82–84)
+1. **Nomor quotation:** tersedia dua pilihan prefix di Profil Usaha, `QUO` (Quotation) atau `SPH` (Surat Penawaran Harga), dengan pola `PREFIX/2026/10/0001`.
+2. **Invoice & jurnal otomatis:** user tidak membuat jurnal manual. Semua tagihan pesanan tampil di satu **daftar tagihan** (status: belum dibayar, sebagian, lunas), dan aksi di daftar itu membuat jurnal otomatis:
+   - invoice DP diterbitkan → dokumen tagihan saja (tanpa jurnal);
+   - DP dibayar → Kas/Bank pada Uang Muka Pelanggan;
+   - acara selesai / invoice pelunasan diterbitkan → Uang Muka + Piutang pada Pendapatan;
+   - pelunasan dibayar → Kas/Bank pada Piutang.
+3. **Penandaan biaya ke pesanan (10B):** kolom opsional pada baris jurnal (mis. `order_id`) disetujui; dicatat di ADR baru (mengubah ADR 011).
 
 ## Fase 11 (Rencana): Pajak UMKM
 - **PPh Final 0,5% (PP 55/2022):** omzet bruto per bulan dari jurnal pendapatan, PPh terutang 0,5%, pengingat setor (tanggal 15 bulan berikutnya), pemantauan batas omzet bebas pajak Rp 500 juta/tahun untuk WP orang pribadi, dan jurnal pembayaran PPh Final.
@@ -354,3 +358,6 @@ Template ketiga `catering` untuk usaha katering: acara (nikahan, syukuran), nasi
 | 79 | PBJT katering | Belum memungut; tersedia di pengaturan | Fase 10A |
 | 80 | Urutan katering | 10A → 10B → 10C → 10D; F&B & Retail ditahan | Fase 10 |
 | 81 | Dokumen klien katering | Quotation & Invoice dapat dicetak | Fase 10A |
+| 82 | Nomor quotation | Dua pilihan prefix: QUO atau SPH (PREFIX/yyyy/mm/0001) | Fase 10A |
+| 83 | Invoice DP & jurnal | Invoice DP = dokumen saja; jurnal otomatis dari daftar tagihan saat DP dibayar, acara selesai/invoice pelunasan, dan pelunasan dibayar | Fase 10A |
+| 84 | Tag pesanan di jurnal | Kolom opsional di baris jurnal untuk laba per pesanan (ADR baru) | Fase 10B |
