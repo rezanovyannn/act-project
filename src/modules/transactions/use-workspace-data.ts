@@ -1,7 +1,7 @@
 "use client"
 
 import type { AppServices } from "@/core/services"
-import type { Account, Item, JournalEntry, Workspace } from "@/core/types"
+import type { Account, CateringOrder, Item, JournalEntry, Workspace } from "@/core/types"
 import { useLoader } from "@/lib/utils"
 
 export interface WorkspaceData {
@@ -9,6 +9,8 @@ export interface WorkspaceData {
   accounts: Account[]
   journals: JournalEntry[]
   items: Item[]
+  /** Pesanan katering yang dapat diberi biaya (ADR 024, Fase 10B). */
+  orders: CateringOrder[]
 }
 
 /** Workspace, akun, dan jurnal untuk form transaksi. */
@@ -21,7 +23,8 @@ export function useWorkspaceData(services: AppServices, workspaceId: string) {
       services.items.listByWorkspace(workspaceId),
     ])
     if (!workspace) throw new Error("Workspace tidak ditemukan")
-    return { workspace, accounts, journals, items }
+    const orders = workspace.templateType === "catering" ? await services.catering.listOrders(workspaceId) : []
+    return { workspace, accounts, journals, items, orders }
   }, [services, workspaceId])
 }
 

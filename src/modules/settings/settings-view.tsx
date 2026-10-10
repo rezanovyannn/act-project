@@ -12,6 +12,7 @@ import { PeriodsTab } from "./periods-tab"
 import { ProfileTab } from "./profile-tab"
 import { InventoryTab } from "./inventory-tab"
 import { TaxTab } from "./tax-tab"
+import { CateringSettingsCard } from "./catering-settings"
 
 export type SettingsTab = "accounts" | "periods" | "opening" | "tax" | "inventory" | "profile" | "closing" | "backup"
 const SETTINGS_TABS: readonly SettingsTab[] = ["accounts", "periods", "opening", "tax", "inventory", "profile", "closing", "backup"]
@@ -78,8 +79,14 @@ export function SettingsView({
         </TabsContent>
         <TabsContent value="tax">
           <TaxTab services={services} workspace={workspace} journalHref={journalHref} onSaved={data.reload} />
+          {workspace.templateType === "catering" && (
+            <div className="mt-5"><CateringSettingsCard key={workspace.updatedAt} services={services} workspace={workspace} part="pph23" onSaved={data.reload} /></div>
+          )}
         </TabsContent>
         <TabsContent value="inventory">
+          {workspace.templateType === "catering" && (
+            <div className="mb-5"><CateringSettingsCard key={workspace.updatedAt} services={services} workspace={workspace} part="cost" onSaved={data.reload} /></div>
+          )}
           <InventoryTab services={services} workspace={workspace} itemsHref={itemsHref} journalHref={journalHref} onSaved={data.reload} />
         </TabsContent>
         <TabsContent value="profile">

@@ -4,14 +4,14 @@ import { useState } from "react"
 import Link from "next/link"
 import { EyeIcon, InfoIcon, PencilIcon, PlusIcon, Trash2Icon, UserPlusIcon } from "lucide-react"
 import { toast } from "sonner"
-import { DEFAULT_CANCELLATION_POLICY, orderTotals, SERVICE_TYPE_LABELS } from "@/core/catering"
+import { COST_CATEGORY_LABELS, costCategoriesFor, DEFAULT_CANCELLATION_POLICY, orderTotals, SERVICE_TYPE_LABELS } from "@/core/catering"
 import { addDays } from "@/core/dates"
 import { todayIsoDate } from "@/core/format"
 import { formatPercentBps, parsePercentBps, safeLineAmount } from "@/core/invoice"
 import { formatTaxSettings } from "@/core/sales-tax"
 import type { AppServices } from "@/core/services"
 import type { CateringData } from "@/core/services/catering-service"
-import type { CancellationPolicy, CateringOrder, CateringOrderInput, CateringServiceType, Contact, InvoiceDiscount } from "@/core/types"
+import type { CancellationPolicy, CateringOrder, CateringOrderInput, CateringServiceType, Contact, CostCategory, CostEstimates, InvoiceDiscount } from "@/core/types"
 import { workspaceTaxSettings } from "@/core/vat"
 import { Amount } from "@/components/ui/amount"
 import { AmountInput } from "@/components/ui/amount-input"
@@ -92,6 +92,8 @@ export function OrderEditor({
       ? order.lines.map((l) => ({ key: ++lineKey, description: l.description, quantity: String(l.quantity), unit: l.unit ?? "", unitPrice: l.unitPrice, accountId: l.accountId }))
       : [{ key: ++lineKey, description: "", quantity: "", unit: "pax", unitPrice: null, accountId: mainRevenue?.id ?? "" }],
   )
+  const costCategories = costCategoriesFor(workspace.cateringSettings.costMode)
+  const [estimates, setEstimates] = useState<Partial<Record<CostCategory, number | null>>>(() => ({ ...(order?.costEstimates ?? {}) }))
   const [addingContact, setAddingContact] = useState(false)
   const [preview, setPreview] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -135,11 +137,13 @@ export function OrderEditor({
     discount,
     notes: notes || null,
     cancellationPolicy: policy ?? DEFAULT_CANCELLATION_POLICY,
+    costEstimates: Object.fromEntries(costCategories.flatMap((c) => (estimates[c] ? [[c, estimates[c]]] : []))) as CostEstimates,
     lines: lines
       .filter((l) => l.description.trim() || l.unitPrice)
       .map((l) => ({ description: l.description, quantity: qtyOf(l), unit: l.unit || null, unitPrice: l.unitPrice ?? 0, accountId: l.accountId, itemId: null })),
   }
   const totals = orderTotals(input, workspace)
+  const estimateTotal = costCategories.reduce((t, c) => t + (estimates[c] ?? 0), 0)
 
   async function save() {
     setError(null)
@@ -299,6 +303,18 @@ export function OrderEditor({
           )}
         </label>
 
+        <fieldset className="grid gap-2">
+          <legend className="mb-1 text-sm font-medium">Estimasi biaya (opsional, untuk dibandingkan dengan realisasi)</legend>
+          <div className="grid gap-2 sm:grid-cols-3">
+            {costCategories.map((c) => (
+              <div key={c} className="grid gap-1">
+                <Label htmlFor={`order-estimate-${c}`} className="text-xs text-muted-foreground">{COST_CATEGORY_LABELS[c]}</Label>
+                <AmountInput id={`order-estimate-${c}`} value={estimates[c] ?? null} onValueChange={(v) => setEstimates((e) => ({ ...e, [c]: v }))} />
+              </div>
+            ))}
+          </div>
+        </fieldset>
+
         <CancellationPolicyField key={policyKey} value={policy} onChange={(p) => setPolicy(p)} />
 
         <div className="grid gap-4 sm:grid-cols-[11rem_11rem]">
@@ -339,6 +355,18 @@ export function OrderEditor({
           </div>
           {paxNumber > 0 && totals.total > 0 && (
             <p className="text-xs text-muted-foreground">≈ <Amount value={Math.round(totals.total / paxNumber)} /> per pax</p>
+          )}
+          {estimateTotal > 0 && (
+            <>
+              <div className="mt-1 flex justify-between border-t pt-2">
+                <dt className="text-muted-foreground">Estimasi biaya</dt>
+                <dd><Amount value={-estimateTotal} /></dd>
+              </div>
+              <div className="flex justify-between font-semibold text-ink">
+                <dt>Estimasi laba kotor</dt>
+                <dd><Amount value={totals.base - estimateTotal} /></dd>
+              </div>
+            </>
           )}
         </dl>
         <p className="flex gap-2 rounded-2xl bg-card px-4 py-3 text-xs text-muted-foreground">

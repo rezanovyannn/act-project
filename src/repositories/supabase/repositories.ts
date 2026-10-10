@@ -33,6 +33,7 @@ import type {
   ItemInput,
   BusinessProfile,
   BusinessProfileInput,
+  CateringSettings,
   CateringOrder,
   CateringOrderInput,
   OrderBill,
@@ -130,6 +131,11 @@ export class SupabaseWorkspaceRepository implements IWorkspaceRepository {
     await unwrap(
       this.client.rpc("update_workspace_tax_settings", { p_id: id, p_settings: settings }),
     );
+    return required(await this.getById(id), "Workspace");
+  }
+
+  async updateCateringSettings(id: string, settings: CateringSettings): Promise<Workspace> {
+    await unwrap(this.client.rpc("update_catering_settings", { p_id: id, p_settings: settings }));
     return required(await this.getById(id), "Workspace");
   }
 

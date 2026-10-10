@@ -12,7 +12,7 @@ export const CATERING_ACCOUNTS: AccountSeed[] = [
   { code: "1-1200", name: "Bank", accountType: "asset", normalBalance: "debit", cashFlowCategory: "none", isCash: true, systemRole: null },
   { code: "1-1300", name: "Persediaan Bahan Baku", accountType: "asset", normalBalance: "debit", cashFlowCategory: "operating", isCash: false, systemRole: "inventory" },
   { code: "1-1400", name: "Piutang Usaha", accountType: "asset", normalBalance: "debit", cashFlowCategory: "operating", isCash: false, systemRole: "accounts_receivable" },
-  { code: "1-1500", name: "PPh 23 Dibayar Dimuka", accountType: "asset", normalBalance: "debit", cashFlowCategory: "operating", isCash: false, systemRole: null },
+  { code: "1-1500", name: "PPh 23 Dibayar Dimuka", accountType: "asset", normalBalance: "debit", cashFlowCategory: "operating", isCash: false, systemRole: "pph23_prepaid" },
   { code: "1-2100", name: "Peralatan Katering", accountType: "asset", normalBalance: "debit", cashFlowCategory: "investing", isCash: false, systemRole: null },
   { code: "1-2190", name: "Akumulasi Penyusutan Peralatan", accountType: "asset", normalBalance: "credit", cashFlowCategory: "investing", isCash: false, systemRole: null },
   // Liabilitas

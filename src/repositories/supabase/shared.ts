@@ -73,6 +73,11 @@ export const toWorkspace = (r: any): Workspace => ({
   inventoryMethod: r.inventory_method,
   costMethodHistory: r.cost_method_history ?? [],
   stockValuation: r.stock_valuation ?? "average",
+  cateringSettings: {
+    costMode: r.catering_cost_mode ?? "detail",
+    pph23Enabled: r.pph23_enabled ?? false,
+    pph23RateBps: r.pph23_rate_bps ?? 200,
+  },
   salesTaxRateBps: r.sales_tax_rate_bps,
   salesTaxInclusive: r.sales_tax_inclusive,
   createdAt: r.created_at,
@@ -208,6 +213,7 @@ export const toCateringOrder = (r: any): CateringOrder => ({
   discount: r.discount_kind ? { kind: r.discount_kind, value: toAmount(r.discount_value) } : null,
   notes: r.notes ?? null,
   cancellationPolicy: { kind: r.cancellation_policy.kind, forfeitBps: Number(r.cancellation_policy.forfeitBps ?? 0) },
+  costEstimates: Object.fromEntries(Object.entries(r.cost_estimates ?? {}).map(([k, v]) => [k, toAmount(v)])),
   lines: (r.lines ?? []).map((l: any) => ({
     description: l.description ?? "",
     quantity: toAmount(l.quantity),

@@ -277,6 +277,7 @@ export function buildFnbMockState(): MockState {
     inventoryMethod: "periodic",
     costMethodHistory: [],
     stockValuation: "average",
+    cateringSettings: { costMode: "detail", pph23Enabled: false, pph23RateBps: 200 },
     salesTaxRateBps: 1000,
     salesTaxInclusive: false,
     createdAt: SEED_TIMESTAMP,

@@ -5,19 +5,24 @@ import {
   buildCancellation,
   buildDepositReceipt,
   buildDepositRefund,
+  buildOrderCost,
   buildOrderSettlement,
   depositFlows,
   orderInvoiceInput,
+  orderProfits,
   summarizeBills,
   summarizeClients,
   summarizeOrders,
   tagOrder,
   validateBill,
+  validateCateringSettings,
   validateOrderInput,
   type BillSummary,
   type CancellationInput,
   type CancellationPlan,
   type ClientSummary,
+  type OrderCostInput,
+  type OrderProfit,
   type OrderSummary,
   type PaymentInput,
 } from "../catering";
@@ -27,6 +32,7 @@ import type { IAccountRepository, ICateringRepository, IInvoiceRepository, IJour
 import type {
   Account,
   BusinessProfile,
+  CateringSettings,
   CateringOrder,
   CateringOrderInput,
   Contact,
@@ -97,6 +103,39 @@ export class CateringService {
     return summarizeClients(this.summaries(data, today), data.contacts, today);
   }
 
+  /** Laba kotor per pesanan sesuai mode biaya workspace (Fase 10B). */
+  profits(data: CateringData): Map<string, OrderProfit> {
+    return orderProfits(data.orders, data.journals, data.accounts, data.workspace.cateringSettings.costMode);
+  }
+
+  async updateSettings(workspaceId: string, settings: CateringSettings): Promise<Workspace> {
+    const clean = validateCateringSettings(settings);
+    if (clean.pph23Enabled) await this.ensurePph23Account(workspaceId);
+    return this.deps.workspaces.updateCateringSettings(workspaceId, clean);
+  }
+
+  /** Akun PPh 23 Dibayar Dimuka (peran pph23_prepaid) dibuat bila belum ada. */
+  private async ensurePph23Account(workspaceId: string): Promise<void> {
+    const accounts = await this.deps.accounts.listByWorkspace(workspaceId);
+    if (accounts.some((a) => a.systemRole === "pph23_prepaid")) return;
+    const code = accounts.some((a) => a.code === "1-1500") ? "1-1510" : "1-1500";
+    await this.deps.accounts.create(workspaceId, {
+      code,
+      name: "PPh 23 Dibayar Dimuka",
+      accountType: "asset",
+      normalBalance: "debit",
+      cashFlowCategory: "operating",
+      isCash: false,
+      systemRole: "pph23_prepaid",
+    });
+  }
+
+  /** Catat biaya pesanan (bahan langsung HPP, beban lain per kategori). */
+  async recordCost(order: CateringOrder, input: OrderCostInput): Promise<JournalEntry> {
+    const data = await this.data(order.workspaceId);
+    return this.deps.journalService.postJournal(buildOrderCost(order, input, data.accounts, data.workspace.cateringSettings.costMode));
+  }
+
   // ---------- Pesanan ----------
 
   async saveOrder(input: CateringOrderInput, id?: string): Promise<CateringOrder> {
@@ -141,7 +180,7 @@ export class CateringService {
    * Terima pembayaran dari klien: sebelum selesai = DP (Uang Muka Pelanggan;
    * penawaran otomatis dikonfirmasi), sesudah selesai = pelunasan faktur.
    */
-  async receivePayment(order: CateringOrder, payment: PaymentInput): Promise<JournalEntry> {
+  async receivePayment(order: CateringOrder, payment: PaymentInput, withholding = 0): Promise<JournalEntry> {
     const data = await this.data(order.workspaceId);
     const name = this.clientName(data, order);
     if (order.state === "cancelled") fail("INVALID_ORDER", "Pesanan sudah dibatalkan");
@@ -149,8 +188,10 @@ export class CateringService {
       const invoice = data.invoices.find((i) => i.id === order.invoiceId);
       const journal = data.journals.find((e) => e.id === invoice?.journalEntryId);
       if (!journal) fail("INVOICE_NOT_FOUND", "Faktur pesanan tidak ditemukan");
-      return this.deps.journalService.postJournal(buildOrderSettlement(order, name, journal, payment, data.accounts));
+      if (withholding > 0 && !data.workspace.cateringSettings.pph23Enabled) fail("INVALID_SETTLEMENT", "Aktifkan PPh 23 di Pengaturan → Pajak");
+      return this.deps.journalService.postJournal(buildOrderSettlement(order, name, journal, payment, data.accounts, withholding));
     }
+    if (withholding > 0) fail("INVALID_DEPOSIT", "PPh 23 dipotong saat pelunasan faktur, bukan saat DP");
     const entry = buildDepositReceipt(order, name, payment, data.accounts);
     await this.deps.journalService.validateForPosting(entry);
     if (order.state === "quotation") await this.confirm(order);

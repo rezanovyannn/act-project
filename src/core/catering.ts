@@ -10,7 +10,7 @@ import { fail } from "./errors";
 import { discountAmount, lineAmount, summarizeInvoices, validateDiscount, type InvoiceSummary } from "./invoice";
 import { computeSalesTax, effectiveTaxSettings } from "./sales-tax";
 import { mulDivRound } from "./stock";
-import { accountByRole } from "./transactions";
+import { accountByRole, buildExpense, type Payment } from "./transactions";
 import type {
   Account,
   CancellationPolicy,
@@ -25,6 +25,10 @@ import type {
   JournalEntryInput,
   OrderBill,
   OrderBillInput,
+  CateringCostMode,
+  CateringSettings,
+  CostCategory,
+  CostEstimates,
   Workspace,
 } from "./types";
 import { workspaceTaxSettings } from "./vat";
@@ -69,6 +73,7 @@ export function validateOrderInput(input: CateringOrderInput): CateringOrderInpu
     notes: trimOrNull(input.notes),
     discount: validateDiscount(input.discount ?? null),
     cancellationPolicy: validatePolicy(input.cancellationPolicy),
+    costEstimates: validateCostEstimates(input.costEstimates ?? {}),
     lines,
   };
 }
@@ -402,9 +407,35 @@ export function buildDepositRefund(order: CateringOrder, clientName: string, pay
 }
 
 /** Pelunasan faktur pesanan selesai: Dr Kas/Bank / Cr Piutang (ADR 012). */
-export function buildOrderSettlement(order: CateringOrder, clientName: string, invoiceJournal: JournalEntry, payment: PaymentInput, accounts: readonly Account[]): JournalEntryInput {
+export function buildOrderSettlement(
+  order: CateringOrder,
+  clientName: string,
+  invoiceJournal: JournalEntry,
+  payment: PaymentInput,
+  accounts: readonly Account[],
+  /** PPh 23 yang dipotong pelanggan (Fase 10B); 0 = tidak dipotong. */
+  withholding = 0,
+): JournalEntryInput {
   requireAmount(payment.amount, "Nominal pembayaran");
   const cash = requireCash(accounts, payment.cashAccountId);
+  if (!Number.isSafeInteger(withholding) || withholding < 0) fail("INVALID_AMOUNT", "PPh 23 harus bilangan bulat ≥ 0");
+  if (withholding > 0) {
+    const prepaid = accounts.find((a) => a.systemRole === "pph23_prepaid" && a.deletedAt === null);
+    if (!prepaid) fail("ACCOUNT_NOT_FOUND", "Akun PPh 23 Dibayar Dimuka belum ada");
+    return {
+      workspaceId: order.workspaceId,
+      entryDate: payment.date,
+      description: `Pelunasan pesanan ${order.number} · ${clientName} (dipotong PPh 23)`,
+      source: "settlement",
+      counterparty: clientName,
+      settlementOf: invoiceJournal.id,
+      lines: [
+        { accountId: cash.id, debit: payment.amount, credit: 0, orderId: order.id },
+        { accountId: prepaid.id, description: "PPh 23 dipotong pelanggan", debit: withholding, credit: 0, orderId: order.id },
+        { accountId: accountByRole(accounts, "accounts_receivable").id, debit: 0, credit: payment.amount + withholding, orderId: order.id },
+      ],
+    };
+  }
   return {
     workspaceId: order.workspaceId,
     entryDate: payment.date,
@@ -503,4 +534,167 @@ export function ordersByDate(orders: readonly CateringOrder[], month: string): M
   }
   for (const list of map.values()) list.sort((a, b) => (a.eventTime ?? "99").localeCompare(b.eventTime ?? "99"));
   return map;
+}
+
+// ---------- Biaya & laba per pesanan (Fase 10B) ----------
+
+export const COST_CATEGORIES: readonly CostCategory[] = ["materials", "labor", "equipment", "transport", "packaging", "other"];
+
+export const COST_CATEGORY_LABELS: Record<CostCategory, string> = {
+  materials: "Bahan baku",
+  labor: "Tenaga lepas",
+  equipment: "Sewa alat",
+  transport: "Transport & pengiriman",
+  packaging: "Kemasan",
+  other: "Lain-lain",
+};
+
+/** Kode akun template katering per kategori beban (ADR 024); akun beban lain = lain-lain. */
+const CATEGORY_CODES: Partial<Record<string, CostCategory>> = {
+  "6-1100": "labor",
+  "6-1200": "equipment",
+  "6-1300": "transport",
+  "6-1400": "packaging",
+};
+
+/** Kategori biaya sebuah akun: HPP = bahan baku; beban menurut kode; selain itu bukan biaya. */
+export function costCategoryOf(account: Pick<Account, "accountType" | "code">): CostCategory | null {
+  if (account.accountType === "cogs") return "materials";
+  if (account.accountType === "expense") return CATEGORY_CODES[account.code] ?? "other";
+  return null;
+}
+
+/** Kategori yang dipakai sesuai mode biaya (Catatan Keputusan 78). */
+export const costCategoriesFor = (mode: CateringCostMode): readonly CostCategory[] => (mode === "materials" ? ["materials"] : COST_CATEGORIES);
+
+/** Akun default untuk mencatat biaya kategori tertentu. */
+export function defaultCostAccount(accounts: readonly Account[], category: CostCategory): Account | null {
+  const usable = accounts.filter((a) => a.deletedAt === null && a.isActive);
+  if (category === "materials") return usable.find((a) => a.systemRole === "cogs") ?? usable.find((a) => a.accountType === "cogs") ?? null;
+  const code = Object.entries(CATEGORY_CODES).find(([, c]) => c === category)?.[0];
+  const byCode = code ? usable.find((a) => a.code === code && a.accountType === "expense") : undefined;
+  if (byCode) return byCode;
+  return category === "other" ? (usable.find((a) => a.accountType === "expense" && a.code === "6-9000") ?? null) : null;
+}
+
+export function validateCostEstimates(estimates: CostEstimates): CostEstimates {
+  const clean: CostEstimates = {};
+  for (const [key, value] of Object.entries(estimates)) {
+    if (!COST_CATEGORIES.includes(key as CostCategory)) fail("INVALID_ORDER", "Kategori estimasi biaya tidak dikenal");
+    if (typeof value !== "number" || !Number.isSafeInteger(value) || value < 0) fail("INVALID_AMOUNT", "Estimasi biaya harus bilangan bulat ≥ 0");
+    if (value > 0) clean[key as CostCategory] = value;
+  }
+  return clean;
+}
+
+export interface OrderProfit {
+  /** Pendapatan bersih bertag pesanan (setelah diskon, tanpa pajak; termasuk DP hangus). */
+  revenue: number;
+  costs: Record<CostCategory, number>;
+  totalCost: number;
+  /** Laba kotor = pendapatan − biaya. */
+  profit: number;
+  /** Margin laba kotor dalam basis poin (null bila pendapatan 0). */
+  marginBps: number | null;
+  /** Laba kotor per pax (dibulatkan). */
+  profitPerPax: number;
+  estimates: Record<CostCategory, number>;
+  estimateTotal: number;
+}
+
+/**
+ * Laba kotor per pesanan dari baris jurnal bertag pesanan (posted; pembalik ikut
+ * menetralkan). Mode bahan baku saja: hanya biaya HPP yang dihitung.
+ */
+export function orderProfits(
+  orders: readonly CateringOrder[],
+  entries: readonly JournalEntry[],
+  accounts: readonly Account[],
+  mode: CateringCostMode,
+): Map<string, OrderProfit> {
+  const byId = new Map(accounts.map((a) => [a.id, a]));
+  const categories = costCategoriesFor(mode);
+  const zero = () => Object.fromEntries(COST_CATEGORIES.map((c) => [c, 0])) as Record<CostCategory, number>;
+  const raw = new Map<string, { revenue: number; costs: Record<CostCategory, number> }>();
+  for (const entry of entries) {
+    if (entry.status !== "posted" || entry.deletedAt !== null) continue;
+    for (const line of entry.lines) {
+      if (!line.orderId) continue;
+      const account = byId.get(line.accountId);
+      if (!account) continue;
+      const r = raw.get(line.orderId) ?? { revenue: 0, costs: zero() };
+      if (account.accountType === "revenue") r.revenue += line.credit - line.debit;
+      const category = costCategoryOf(account);
+      if (category && categories.includes(category)) r.costs[category] += line.debit - line.credit;
+      raw.set(line.orderId, r);
+    }
+  }
+  const result = new Map<string, OrderProfit>();
+  for (const order of orders) {
+    const r = raw.get(order.id) ?? { revenue: 0, costs: zero() };
+    const totalCost = COST_CATEGORIES.reduce((t, c) => t + r.costs[c], 0);
+    const profit = r.revenue - totalCost;
+    const estimates = zero();
+    for (const c of categories) estimates[c] = order.costEstimates[c] ?? 0;
+    result.set(order.id, {
+      revenue: r.revenue,
+      costs: r.costs,
+      totalCost,
+      profit,
+      marginBps: r.revenue > 0 ? mulDivRound(profit, 10_000, r.revenue) : null,
+      profitPerPax: Math.round(profit / order.pax),
+      estimates,
+      estimateTotal: categories.reduce((t, c) => t + estimates[c], 0),
+    });
+  }
+  return result;
+}
+
+export interface OrderCostInput {
+  date: IsoDate;
+  category: CostCategory;
+  /** Akun HPP/beban; bahan baku langsung ke HPP (Catatan Keputusan 86). */
+  accountId: string;
+  amount: number;
+  description: string;
+  /** Tunai dari rekening (dipilih) atau kredit ke pemasok. */
+  payment: Payment;
+}
+
+/** Catat biaya pesanan: Dr HPP/Beban (bertag pesanan) / Cr Kas/Bank atau Utang Usaha. */
+export function buildOrderCost(order: CateringOrder, input: OrderCostInput, accounts: readonly Account[], mode: CateringCostMode): JournalEntryInput {
+  if (!costCategoriesFor(mode).includes(input.category)) fail("INVALID_ACCOUNT", "Mode biaya bahan baku saja: catat kategori bahan baku");
+  if (!isValidIsoDate(input.date)) fail("INVALID_DATE", "Tanggal biaya tidak valid");
+  requireAmount(input.amount, "Nominal biaya");
+  const account = accounts.find((a) => a.id === input.accountId && a.deletedAt === null);
+  if (!account || costCategoryOf(account) === null) fail("INVALID_ACCOUNT", "Pilih akun HPP atau beban");
+  if (input.category === "materials" && account.accountType !== "cogs") fail("INVALID_ACCOUNT", "Bahan baku pesanan dicatat langsung ke akun HPP");
+  if (input.payment.kind === "cash") requireCash(accounts, input.payment.accountId);
+  const label = input.description.trim() || COST_CATEGORY_LABELS[input.category];
+  const entry = buildExpense(
+    {
+      workspaceId: order.workspaceId,
+      entryDate: input.date,
+      description: `${label} · pesanan ${order.number}`,
+      payment: input.payment,
+      items: [{ accountId: account.id, amount: input.amount, description: label }],
+    },
+    accounts,
+  );
+  // Hanya baris biaya yang bertag pesanan.
+  return { ...entry, lines: entry.lines.map((l) => (l.accountId === account.id && l.debit > 0 ? { ...l, orderId: order.id } : l)) };
+}
+
+/** PPh 23 default saat pelunasan: tarif × dasar (total faktur tanpa pajak penjualan), maks. sisa tagihan. */
+export function defaultWithholding(invoiceBase: number, rateBps: number, outstanding: number): number {
+  if (invoiceBase <= 0 || rateBps <= 0) return 0;
+  return Math.min(mulDivRound(invoiceBase, rateBps, 10_000), outstanding);
+}
+
+export function validateCateringSettings(settings: CateringSettings): CateringSettings {
+  if (settings.costMode !== "detail" && settings.costMode !== "materials") fail("INVALID_ORDER", "Mode biaya tidak dikenal");
+  if (!Number.isSafeInteger(settings.pph23RateBps) || settings.pph23RateBps < 1 || settings.pph23RateBps > 10_000) {
+    fail("INVALID_AMOUNT", "Tarif PPh 23 harus lebih dari 0% dan maksimal 100%");
+  }
+  return { costMode: settings.costMode, pph23Enabled: Boolean(settings.pph23Enabled), pph23RateBps: settings.pph23RateBps };
 }

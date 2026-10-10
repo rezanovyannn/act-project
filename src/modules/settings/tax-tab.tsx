@@ -257,18 +257,6 @@ export function TaxTab({
       <Button type="submit" className="w-fit" disabled={saving}>
         {saving ? "Menyimpan…" : "Simpan pengaturan pajak"}
       </Button>
-      {workspace.templateType === "catering" && (
-        <section className="grid gap-2 rounded-2xl bg-card p-4 text-sm">
-          <label className="flex items-center gap-3">
-            <Switch checked={false} disabled aria-label="PPh 23 dipotong pelanggan" />
-            <span className="font-medium text-ink">PPh 23 dipotong pelanggan (nonaktif)</span>
-          </label>
-          <p className="text-xs text-muted-foreground">
-            Pelanggan badan dapat memotong PPh 23 sebesar 2% atas jasa katering, kecuali Anda menyerahkan Suket PP 55/2022. Pencatatan potongan saat pelunasan
-            (akun PPh 23 Dibayar Dimuka) disiapkan untuk tahap berikutnya (ROADMAP Fase 10B). Katering bukan objek PPN; pajak penjualannya PBJT.
-          </p>
-        </section>
-      )}
     </form>
   )
 }

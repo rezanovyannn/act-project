@@ -79,7 +79,11 @@ export class MockCateringRepository implements ICateringRepository {
       }
       const policy = validatePolicy(input.cancellationPolicy);
       const now = this.db.now();
-      const fields = { ...input, cancellationPolicy: policy, lines: input.lines.map((l) => ({ ...l, itemId: null })) };
+      const estimates = input.costEstimates ?? {};
+      if (Object.entries(estimates).some(([k, v]) => !["materials", "labor", "equipment", "transport", "packaging", "other"].includes(k) || !Number.isSafeInteger(v) || (v as number) < 0)) {
+        fail("INVALID_AMOUNT", "Estimasi biaya tidak valid");
+      }
+      const fields = { ...input, costEstimates: { ...estimates }, cancellationPolicy: policy, lines: input.lines.map((l) => ({ ...l, itemId: null })) };
       if (id) {
         const order = requireOrder(state, id);
         if (order.workspaceId !== input.workspaceId) fail("ORDER_NOT_FOUND", "Pesanan tidak ditemukan");

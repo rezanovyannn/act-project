@@ -24,6 +24,7 @@ import { LoadingState, PageHeader } from "@/components/ui/page-header"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { cn, errorMessage, useLoader } from "@/lib/utils"
 import { PaymentDialog } from "./order-dialogs"
+import { ProfitList } from "./order-profit"
 
 export interface OrderRoutes {
   list: string
@@ -61,12 +62,12 @@ export function PaymentBadge({ status }: { status: PaymentStatus }) {
   return <Badge className={cn("border-0", PAYMENT_STYLES[status])}>{PAYMENT_STATUS_LABELS[status]}</Badge>
 }
 
-type Tab = "orders" | "calendar" | "bills" | "clients"
+type Tab = "orders" | "calendar" | "bills" | "clients" | "profit"
 
 /** Pesanan katering: daftar, kalender, tagihan, dan DP & sisa per klien (ADR 024). */
 export function OrdersView({ services, workspaceId, routes, initialTab }: { services: AppServices; workspaceId: string; routes: OrderRoutes; initialTab?: string }) {
   const data = useLoader(() => services.cateringService.data(workspaceId), [services, workspaceId])
-  const [tab, setTab] = useState<Tab>((["orders", "calendar", "bills", "clients"] as const).find((t) => t === initialTab) ?? "orders")
+  const [tab, setTab] = useState<Tab>((["orders", "calendar", "bills", "clients", "profit"] as const).find((t) => t === initialTab) ?? "orders")
 
   if (data.loading && !data.data) return <LoadingState />
   if (data.error) return <p role="alert" className="text-sm text-destructive">{errorMessage(data.error)}</p>
@@ -101,11 +102,13 @@ export function OrdersView({ services, workspaceId, routes, initialTab }: { serv
           <TabsTrigger value="calendar">Kalender</TabsTrigger>
           <TabsTrigger value="bills">Tagihan</TabsTrigger>
           <TabsTrigger value="clients">Per Klien</TabsTrigger>
+          <TabsTrigger value="profit">Laba</TabsTrigger>
         </TabsList>
         <TabsContent value="orders"><OrderList data={current} summaries={summaries} routes={routes} /></TabsContent>
         <TabsContent value="calendar"><OrderCalendar data={current} summaries={summaries} routes={routes} /></TabsContent>
         <TabsContent value="bills"><BillsList services={services} data={current} summaries={summaries} routes={routes} onChanged={data.reload} /></TabsContent>
         <TabsContent value="clients"><ClientsList services={services} data={current} routes={routes} /></TabsContent>
+        <TabsContent value="profit"><ProfitList data={current} summaries={summaries} profits={services.cateringService.profits(current)} routes={routes} /></TabsContent>
       </Tabs>
     </div>
   )

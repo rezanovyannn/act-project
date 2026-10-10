@@ -4,7 +4,7 @@ import type { InventorySettings, IWorkspaceRepository, NewWorkspace } from "@/co
 import { assertValidTaxSettings, type WorkspaceTaxSettings } from "@/core/sales-tax";
 import type { WorkspaceBackup } from "@/core/backup";
 import { parseBackup } from "@/core/backup-restore";
-import type { AccountSeed, Workspace } from "@/core/types";
+import type { AccountSeed, Workspace, CateringSettings } from "@/core/types";
 import type { MockDatabase } from "./mock-database";
 
 export class MockWorkspaceRepository implements IWorkspaceRepository {
@@ -44,6 +44,7 @@ export class MockWorkspaceRepository implements IWorkspaceRepository {
         inventoryMethod: "periodic",
         costMethodHistory: [],
         stockValuation: "average",
+        cateringSettings: { costMode: "detail", pph23Enabled: false, pph23RateBps: 200 },
         createdAt: now,
         updatedAt: now,
         deletedAt: null,
@@ -111,6 +112,21 @@ export class MockWorkspaceRepository implements IWorkspaceRepository {
     });
   }
 
+  async updateCateringSettings(id: string, settings: CateringSettings): Promise<Workspace> {
+    return this.db.write((state) => {
+      const workspace = state.workspaces.find((w) => w.id === id && w.deletedAt === null);
+      if (!workspace) fail("NOT_FOUND", "Workspace tidak ditemukan");
+      // Meniru constraint kolom workspaces (Fase 10B).
+      const rateOk = Number.isSafeInteger(settings.pph23RateBps) && settings.pph23RateBps >= 1 && settings.pph23RateBps <= 10_000;
+      if (!["detail", "materials"].includes(settings.costMode) || !rateOk) fail("INVALID_AMOUNT", "Pengaturan katering tidak valid");
+      const before = { ...workspace };
+      workspace.cateringSettings = { costMode: settings.costMode, pph23Enabled: settings.pph23Enabled, pph23RateBps: settings.pph23RateBps };
+      workspace.updatedAt = this.db.now();
+      this.db.audit(state, { workspaceId: id, entityType: "workspace", entityId: id, action: "update", before, after: workspace });
+      return workspace;
+    });
+  }
+
   async updateInventorySettings(id: string, settings: InventorySettings): Promise<Workspace> {
     return this.db.write((state) => {
       const workspace = state.workspaces.find((w) => w.id === id && w.deletedAt === null);
@@ -148,7 +164,16 @@ export class MockWorkspaceRepository implements IWorkspaceRepository {
       const ref = (old: string | null | undefined) => (old ? id(old) : null);
       const now = this.db.now();
       const source = backup.workspace;
-      const workspace: Workspace = { ...source, id: id(source.id), ownerId, name: name.trim(), createdAt: now, updatedAt: now, deletedAt: null };
+      const workspace: Workspace = {
+        ...source,
+        cateringSettings: source.cateringSettings ?? { costMode: "detail", pph23Enabled: false, pph23RateBps: 200 },
+        id: id(source.id),
+        ownerId,
+        name: name.trim(),
+        createdAt: now,
+        updatedAt: now,
+        deletedAt: null,
+      };
       const wsId = workspace.id;
       state.workspaces.push(workspace);
       state.accounts.push(...backup.accounts.map((a) => ({ ...a, id: id(a.id), workspaceId: wsId })));

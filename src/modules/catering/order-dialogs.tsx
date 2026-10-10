@@ -6,7 +6,13 @@ import {
   buildCancellation,
   buildDepositReceipt,
   buildDepositRefund,
+  buildOrderCost,
   buildOrderSettlement,
+  COST_CATEGORY_LABELS,
+  costCategoriesFor,
+  costCategoryOf,
+  defaultCostAccount,
+  defaultWithholding,
   forfeitAmount,
   policyLabel,
   type OrderSummary,
@@ -17,7 +23,8 @@ import { mulDivRound } from "@/core/stock"
 import { parsePercentBps, PENDING_DISCOUNT_ACCOUNT_ID, withDiscountAccount } from "@/core/invoice"
 import type { AppServices } from "@/core/services"
 import type { CateringData } from "@/core/services/catering-service"
-import type { CancellationPolicy, JournalEntryInput } from "@/core/types"
+import { formatPercentBps } from "@/core/format"
+import type { CancellationPolicy, CostCategory, JournalEntryInput } from "@/core/types"
 import { Amount } from "@/components/ui/amount"
 import { AmountInput } from "@/components/ui/amount-input"
 import { Button } from "@/components/ui/button"
@@ -28,6 +35,7 @@ import { InputGroup, InputGroupAddon, InputGroupInput, InputGroupText } from "@/
 import { JournalPreview } from "@/components/ui/journal-preview"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Switch } from "@/components/ui/switch"
 import { errorMessage } from "@/lib/utils"
 
 const clientName = (data: CateringData, summary: OrderSummary) => data.contacts.find((c) => c.id === summary.order.contactId)?.name ?? "Klien"
@@ -89,13 +97,26 @@ export function PaymentDialog({
   const payment = { date, amount: amount ?? 0, cashAccountId }
   const completed = order.state === "completed"
   const invoiceJournal = completed ? data.journals.find((j) => j.id === data.invoices.find((i) => i.id === order.invoiceId)?.journalEntryId) : undefined
+  // PPh 23 dipotong pelanggan saat pelunasan, bila diaktifkan di Pengaturan → Pajak (Fase 10B).
+  const { pph23Enabled, pph23RateBps } = data.workspace.cateringSettings
+  const canWithhold = mode === "receive" && completed && pph23Enabled && Boolean(invoiceJournal)
+  const invoiceTax = invoiceJournal?.lines.filter((l) => data.accounts.find((a) => a.id === l.accountId)?.systemRole === "sales_tax_payable").reduce((t, l) => t + l.credit - l.debit, 0) ?? 0
+  const suggestedWithholding = defaultWithholding((summary.invoice?.total ?? 0) - invoiceTax, pph23RateBps, summary.outstanding)
+  const [withhold, setWithhold] = useState(false)
+  const [withholding, setWithholding] = useState<number | null>(suggestedWithholding)
+  const withheld = canWithhold && withhold ? (withholding ?? 0) : 0
+  function toggleWithhold(on: boolean) {
+    setWithhold(on)
+    // Nominal diterima menyesuaikan: sisa tagihan − PPh 23.
+    if (amount === suggested || amount === suggested - (withholding ?? 0)) setAmount(on ? suggested - (withholding ?? 0) : suggested)
+  }
 
   const plan = cashAccountId && amount
     ? tryBuild<JournalEntryInput>(() =>
         mode === "refund"
           ? buildDepositRefund(order, name, payment, summary.deposit.balance, data.accounts)
           : completed && invoiceJournal
-            ? buildOrderSettlement(order, name, invoiceJournal, payment, data.accounts)
+            ? buildOrderSettlement(order, name, invoiceJournal, payment, data.accounts, withheld)
             : buildDepositReceipt(order, name, payment, data.accounts),
       )
     : { value: null, error: null }
@@ -116,7 +137,7 @@ export function PaymentDialog({
       const entry =
         mode === "refund"
           ? await services.cateringService.refundDeposit(order, payment)
-          : await services.cateringService.receivePayment(order, payment)
+          : await services.cateringService.receivePayment(order, payment, withheld)
       toast.success(`${title}: jurnal ${entry.entryNumber} diposting`)
       onDone()
     } catch (e) {
@@ -144,6 +165,20 @@ export function PaymentDialog({
           </div>
         </div>
         <CashAccountSelect data={data} value={cashAccountId} onChange={setCashAccountId} label={mode === "refund" ? "Dibayar dari rekening" : "Masuk ke rekening"} />
+        {canWithhold && (
+          <div className="grid gap-2 rounded-2xl bg-card p-3">
+            <label className="flex items-center gap-3 text-sm">
+              <Switch checked={withhold} onCheckedChange={toggleWithhold} aria-label="Dipotong PPh 23" />
+              <span>Dipotong PPh 23 oleh pelanggan ({formatPercentBps(pph23RateBps)} dari tagihan tanpa {data.workspace.salesTaxLabel})</span>
+            </label>
+            {withhold && (
+              <div className="grid gap-1 sm:max-w-56">
+                <Label htmlFor="payment-pph23" className="text-xs">PPh 23 sesuai bukti potong</Label>
+                <AmountInput id="payment-pph23" value={withholding} onValueChange={setWithholding} />
+              </div>
+            )}
+          </div>
+        )}
         {mode === "receive" && suggested > 0 && (
           <p className="text-xs text-muted-foreground">Sisa yang belum dibayar: <Amount value={suggested} /></p>
         )}
@@ -454,6 +489,134 @@ export function CancelDialog({
         <DialogFooter>
           <Button variant="secondary" onClick={onClose}>Kembali</Button>
           <Button variant="destructive" disabled={busy || (balance > 0 && !plan.value)} onClick={submit}>{busy ? "Memproses…" : "Batalkan pesanan"}</Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  )
+}
+
+/** Catat biaya pesanan (Fase 10B): bahan langsung HPP, beban lain per kategori; jurnal otomatis. */
+export function CostDialog({
+  services,
+  data,
+  summary,
+  onClose,
+  onDone,
+}: {
+  services: AppServices
+  data: CateringData
+  summary: OrderSummary
+  onClose: () => void
+  onDone: () => void
+}) {
+  const { order } = summary
+  const mode = data.workspace.cateringSettings.costMode
+  const categories = costCategoriesFor(mode)
+  const [category, setCategory] = useState<CostCategory>("materials")
+  const [accountId, setAccountId] = useState(defaultCostAccount(data.accounts, "materials")?.id ?? "")
+  const [date, setDate] = useState(todayIsoDate())
+  const [amount, setAmount] = useState<number | null>(null)
+  const [description, setDescription] = useState("")
+  const [method, setMethod] = useState("")
+  const [supplier, setSupplier] = useState("")
+  const [error, setError] = useState<string | null>(null)
+  const [busy, setBusy] = useState(false)
+  const accounts = data.accounts.filter((a) => a.isActive && a.deletedAt === null && (category === "materials" ? a.accountType === "cogs" : a.accountType === "expense" && costCategoryOf(a) === category))
+  const cash = data.accounts.filter((a) => a.isCash && a.isActive && a.deletedAt === null)
+  const payment = method === "credit" ? { kind: "credit" as const, counterparty: supplier } : { kind: "cash" as const, accountId: method }
+  const input = { date, category, accountId, amount: amount ?? 0, description, payment }
+  const plan = method && amount ? tryBuild(() => buildOrderCost(order, input, data.accounts, mode)) : { value: null, error: null }
+
+  function changeCategory(next: CostCategory) {
+    setCategory(next)
+    setAccountId(defaultCostAccount(data.accounts, next)?.id ?? "")
+  }
+
+  async function submit() {
+    setError(null)
+    if (!method) return setError("Pilih cara bayar")
+    setBusy(true)
+    try {
+      const entry = await services.cateringService.recordCost(order, input)
+      toast.success(`Biaya dicatat: jurnal ${entry.entryNumber}`)
+      onDone()
+    } catch (e) {
+      setError(errorMessage(e))
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <Dialog open onOpenChange={(open) => !open && onClose()}>
+      <DialogContent className="sm:max-w-lg">
+        <DialogHeader>
+          <DialogTitle>Catat biaya · {order.number}</DialogTitle>
+          <DialogDescription>
+            {mode === "materials" ? "Mode bahan baku saja: belanja bahan dicatat langsung ke HPP dan masuk laba pesanan." : "Bahan baku dicatat langsung ke HPP; biaya lain ke akun bebannya. Semua masuk laba pesanan."}
+          </DialogDescription>
+        </DialogHeader>
+        <div className="grid gap-4 sm:grid-cols-2">
+          <div className="grid gap-2">
+            <Label htmlFor="cost-category">Kategori</Label>
+            <Select value={category} onValueChange={(v) => changeCategory(v as CostCategory)}>
+              <SelectTrigger id="cost-category" className="w-full bg-background"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                {categories.map((c) => (
+                  <SelectItem key={c} value={c}>{COST_CATEGORY_LABELS[c]}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="grid gap-2">
+            <Label htmlFor="cost-account">Akun</Label>
+            <Select value={accountId} onValueChange={setAccountId}>
+              <SelectTrigger id="cost-account" className="w-full bg-background"><SelectValue placeholder="Pilih akun" /></SelectTrigger>
+              <SelectContent>
+                {accounts.map((a) => (
+                  <SelectItem key={a.id} value={a.id}>{a.code} · {a.name}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="grid gap-2">
+            <Label htmlFor="cost-date">Tanggal</Label>
+            <Input id="cost-date" type="date" value={date} onChange={(e) => setDate(e.target.value)} />
+          </div>
+          <div className="grid gap-2">
+            <Label htmlFor="cost-amount">Nominal</Label>
+            <AmountInput id="cost-amount" value={amount} onValueChange={setAmount} />
+          </div>
+        </div>
+        <div className="grid gap-2">
+          <Label htmlFor="cost-description">Keterangan (opsional)</Label>
+          <Input id="cost-description" value={description} onChange={(e) => setDescription(e.target.value)} placeholder="mis. Belanja pasar, upah 4 pramusaji" />
+        </div>
+        <div className="grid gap-4 sm:grid-cols-2">
+          <div className="grid gap-2">
+            <Label htmlFor="cost-method">Dibayar dari</Label>
+            <Select value={method} onValueChange={setMethod}>
+              <SelectTrigger id="cost-method" className="w-full bg-background"><SelectValue placeholder="Pilih rekening atau kredit" /></SelectTrigger>
+              <SelectContent>
+                {cash.map((a) => (
+                  <SelectItem key={a.id} value={a.id}>{a.code} · {a.name}</SelectItem>
+                ))}
+                <SelectItem value="credit">Kredit (utang ke pemasok)</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          {method === "credit" && (
+            <div className="grid gap-2">
+              <Label htmlFor="cost-supplier">Pemasok</Label>
+              <Input id="cost-supplier" value={supplier} onChange={(e) => setSupplier(e.target.value)} />
+            </div>
+          )}
+        </div>
+        {plan.value && <JournalPreview lines={plan.value.lines} accounts={data.accounts} title="Jurnal otomatis" />}
+        {(error ?? plan.error) && <p role="alert" className="text-sm text-destructive">{error ?? plan.error}</p>}
+        <DialogFooter>
+          <Button variant="secondary" onClick={onClose}>Batal</Button>
+          <Button disabled={busy || !plan.value} onClick={submit}>{busy ? "Menyimpan…" : "Catat biaya"}</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>

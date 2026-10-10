@@ -212,7 +212,8 @@ Template ketiga `catering` untuk usaha katering: acara (nikahan, syukuran), nasi
   - **Pembatalan:** kebijakan dipilih per klien (default di kontak) dan dapat diubah per pesanan: DP dikembalikan penuh, hangus sebagian (%), atau hangus seluruhnya. Bagian yang hangus diakui sebagai Pendapatan Pembatalan.
 - **Kriteria Selesai (Stop & Review):** jurnal DP, pengakuan pendapatan, pelunasan, dan pembatalan benar serta seimbang; daftar DP & sisa tagihan cocok dengan Neraca (Uang Muka Pelanggan, Piutang); quotation & invoice tercetak rapi; teruji unit, contract (mock & Supabase), dan E2E.
 
-### Sub-fase 10B: Biaya & Laba per Pesanan
+### Sub-fase 10B: Biaya & Laba per Pesanan (selesai, menunggu review)
+- **Terealisasi:** tombol **Catat biaya** di halaman pesanan (bahan baku langsung ke HPP Bahan Baku; tenaga lepas, sewa alat, transport, kemasan, lain-lain ke akun bebannya; dibayar dari rekening pilihan atau kredit ke pemasok); pilihan **Pesanan (opsional)** di Input Transaksi → Beban operasional; estimasi biaya per kategori di form pesanan; panel **Biaya & laba kotor** (estimasi vs realisasi, margin, per pax) dan tab **Laba** di halaman Pesanan; mode biaya rinci / bahan baku saja di Pengaturan → Persediaan; **PPh 23 dipotong pelanggan** (aktif/nonaktif + tarif, default 2%) di Pengaturan → Pajak, dipakai saat terima pelunasan (Kas + PPh 23 Dibayar Dimuka / Piutang).
 - **Pekerjaan:** biaya ditandai ke pesanan. Mode biaya dapat dipilih di pengaturan: **detail** (bahan, tenaga lepas, sewa alat, transport, kemasan, lain-lain) atau **bahan baku saja**. Laporan laba kotor per pesanan & per pax, estimasi (saat penawaran) vs realisasi. Pencatatan PPh 23 dipotong pelanggan saat pelunasan bila opsi pengaturan diaktifkan.
 - **Kriteria Selesai (Stop & Review):** angka laba per pesanan teruji unit & E2E dan totalnya cocok dengan Laba Rugi.
 
@@ -365,3 +366,7 @@ Template ketiga `catering` untuk usaha katering: acara (nikahan, syukuran), nasi
 | 83 | Invoice DP & jurnal | Invoice DP = dokumen saja; jurnal otomatis dari daftar tagihan saat DP dibayar, acara selesai/invoice pelunasan, dan pelunasan dibayar | Fase 10A |
 | 84 | Tag pesanan di jurnal | Kolom opsional di baris jurnal untuk laba per pesanan (ADR baru) | Fase 10B |
 | 85 | Rekening penerimaan | Setiap penerimaan/pengembalian DP & pelunasan memilih akun kas/bank tujuan setiap kali, tanpa default dari pilihan terakhir | Fase 10A |
+| 86 | Bahan baku pesanan katering | Langsung ke HPP Bahan Baku saat dibeli; sisa bahan dikoreksi lewat stok opname | Fase 10B |
+| 87 | Penandaan biaya ke pesanan | Dari halaman pesanan (Catat biaya) dan dari Input Transaksi → Beban operasional; Pembelian Bahan Baku tetap untuk stok umum (ke Persediaan) | Fase 10B |
+| 88 | Estimasi biaya pesanan | Diisi manual per kategori di form pesanan (10C: estimasi bahan dari resep) | Fase 10B |
+| 89 | PPh 23 dipotong pelanggan | Fitur di Pengaturan → Pajak (aktif/nonaktif + tarif, default 2%); nilai default tarif × tagihan tanpa PBJT, dapat diubah sesuai bukti potong | Fase 10B |

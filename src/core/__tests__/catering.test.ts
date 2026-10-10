@@ -13,10 +13,18 @@
  * Pelunasan 3.170.000 (Kas) → lunas; Piutang 0.
  *
  * Pembatalan PT Lancar (DP 1.000.000, hangus 30%): Dr Uang Muka 1.000.000 / Cr Kas 700.000 / Cr Pendapatan Pembatalan 300.000.
+ *
+ * Laba per pesanan Bu Sari (Fase 10B): pendapatan 4.700.000 (tanpa PBJT); biaya bahan 2.000.000 (HPP) +
+ *   transport 300.000 → laba kotor 2.400.000, margin 2.400.000/4.700.000 = 51,06% (5106 bps), per pax 24.000.
+ *   Estimasi bahan 1.800.000 + transport 250.000 = 2.050.000.
+ * PPh 23 2% × dasar 4.700.000 = 94.000; sisa piutang 3.170.000 → kas 3.076.000 + PPh 23 94.000.
  */
 import { beforeEach, describe, expect, it } from "vitest";
 import {
   buildCancellation,
+  costCategoryOf,
+  defaultCostAccount,
+  defaultWithholding,
   depositFlows,
   forfeitAmount,
   nextNumberSeq,
@@ -83,6 +91,7 @@ describe("pesanan katering, DP & invoice", () => {
     discount: null,
     notes: null,
     cancellationPolicy: { kind: "refund", forfeitBps: 0 },
+    costEstimates: {},
     lines: [
       { description: "Paket prasmanan", quantity: 100, unit: "pax", unitPrice: 45_000, accountId: byCode("4-1000").id, itemId: null },
       { description: "Ongkir", quantity: 1, unit: null, unitPrice: 200_000, accountId: byCode("4-1100").id, itemId: null },
@@ -303,6 +312,84 @@ describe("pesanan katering, DP & invoice", () => {
     expect(r.bills[0].orderId).toBe(after.order.id);
     // Tag pesanan di jurnal ikut dipetakan.
     expect(r.journals.flatMap((e) => e.lines).filter((l) => l.orderId).every((l) => l.orderId === after.order.id)).toBe(true);
+  });
+
+  it("biaya per pesanan: kategori dari akun, bahan langsung HPP, laba kotor & estimasi, void menetralkan", async () => {
+    expect(costCategoryOf(byCode("5-1000"))).toBe("materials");
+    expect(costCategoryOf(byCode("6-1300"))).toBe("transport");
+    expect(costCategoryOf(byCode("6-2000"))).toBe("other");
+    expect(costCategoryOf(byCode("1-1100"))).toBeNull();
+    expect(defaultCostAccount(accounts, "labor")!.code).toBe("6-1100");
+    expect(defaultCostAccount(accounts, "materials")!.code).toBe("5-1000");
+
+    let order = await env.cateringService.saveOrder(input({ costEstimates: { materials: 1_800_000, transport: 250_000, labor: 0 } }));
+    expect(order.costEstimates).toEqual({ materials: 1_800_000, transport: 250_000 });
+    await env.cateringService.receivePayment(order, { date: "2026-10-03", amount: 2_000_000, cashAccountId: byCode("1-1200").id });
+    order = (await env.repos.catering.getOrder(order.id))!;
+    const bahan = await env.cateringService.recordCost(order, {
+      date: "2026-10-19", category: "materials", accountId: byCode("5-1000").id, amount: 2_000_000, description: "Belanja pasar", payment: { kind: "cash", accountId: byCode("1-1100").id },
+    });
+    expect(bahan.lines.map((l) => [l.accountId, l.debit, l.credit, l.orderId])).toEqual([
+      [byCode("5-1000").id, 2_000_000, 0, order.id],
+      [byCode("1-1100").id, 0, 2_000_000, null],
+    ]);
+    await env.cateringService.recordCost(order, {
+      date: "2026-10-20", category: "transport", accountId: byCode("6-1300").id, amount: 300_000, description: "", payment: { kind: "credit", counterparty: "Rental Pickup" },
+    });
+    const salah = await env.cateringService.recordCost(order, {
+      date: "2026-10-20", category: "labor", accountId: byCode("6-1100").id, amount: 999_000, description: "Salah input", payment: { kind: "cash", accountId: byCode("1-1100").id },
+    });
+    await env.journalService.voidJournal(salah.id, "2026-10-21", "Salah");
+    await expectCode(env.cateringService.recordCost(order, {
+      date: "2026-10-20", category: "materials", accountId: byCode("6-1300").id, amount: 1, description: "", payment: { kind: "cash", accountId: byCode("1-1100").id },
+    }), "INVALID_ACCOUNT");
+    await env.cateringService.complete(order, { date: "2026-10-20", dueDate: "2026-10-27" });
+
+    let d = await data();
+    let profit = env.cateringService.profits(d).get(order.id)!;
+    expect(profit).toMatchObject({ revenue: 4_700_000, totalCost: 2_300_000, profit: 2_400_000, marginBps: 5106, profitPerPax: 24_000, estimateTotal: 2_050_000 });
+    expect(profit.costs).toMatchObject({ materials: 2_000_000, transport: 300_000, labor: 0 });
+    // Semua pendapatan & biaya bertag pesanan → sama dengan laba kotor di Laba Rugi.
+    const pl = d.journals.filter((e) => e.status === "posted").flatMap((e) => e.lines).reduce((t, l) => {
+      const type = d.accounts.find((a) => a.id === l.accountId)!.accountType;
+      return type === "revenue" ? t + l.credit - l.debit : type === "cogs" || type === "expense" ? t - (l.debit - l.credit) : t;
+    }, 0);
+    expect(pl).toBe(profit.profit);
+
+    // Mode bahan baku saja: biaya transport tidak dihitung & tidak bisa dicatat.
+    await env.cateringService.updateSettings(workspaceId, { costMode: "materials", pph23Enabled: false, pph23RateBps: 200 });
+    d = await data();
+    profit = env.cateringService.profits(d).get(order.id)!;
+    expect(profit).toMatchObject({ totalCost: 2_000_000, profit: 2_700_000, estimateTotal: 1_800_000 });
+    await expectCode(env.cateringService.recordCost(order, {
+      date: "2026-10-20", category: "transport", accountId: byCode("6-1300").id, amount: 1, description: "", payment: { kind: "cash", accountId: byCode("1-1100").id },
+    }), "INVALID_ACCOUNT");
+  });
+
+  it("PPh 23 dipotong pelanggan saat pelunasan: harus diaktifkan, default 2% × tanpa PBJT", async () => {
+    let order = await env.cateringService.saveOrder(input());
+    await env.cateringService.receivePayment(order, { date: "2026-10-03", amount: 2_000_000, cashAccountId: byCode("1-1200").id });
+    order = await env.cateringService.complete((await env.repos.catering.getOrder(order.id))!, { date: "2026-10-20", dueDate: "2026-10-27" });
+    const withholding = defaultWithholding(4_700_000, 200, 3_170_000);
+    expect(withholding).toBe(94_000);
+    const pay = { date: "2026-10-25", amount: 3_076_000, cashAccountId: byCode("1-1100").id };
+    await expectCode(env.cateringService.receivePayment(order, pay, withholding), "INVALID_SETTLEMENT");
+    const workspace = await env.cateringService.updateSettings(workspaceId, { costMode: "detail", pph23Enabled: true, pph23RateBps: 200 });
+    expect(workspace.cateringSettings).toEqual({ costMode: "detail", pph23Enabled: true, pph23RateBps: 200 });
+    await expectCode(env.cateringService.updateSettings(workspaceId, { costMode: "detail", pph23Enabled: true, pph23RateBps: 0 }), "INVALID_AMOUNT");
+    const entry = await env.cateringService.receivePayment(order, pay, withholding);
+    expect(entry.lines.map((l) => [l.accountId, l.debit, l.credit])).toEqual([
+      [byCode("1-1100").id, 3_076_000, 0],
+      [byCode("1-1500").id, 94_000, 0],
+      [byCode("1-1400").id, 0, 3_170_000],
+    ]);
+    const s = await summary(order, "2026-10-25");
+    expect(s).toMatchObject({ paymentStatus: "paid", outstanding: 0 });
+    const d = await data();
+    expect(balanceOf(d.journals, byCode("1-1500").id)).toBe(94_000);
+    // PPh 23 tidak berlaku untuk DP.
+    const other = await env.cateringService.saveOrder(input());
+    await expectCode(env.cateringService.receivePayment(other, { date: "2026-10-03", amount: 100, cashAccountId: byCode("1-1100").id }, 2), "INVALID_DEPOSIT");
   });
 
   it("status invoice DP FIFO, urutan nomor per tahun, kalender per tanggal", () => {

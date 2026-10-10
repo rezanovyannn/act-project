@@ -9,6 +9,7 @@ import type {
   AuditLog,
   BusinessProfile,
   BusinessProfileInput,
+  CateringSettings,
   CateringOrder,
   CateringOrderInput,
   OrderBill,
@@ -67,6 +68,8 @@ export interface IWorkspaceRepository {
   updateSalesTaxSettings(id: string, settings: WorkspaceTaxSettings): Promise<Workspace>;
   /** Metode persediaan & riwayat metode biaya (ADR 017). */
   updateInventorySettings(id: string, settings: InventorySettings): Promise<Workspace>;
+  /** Mode biaya pesanan & PPh 23 (ADR 024, Fase 10B). */
+  updateCateringSettings(id: string, settings: CateringSettings): Promise<Workspace>;
   softDelete(id: string): Promise<void>;
   /**
    * Pulihkan backup sebagai workspace baru milik `ownerId` (ADR 023), atomik:

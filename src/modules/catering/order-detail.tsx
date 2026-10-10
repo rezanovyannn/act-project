@@ -5,6 +5,7 @@ import Link from "next/link"
 import { useRouter } from "next/navigation"
 import {
   BadgeCheckIcon,
+  CoinsIcon,
   CheckCircle2Icon,
   FileTextIcon,
   HandCoinsIcon,
@@ -24,12 +25,13 @@ import { Amount } from "@/components/ui/amount"
 import { Button } from "@/components/ui/button"
 import { LoadingState, PageHeader } from "@/components/ui/page-header"
 import { cn, errorMessage, useLoader } from "@/lib/utils"
-import { BillDialog, CancelDialog, CompleteDialog, PaymentDialog } from "./order-dialogs"
+import { BillDialog, CancelDialog, CompleteDialog, CostDialog, PaymentDialog } from "./order-dialogs"
+import { OrderProfitPanel } from "./order-profit"
 import { BillDocument, QuotationDocument } from "./order-documents"
 import { OrderEditor, type ContactDialogRenderer } from "./order-editor"
 import { OrderStatusBadge, PaymentBadge, type OrderRoutes } from "./orders-view"
 
-type DialogKind = "receive" | "refund" | "bill" | "complete" | "cancel" | null
+type DialogKind = "receive" | "refund" | "bill" | "complete" | "cancel" | "cost" | null
 
 /** Pesanan baru atau detail pesanan (ADR 024). */
 export function OrderDetailView({
@@ -115,6 +117,7 @@ function OrderDetail({
     .filter((j) => j.status === "posted" && j.deletedAt === null && j.lines.some((l) => l.orderId === order.id))
     .sort((a, b) => a.entryDate.localeCompare(b.entryDate) || (a.entryNumber ?? "").localeCompare(b.entryNumber ?? ""))
   const reversed = new Set(payments.filter((j) => j.reversalOf).map((j) => j.reversalOf))
+  const profit = services.cateringService.profits(data).get(order.id)!
 
   const close = () => setDialog(null)
   const done = () => {
@@ -190,6 +193,11 @@ function OrderDetail({
               <Undo2Icon data-icon="inline-start" /> Kembalikan kelebihan DP
             </Button>
           )}
+          {order.state !== "quotation" && (
+            <Button variant="secondary" onClick={() => setDialog("cost")}>
+              <CoinsIcon data-icon="inline-start" /> Catat biaya
+            </Button>
+          )}
           {open && (
             <Button variant="secondary" onClick={() => setDialog("bill")}>
               <ReceiptTextIcon data-icon="inline-start" /> Buat invoice DP
@@ -232,7 +240,7 @@ function OrderDetail({
             </dl>
           </section>
           <section className="grid content-start gap-2 rounded-2xl bg-canvas p-4 text-sm ring-1 ring-border">
-            <h2 className="font-bold text-ink">Riwayat pembayaran & jurnal</h2>
+            <h2 className="font-bold text-ink">Riwayat pembayaran, biaya & jurnal</h2>
             {payments.length === 0 ? (
               <p className="text-muted-foreground">Belum ada pembayaran. DP yang diterima tercatat otomatis sebagai Uang Muka Pelanggan.</p>
             ) : (
@@ -250,6 +258,8 @@ function OrderDetail({
             )}
           </section>
         </div>
+
+        {order.state !== "quotation" && <OrderProfitPanel data={data} profit={profit} pax={order.pax} />}
 
         {bills.length > 0 && (
           <section className="grid gap-2">
@@ -327,6 +337,7 @@ function OrderDetail({
       {(dialog === "receive" || dialog === "refund") && <PaymentDialog services={services} data={data} summary={summary} mode={dialog} onClose={close} onDone={done} />}
       {dialog === "bill" && <BillDialog services={services} data={data} summary={summary} onClose={close} onDone={(id) => { done(); setDoc(id) }} />}
       {dialog === "complete" && <CompleteDialog services={services} data={data} summary={summary} onClose={close} onDone={done} />}
+      {dialog === "cost" && <CostDialog services={services} data={data} summary={summary} onClose={close} onDone={done} />}
       {dialog === "cancel" && <CancelDialog services={services} data={data} summary={summary} onClose={close} onDone={done} />}
     </div>
   )

@@ -71,7 +71,7 @@ describe("RLS: user B tidak dapat membaca atau menulis data user A", () => {
 
   const orderInput = (): CateringOrderInput => ({
     workspaceId: workspaceA.id, contactId: contactA, serviceType: "event", eventDate: "2026-03-20", eventTime: null, location: null, pax: 10,
-    quoteDate: "2026-03-01", validUntil: "2026-03-08", applyTax: false, discount: null, notes: null, cancellationPolicy: { kind: "refund", forfeitBps: 0 },
+    quoteDate: "2026-03-01", validUntil: "2026-03-08", applyTax: false, discount: null, notes: null, cancellationPolicy: { kind: "refund", forfeitBps: 0 }, costEstimates: {},
     lines: [{ description: "Rahasia", quantity: 10, unit: null, unitPrice: 1000, accountId: jualA, itemId: null }],
   });
 

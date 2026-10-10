@@ -13,10 +13,13 @@ import { Input } from "@/components/ui/input"
 import { InputVatField } from "@/components/ui/input-vat-field"
 import { JournalPreview, PostedNotice } from "@/components/ui/journal-preview"
 import { Label } from "@/components/ui/label"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { PaymentField, initialPayment, toPayment, type PaymentState } from "@/components/ui/payment-field"
 import { errorMessage } from "@/lib/utils"
 import { AmountItemsField, newItem, toAmountItems, type ItemState } from "./amount-items-field"
 import { activeAccounts, counterpartyNames, type WorkspaceData } from "./use-workspace-data"
+
+const NO_ORDER = "__none__"
 
 export function ExpenseForm({
   services,
@@ -31,7 +34,15 @@ export function ExpenseForm({
 }) {
   const { workspace, accounts, journals } = data
   const cashAccounts = activeAccounts(accounts, (a) => a.isCash)
-  const expenseAccounts = activeAccounts(accounts, (a) => a.accountType === "expense")
+  // Katering: biaya bisa ditandai ke pesanan; bahan untuk pesanan langsung HPP (ADR 024, Fase 10B).
+  const catering = workspace.templateType === "catering"
+  const materialsOnly = workspace.cateringSettings.costMode === "materials"
+  const orders = data.orders.filter((o) => o.state !== "cancelled")
+  const [orderId, setOrderId] = useState(NO_ORDER)
+  const tagged = catering && orderId !== NO_ORDER
+  const expenseAccounts = activeAccounts(accounts, (a) =>
+    tagged && materialsOnly ? a.accountType === "cogs" : a.accountType === "expense" || (catering && a.accountType === "cogs"),
+  )
 
   const [entryDate, setEntryDate] = useState(todayIsoDate)
   const [description, setDescription] = useState("")
@@ -49,11 +60,15 @@ export function ExpenseForm({
   const suggestedVat = fullVat ? computeInputVat(subtotal, taxSettings) : 0
   const inputVat = fullVat && vatEnabled ? (vatOverride ?? suggestedVat) : 0
 
-  const build = (): JournalEntryInput =>
-    buildExpense(
+  const build = (): JournalEntryInput => {
+    const entry = buildExpense(
       { workspaceId: workspace.id, entryDate, description, payment: toPayment(payment), items: toAmountItems(items), inputVat },
       accounts,
     )
+    if (!tagged) return entry
+    const costIds = new Set(toAmountItems(items).map((i) => i.accountId))
+    return { ...entry, lines: entry.lines.map((l) => (costIds.has(l.accountId) && l.debit > 0 ? { ...l, orderId } : l)) }
+  }
 
   let preview: JournalEntryInput | null = null
   try {
@@ -109,6 +124,27 @@ export function ExpenseForm({
           counterpartyLabel="Pemasok"
           counterpartySuggestions={counterpartyNames(journals)}
         />
+        {catering && (
+          <div className="grid gap-2 sm:max-w-md">
+            <Label htmlFor="expense-order">Pesanan (opsional)</Label>
+            <Select value={orderId} onValueChange={setOrderId}>
+              <SelectTrigger id="expense-order" className="w-full bg-background"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value={NO_ORDER}>Bukan untuk pesanan tertentu</SelectItem>
+                {orders.map((o) => (
+                  <SelectItem key={o.id} value={o.id}>{o.number} · {o.eventDate}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <p className="text-xs text-muted-foreground">
+              {tagged
+                ? materialsOnly
+                  ? "Mode biaya bahan baku saja: pilih akun HPP Bahan Baku; biaya masuk laba pesanan."
+                  : "Biaya masuk laba pesanan. Bahan untuk pesanan dicatat ke HPP Bahan Baku."
+                : "Pilih pesanan agar biaya ini masuk laporan laba per pesanan."}
+            </p>
+          </div>
+        )}
         <AmountItemsField
           label={fullVat ? "Rincian beban (harga sebelum PPN)" : "Rincian beban"}
           accounts={expenseAccounts}

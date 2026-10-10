@@ -902,7 +902,7 @@ export function describeRepositoryContract(
         const input = (overrides: Partial<CateringOrderInput> = {}): CateringOrderInput => ({
           workspaceId: ws.id, contactId: client.id, serviceType: "event", eventDate: "2026-03-20", eventTime: "11:30", location: "Gedung A", pax: 100,
           quoteDate: "2026-03-01", validUntil: "2026-03-08", applyTax: false, discount: null, notes: "Tanpa MSG",
-          cancellationPolicy: { kind: "forfeit_percent", forfeitBps: 2500 },
+          cancellationPolicy: { kind: "forfeit_percent", forfeitBps: 2500 }, costEstimates: {},
           lines: [{ description: "Prasmanan", quantity: 100, unit: "pax", unitPrice: 40_000, accountId: code("4-1000"), itemId: null }],
           ...overrides,
         });
@@ -938,6 +938,20 @@ export function describeRepositoryContract(
         await expectCode(repos.catering.confirmOrder(first.id), "INVALID_ORDER");
         // Pengguna lain tidak melihat pesanan (backend nyata).
         if (actors.other.repos !== repos) expect(await actors.other.repos.catering.listOrders(ws.id)).toEqual([]);
+      });
+
+      it("pengaturan katering & estimasi biaya: tersimpan, divalidasi, terbawa backup", async () => {
+        const { ws, input } = await setupCatering();
+        expect(ws.cateringSettings).toEqual({ costMode: "detail", pph23Enabled: false, pph23RateBps: 200 });
+        const updated = await repos.workspaces.updateCateringSettings(ws.id, { costMode: "materials", pph23Enabled: true, pph23RateBps: 150 });
+        expect(updated.cateringSettings).toEqual({ costMode: "materials", pph23Enabled: true, pph23RateBps: 150 });
+        await expectCode(repos.workspaces.updateCateringSettings(ws.id, { costMode: "materials", pph23Enabled: true, pph23RateBps: 0 }), "INVALID_AMOUNT");
+        expect((await repos.accounts.listByWorkspace(ws.id)).find((a) => a.code === "1-1500")?.systemRole).toBe("pph23_prepaid");
+        const order = await repos.catering.saveOrder(input({ costEstimates: { materials: 1_500_000, transport: 200_000 } }), "QUO");
+        expect(order.costEstimates).toEqual({ materials: 1_500_000, transport: 200_000 });
+        const changed = await repos.catering.saveOrder(input({ costEstimates: { materials: 1_600_000 } }), "QUO", order.id);
+        expect(changed.costEstimates).toEqual({ materials: 1_600_000 });
+        await expectCode(repos.catering.saveOrder(input({ costEstimates: { materials: -1 } }), "QUO"), "INVALID_AMOUNT");
       });
 
       it("invoice DP: nomor INV-DP per tahun, validasi, hapus", async () => {
@@ -1132,10 +1146,11 @@ export function describeRepositoryContract(
         const client = await repos.invoices.createContact(ws.id, { name: "Bu R", isCustomer: true, isSupplier: false, address: null, phone: null, email: null, npwp: null, paymentTermDays: 0, notes: null, cancellationPolicy: { kind: "forfeit_all", forfeitBps: 0 } });
         const orderInput = (eventDate: string): CateringOrderInput => ({
           workspaceId: ws.id, contactId: client.id, serviceType: "box", eventDate, eventTime: null, location: null, pax: 10,
-          quoteDate: "2026-03-01", validUntil: "2026-03-08", applyTax: false, discount: null, notes: null, cancellationPolicy: { kind: "refund", forfeitBps: 0 },
+          quoteDate: "2026-03-01", validUntil: "2026-03-08", applyTax: false, discount: null, notes: null, cancellationPolicy: { kind: "refund", forfeitBps: 0 }, costEstimates: {},
           lines: [{ description: "Nasi box", quantity: 10, unit: "box", unitPrice: 30_000, accountId: code("4-1000"), itemId: null }],
         });
-        const done = await repos.catering.saveOrder(orderInput("2026-03-20"), "QUO");
+        await repos.workspaces.updateCateringSettings(ws.id, { costMode: "detail", pph23Enabled: true, pph23RateBps: 200 });
+        const done = await repos.catering.saveOrder({ ...orderInput("2026-03-20"), costEstimates: { labor: 50_000 } }, "QUO");
         const cancelled = await repos.catering.saveOrder(orderInput("2026-03-25"), "QUO");
         await repos.catering.createBill({ workspaceId: ws.id, orderId: done.id, billDate: "2026-03-02", dueDate: "2026-03-05", amount: 100_000, note: null }, "INV-DP");
         await repos.catering.confirmOrder(done.id);
@@ -1154,9 +1169,10 @@ export function describeRepositoryContract(
         expect(backup.cateringOrders).toHaveLength(2);
         const restored = await repos.workspaces.restoreFromBackup(actors.owner.ownerId, "Katering R (pulihan)", backup);
         expect(restored.templateType).toBe("catering");
+        expect(restored.cateringSettings).toEqual({ costMode: "detail", pph23Enabled: true, pph23RateBps: 200 });
         const orders = await repos.catering.listOrders(restored.id);
         const byNumber = new Map(orders.map((o) => [o.number, o]));
-        expect(byNumber.get(done.number)).toMatchObject({ state: "completed", pax: 10, serviceType: "box" });
+        expect(byNumber.get(done.number)).toMatchObject({ state: "completed", pax: 10, serviceType: "box", costEstimates: { labor: 50_000 } });
         expect(byNumber.get(cancelled.number)).toMatchObject({ state: "cancelled", cancelReason: "Batal" });
         const restoredDone = byNumber.get(done.number)!;
         const [inv] = await repos.invoices.listInvoices(restored.id);

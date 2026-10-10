@@ -39,6 +39,15 @@ Keputusan user yang relevan untuk 10A:
    - **Per Klien:** total pesanan, DP diterima (= saldo Uang Muka Pelanggan), dan sisa tagihan (= Piutang) per klien.
 10. **Backup & pulihkan** menyertakan pesanan dan invoice DP, termasuk tag pesanan di baris jurnal.
 
+## Keputusan Fase 10B (dijawab user, 11 Oktober 2026 — Catatan Keputusan 86–89)
+11. **Bahan baku pesanan langsung HPP.** Belanja bahan untuk pesanan didebit ke akun HPP Bahan Baku (peran `cogs`) dan bertag pesanan, bukan ke Persediaan. Sisa bahan di akhir periode dikoreksi lewat stok opname (ADR 020): saldo Persediaan disesuaikan ke nilai fisik dengan lawan HPP. Halaman Pembelian Bahan Baku tetap untuk stok umum (ke Persediaan).
+12. **Mencatat biaya pesanan.** (a) Tombol **Catat biaya** di halaman pesanan (pesanan dikonfirmasi, selesai, atau dibatalkan), dengan kategori bahan baku, tenaga lepas, sewa alat, transport & pengiriman, kemasan, atau lain-lain; dibayar dari rekening kas/bank pilihan atau kredit ke pemasok (Utang Usaha). (b) Pilihan **Pesanan (opsional)** di Input Transaksi → Beban operasional; akun HPP ikut ditawarkan di workspace katering. Hanya baris biaya yang bertag pesanan.
+13. **Kategori biaya** diturunkan dari akun: akun HPP = bahan baku; akun beban berkode template 6-1100 tenaga lepas, 6-1200 sewa alat, 6-1300 transport & pengiriman, 6-1400 kemasan; beban lain = lain-lain.
+14. **Mode biaya** per workspace (`catering_cost_mode`): `detail` (semua kategori) atau `materials` (bahan baku saja). Pada mode bahan baku saja, form & laporan hanya memakai kategori bahan baku; dapat diubah kapan saja.
+15. **Estimasi biaya** per kategori disimpan di pesanan (`cost_estimates`, rupiah bulat ≥ 0) dan dibandingkan dengan realisasi.
+16. **Laba kotor per pesanan** = pendapatan bertag pesanan (akun pendapatan: setelah diskon, tanpa pajak, termasuk DP hangus) − biaya bertag pesanan sesuai mode; ditampilkan dengan margin dan laba per pax di halaman pesanan dan tab **Laba**. Dihitung dari jurnal posted (pembalik ikut menetralkan); bila semua pendapatan & biaya ditandai, totalnya sama dengan laba kotor di Laba Rugi.
+17. **PPh 23 dipotong pelanggan.** Pengaturan workspace `pph23_enabled` + `pph23_rate_bps` (default 200 = 2%) di Pengaturan → Pajak. Bila aktif, dialog terima pelunasan pesanan selesai menyediakan potongan PPh 23 dengan nilai default tarif × (total faktur − pajak penjualan), maksimal sisa tagihan, dan dapat diubah sesuai bukti potong. Jurnal: Dr Kas/Bank (diterima) + Dr PPh 23 Dibayar Dimuka (peran baru `pph23_prepaid`) / Cr Piutang. PPh 23 tidak berlaku untuk DP.
+
 ## Konsekuensi
 ### Positif:
 - Pendapatan katering berbasis akrual tanpa jurnal manual. DP dan sisa tagihan selalu cocok dengan Neraca (Uang Muka Pelanggan & Piutang Usaha).

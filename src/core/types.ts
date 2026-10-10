@@ -40,7 +40,9 @@ export type SystemRole =
   | "non_creditable_vat"
   | "sales_returns"
   /** Uang Muka Pelanggan (DP pesanan katering), ADR 024. */
-  | "customer_deposits";
+  | "customer_deposits"
+  /** PPh 23 dipotong pelanggan, dikreditkan kelak (ADR 024, Fase 10B). */
+  | "pph23_prepaid";
 
 export type PeriodStatus = "open" | "closed";
 
@@ -69,6 +71,18 @@ export type CostMethod = "average" | "fifo";
 /** Metode biaya yang berlaku mulai tanggal `from` (inklusif). */
 /** Dasar nilai stok akhir pada stok opname sisa bahan (ADR 020). */
 export type StockValuation = "average" | "last";
+
+/** Biaya per pesanan katering: rinci per kategori atau bahan baku saja (Catatan Keputusan 78). */
+export type CateringCostMode = "detail" | "materials";
+
+/** Pengaturan katering per workspace (ADR 024, Fase 10B). */
+export interface CateringSettings {
+  costMode: CateringCostMode;
+  /** Pelanggan memotong PPh 23 saat pelunasan. */
+  pph23Enabled: boolean;
+  /** Tarif PPh 23 dalam basis poin (200 = 2%). */
+  pph23RateBps: number;
+}
 
 export interface CostMethodPeriod {
   method: CostMethod;
@@ -99,6 +113,8 @@ export interface Workspace {
   costMethodHistory: CostMethodPeriod[];
   /** Harga satuan untuk menilai sisa bahan: rata-rata atau beli terakhir (ADR 020). */
   stockValuation: StockValuation;
+  /** Pengaturan pesanan katering (dipakai template katering). */
+  cateringSettings: CateringSettings;
   createdAt: IsoTimestamp;
   updatedAt: IsoTimestamp;
   deletedAt: IsoTimestamp | null;
@@ -354,6 +370,9 @@ export interface Invoice extends InvoiceInput {
 }
 
 export type CateringServiceType = "event" | "box" | "subscription";
+/** Kategori biaya pesanan; bahan baku = akun HPP (Catatan Keputusan 86). */
+export type CostCategory = "materials" | "labor" | "equipment" | "transport" | "packaging" | "other";
+export type CostEstimates = Partial<Record<CostCategory, number>>;
 export type CateringOrderState = "quotation" | "confirmed" | "completed" | "cancelled";
 
 /** Pesanan katering yang dapat diubah selama penawaran/dikonfirmasi (ADR 024). */
@@ -373,6 +392,8 @@ export interface CateringOrderInput {
   discount: InvoiceDiscount | null;
   notes: string | null;
   cancellationPolicy: CancellationPolicy;
+  /** Estimasi biaya per kategori untuk dibandingkan dengan realisasi (Fase 10B). */
+  costEstimates: CostEstimates;
   /** Baris seperti faktur penjualan (tanpa barang). */
   lines: InvoiceLine[];
 }
