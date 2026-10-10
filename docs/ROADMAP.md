@@ -233,13 +233,15 @@ Template ketiga `catering` untuk usaha katering: acara (nikahan, syukuran), nasi
 7. **Urutan:** 10A → 10B → 10C → 10D.
 8. **Dokumen:** Quotation dan Invoice ke klien.
 
-### Keputusan lanjutan (dijawab user, 10 Oktober 2026 — Catatan Keputusan 82–84)
+### Keputusan lanjutan (dijawab user, 10 Oktober 2026 — Catatan Keputusan 82–85)
 1. **Nomor quotation:** tersedia dua pilihan prefix di Profil Usaha, `QUO` (Quotation) atau `SPH` (Surat Penawaran Harga), dengan pola `PREFIX/2026/10/0001`.
 2. **Invoice & jurnal otomatis:** user tidak membuat jurnal manual. Semua tagihan pesanan tampil di satu **daftar tagihan** (status: belum dibayar, sebagian, lunas), dan aksi di daftar itu membuat jurnal otomatis:
    - invoice DP diterbitkan → dokumen tagihan saja (tanpa jurnal);
    - DP dibayar → Kas/Bank pada Uang Muka Pelanggan;
    - acara selesai / invoice pelunasan diterbitkan → Uang Muka + Piutang pada Pendapatan;
    - pelunasan dibayar → Kas/Bank pada Piutang.
+
+   Setiap penerimaan (DP maupun pelunasan) dan pengembalian DP memilih **akun kas/bank tujuan** (semua akun aktif `is_cash`, mis. Kas, Bank BCA, Bank Mandiri); pilihan terakhir diingat sebagai default.
 3. **Penandaan biaya ke pesanan (10B):** kolom opsional pada baris jurnal (mis. `order_id`) disetujui; dicatat di ADR baru (mengubah ADR 011).
 
 ## Fase 11 (Rencana): Pajak UMKM
@@ -361,3 +363,4 @@ Template ketiga `catering` untuk usaha katering: acara (nikahan, syukuran), nasi
 | 82 | Nomor quotation | Dua pilihan prefix: QUO atau SPH (PREFIX/yyyy/mm/0001) | Fase 10A |
 | 83 | Invoice DP & jurnal | Invoice DP = dokumen saja; jurnal otomatis dari daftar tagihan saat DP dibayar, acara selesai/invoice pelunasan, dan pelunasan dibayar | Fase 10A |
 | 84 | Tag pesanan di jurnal | Kolom opsional di baris jurnal untuk laba per pesanan (ADR baru) | Fase 10B |
+| 85 | Rekening penerimaan | Setiap penerimaan/pengembalian DP & pelunasan memilih akun kas/bank tujuan | Fase 10A |
