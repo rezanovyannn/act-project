@@ -47,8 +47,10 @@ export function TransactionsView({
   const formProps = { services, data: current, journalHref, onPosted: data.reload }
   // Penjualan per menu (resep & variance) khusus F&B (ADR 021).
   const menuSales = current.workspace.templateType === "fnb"
-  const tabs: TransactionTab[] = ["sale", "expense", "tax", ...(menuSales ? (["menu_sale"] as const) : []), ...(current.workspace.inventoryMethod === "perpetual" ? (["item_sale"] as const) : [])]
-  const defaultTab = tabs.includes(initialTab) ? initialTab : "sale"
+  // Katering: penjualan lewat menu Pesanan, tab penjualan disembunyikan (Catatan Keputusan 94).
+  const salesTabs = current.workspace.templateType !== "catering"
+  const tabs: TransactionTab[] = [...(salesTabs ? (["sale"] as const) : []), "expense", "tax", ...(menuSales ? (["menu_sale"] as const) : []), ...(salesTabs && current.workspace.inventoryMethod === "perpetual" ? (["item_sale"] as const) : [])]
+  const defaultTab = tabs.includes(initialTab) ? initialTab : tabs[0]
 
   return (
     <div className="grid grid-cols-1 gap-6">
@@ -66,9 +68,9 @@ export function TransactionsView({
       />
       <Tabs defaultValue={defaultTab} className="grid grid-cols-1 gap-4">
         <TabsList className="w-fit max-w-full flex-wrap">
-          <TabsTrigger value="sale">Penjualan</TabsTrigger>
+          {salesTabs && <TabsTrigger value="sale">Penjualan</TabsTrigger>}
           {menuSales && <TabsTrigger value="menu_sale">Penjualan menu</TabsTrigger>}
-          {current.workspace.inventoryMethod === "perpetual" && <TabsTrigger value="item_sale">Penjualan barang</TabsTrigger>}
+          {salesTabs && current.workspace.inventoryMethod === "perpetual" && <TabsTrigger value="item_sale">Penjualan barang</TabsTrigger>}
           <TabsTrigger value="expense">Beban operasional</TabsTrigger>
           <TabsTrigger value="tax">Setoran {current.workspace.salesTaxLabel}</TabsTrigger>
         </TabsList>

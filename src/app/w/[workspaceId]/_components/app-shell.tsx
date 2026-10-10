@@ -77,7 +77,8 @@ function navGroups(workspaceId: string, template: WorkspaceTemplate, openClaims:
           badgeLabel: openClaims ? `${openClaims} tagihan belum lunas` : undefined,
         },
         { label: "Faktur Penjualan", href: routes.invoices(workspaceId), icon: ReceiptTextIcon },
-        { label: "Faktur Pembelian", href: routes.purchaseInvoices(workspaceId), icon: FileInputIcon },
+        // Katering: fitur yang tidak dipakai disembunyikan (Catatan Keputusan 94); data & halaman tetap ada.
+        ...(template.type === "catering" ? [] : [{ label: "Faktur Pembelian", href: routes.purchaseInvoices(workspaceId), icon: FileInputIcon }]),
         { label: "Kontak", href: routes.contacts(workspaceId), icon: ContactIcon },
         { label: "Jurnal Umum", href: routes.journals(workspaceId), icon: FileTextIcon },
         { label: "Buku Besar", href: routes.ledger(workspaceId), icon: LandmarkIcon },
@@ -93,8 +94,12 @@ function navGroups(workspaceId: string, template: WorkspaceTemplate, openClaims:
         // Resep & variance theoretical vs actual khusus F&B (ADR 021).
         ...(template.type === "fnb" ? [{ label: "Menu & Resep", href: routes.inventoryMenus(workspaceId), icon: ChefHatIcon }] : []),
         { label: "Stok Opname & COGS", href: routes.inventoryStockOpname(workspaceId), icon: ClipboardCheckIcon },
-        { label: "Pemakaian Barang", href: routes.inventoryUsage(workspaceId), icon: PackageMinusIcon },
-        { label: "Retur Barang", href: routes.inventoryReturns(workspaceId), icon: Undo2Icon },
+        ...(template.type === "catering"
+          ? []
+          : [
+              { label: "Pemakaian Barang", href: routes.inventoryUsage(workspaceId), icon: PackageMinusIcon },
+              { label: "Retur Barang", href: routes.inventoryReturns(workspaceId), icon: Undo2Icon },
+            ]),
       ],
     },
     {

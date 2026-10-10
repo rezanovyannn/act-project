@@ -375,3 +375,4 @@ Template ketiga `catering` untuk usaha katering: acara (nikahan, syukuran), nasi
 | 91 | Harga bahan untuk estimasi | Pembelian terakhir (Pembelian Bahan Baku); bila belum ada, harga perkiraan di Daftar Barang | Fase 10C |
 | 92 | Estimasi bahan di pesanan | Otomatis dari resep × pax, tetap bisa diubah | Fase 10C |
 | 93 | Daftar belanja | Per rentang tanggal acara, gabungan pesanan dikonfirmasi; cetak & ekspor CSV/Excel | Fase 10C |
+| 94 | Fitur disembunyikan di workspace Katering | Faktur Pembelian, Pemakaian Barang, Retur Barang (menu & pencarian) dan tab Penjualan di Input Transaksi; data & halaman tetap ada, dapat dimunculkan lagi | Fase 10 |
