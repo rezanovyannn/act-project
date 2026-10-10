@@ -11,6 +11,7 @@ import { buildBackup, type WorkspaceBackup } from "@/core/backup";
 import type {
   IAccountRepository,
   IAuditLogRepository,
+  ICateringRepository,
   IInvoiceRepository,
   IItemRepository,
   IMenuRepository,
@@ -19,7 +20,8 @@ import type {
   IPeriodRepository,
   IWorkspaceRepository,
 } from "@/core/ports";
-import type { InvoiceInput, JournalEntryInput, Workspace } from "@/core/types";
+import type { CateringOrderInput, InvoiceInput, JournalEntryInput, Workspace } from "@/core/types";
+import { CATERING_TEMPLATE } from "@/modules/catering/template";
 import { FNB_TEMPLATE } from "@/modules/fnb/template";
 import { RETAIL_TEMPLATE } from "@/modules/retail/template";
 import { VAT_ACCOUNT_SEEDS } from "@/core/vat";
@@ -34,6 +36,7 @@ export interface ContractRepositories {
   stockCounts: IStockCountRepository;
   menus: IMenuRepository;
   invoices: IInvoiceRepository;
+  catering: ICateringRepository;
 }
 
 async function expectCode(promise: Promise<unknown>, code: ValidationCode) {
@@ -769,6 +772,7 @@ export function describeRepositoryContract(
           invoiceNotes: "Terima kasih",
           invoicePrefix: "KDA",
           purchasePrefix: "PBK",
+          quotationPrefix: "SPH",
           logoDataUrl: "data:image/png;base64,iVBORw0KGgo=",
         };
         expect(await repos.invoices.saveProfile(workspace.id, profile)).toMatchObject(profile);
@@ -882,9 +886,157 @@ export function describeRepositoryContract(
       });
     });
 
+    describe("pesanan katering & uang muka (ADR 024)", () => {
+      async function setupCatering() {
+        const ws = await repos.workspaces.createWithSeed(
+          { ownerId: actors.owner.ownerId, name: "Katering A", templateType: "catering", booksStartDate: "2026-01-01", salesTax: CATERING_TEMPLATE.salesTaxDefaults },
+          CATERING_TEMPLATE.accounts,
+          monthlyPeriodsForYear(2026),
+        );
+        const accounts = await repos.accounts.listByWorkspace(ws.id);
+        const code = (c: string) => accounts.find((a) => a.code === c)!.id;
+        const client = await repos.invoices.createContact(ws.id, {
+          name: "Bu Sari", isCustomer: true, isSupplier: false, address: null, phone: null, email: null, npwp: null, paymentTermDays: 7, notes: null,
+          cancellationPolicy: { kind: "forfeit_percent", forfeitBps: 2500 },
+        });
+        const input = (overrides: Partial<CateringOrderInput> = {}): CateringOrderInput => ({
+          workspaceId: ws.id, contactId: client.id, serviceType: "event", eventDate: "2026-03-20", eventTime: "11:30", location: "Gedung A", pax: 100,
+          quoteDate: "2026-03-01", validUntil: "2026-03-08", applyTax: false, discount: null, notes: "Tanpa MSG",
+          cancellationPolicy: { kind: "forfeit_percent", forfeitBps: 2500 },
+          lines: [{ description: "Prasmanan", quantity: 100, unit: "pax", unitPrice: 40_000, accountId: code("4-1000"), itemId: null }],
+          ...overrides,
+        });
+        const deposit = (orderId: string, amount: number, overrides: Partial<JournalEntryInput> = {}): JournalEntryInput => ({
+          workspaceId: ws.id, entryDate: "2026-03-05", description: "DP pesanan", source: "deposit", counterparty: "Bu Sari",
+          lines: [{ accountId: code("1-1200"), debit: amount, credit: 0, orderId }, { accountId: code("2-1300"), debit: 0, credit: amount, orderId }],
+          ...overrides,
+        });
+        return { ws, code, client, input, deposit };
+      }
+
+      it("pesanan: nomor quotation per tahun, ubah, konfirmasi butuh baris lengkap, hapus hanya penawaran tanpa DP; kontak menyimpan kebijakan", async () => {
+        const { ws, client, input, code } = await setupCatering();
+        expect(client.cancellationPolicy).toEqual({ kind: "forfeit_percent", forfeitBps: 2500 });
+        expect(ws).toMatchObject({ templateType: "catering", salesTaxLabel: "PBJT", salesTaxRateBps: 0 });
+        const first = await repos.catering.saveOrder(input(), "QUO");
+        expect(first).toMatchObject({ number: "QUO/2026/03/0001", state: "quotation", pax: 100, eventTime: "11:30", notes: "Tanpa MSG", invoiceId: null,
+          cancellationPolicy: { kind: "forfeit_percent", forfeitBps: 2500 }, lines: [{ description: "Prasmanan", quantity: 100, unitPrice: 40_000, accountId: code("4-1000") }] });
+        const second = await repos.catering.saveOrder(input({ quoteDate: "2026-04-02", validUntil: "2026-04-09", lines: [{ description: "", quantity: 0, unit: null, unitPrice: 0, accountId: "", itemId: null }] }), "SPH");
+        expect(second.number).toBe("SPH/2026/04/0002");
+        const updated = await repos.catering.saveOrder(input({ pax: 120, discount: { kind: "percent", value: 1000 } }), "QUO", first.id);
+        expect(updated).toMatchObject({ id: first.id, number: first.number, pax: 120, discount: { kind: "percent", value: 1000 } });
+        await expectCode(repos.catering.confirmOrder(second.id), "INVALID_ORDER");
+        await expectCode(repos.catering.saveOrder(input({ pax: 0 }), "QUO"), "INVALID_ORDER");
+        await expectCode(repos.catering.saveOrder(input({ validUntil: "2026-02-01" }), "QUO"), "INVALID_DATE");
+        await repos.catering.deleteOrder(second.id);
+        expect(await repos.catering.getOrder(second.id)).toBeNull();
+        expect((await repos.catering.saveOrder(input(), "QUO")).number).toBe("QUO/2026/03/0003");
+        await repos.catering.createBill({ workspaceId: ws.id, orderId: first.id, billDate: "2026-03-02", dueDate: "2026-03-09", amount: 1_000_000, note: "DP 25%" }, "INV-DP");
+        await expectCode(repos.catering.deleteOrder(first.id), "ORDER_IN_USE");
+        const confirmed = await repos.catering.confirmOrder(first.id);
+        expect(confirmed.state).toBe("confirmed");
+        await expectCode(repos.catering.confirmOrder(first.id), "INVALID_ORDER");
+        // Pengguna lain tidak melihat pesanan (backend nyata).
+        if (actors.other.repos !== repos) expect(await actors.other.repos.catering.listOrders(ws.id)).toEqual([]);
+      });
+
+      it("invoice DP: nomor INV-DP per tahun, validasi, hapus", async () => {
+        const { ws, input } = await setupCatering();
+        const order = await repos.catering.saveOrder(input(), "QUO");
+        const a = await repos.catering.createBill({ workspaceId: ws.id, orderId: order.id, billDate: "2026-03-02", dueDate: "2026-03-09", amount: 1_000_000, note: null }, "INV-DP");
+        const b = await repos.catering.createBill({ workspaceId: ws.id, orderId: order.id, billDate: "2026-04-01", dueDate: "2026-04-01", amount: 500_000, note: "Termin 2" }, "INV-DP");
+        expect([a.number, b.number, b.note]).toEqual(["INV-DP/2026/03/0001", "INV-DP/2026/04/0002", "Termin 2"]);
+        await expectCode(repos.catering.createBill({ workspaceId: ws.id, orderId: order.id, billDate: "2026-03-02", dueDate: "2026-03-01", amount: 1, note: null }, "INV-DP"), "INVALID_DATE");
+        await expectCode(repos.catering.createBill({ workspaceId: ws.id, orderId: order.id, billDate: "2026-03-02", dueDate: "2026-03-02", amount: 0, note: null }, "INV-DP"), "INVALID_AMOUNT");
+        await repos.catering.deleteBill(a.id);
+        expect((await repos.catering.listBills(ws.id)).map((x) => x.id)).toEqual([b.id]);
+      });
+
+      it("jurnal uang muka: tag pesanan wajib & satu workspace, saldo DP tidak boleh negatif; pembalik membawa tag", async () => {
+        const { input, deposit, code } = await setupCatering();
+        const order = await repos.catering.saveOrder(input(), "QUO");
+        await repos.catering.confirmOrder(order.id);
+        const posted = await repos.journals.postJournal(deposit(order.id, 1_500_000));
+        expect(posted.lines.map((l) => l.orderId)).toEqual([order.id, order.id]);
+        expect(posted.source).toBe("deposit");
+        // Tanpa tag / tanpa akun Uang Muka ditolak.
+        await expectCode(repos.journals.postJournal({ ...deposit(order.id, 1), lines: [{ accountId: code("1-1200"), debit: 1, credit: 0 }, { accountId: code("2-1300"), debit: 0, credit: 1 }] }), "INVALID_DEPOSIT");
+        await expectCode(repos.journals.postJournal({ ...deposit(order.id, 1), lines: [{ accountId: code("1-1200"), debit: 1, credit: 0, orderId: order.id }, { accountId: code("4-1000"), debit: 0, credit: 1, orderId: order.id }] }), "INVALID_DEPOSIT");
+        // Pesanan workspace lain ditolak.
+        await expectCode(repos.journals.postJournal(sale(1_000, { lines: [{ accountId: kasId, debit: 1_000, credit: 0, orderId: order.id }, { accountId: jualId, debit: 0, credit: 1_000 }] })), "ORDER_NOT_FOUND");
+        // Pengembalian melebihi saldo ditolak.
+        const refund = (amount: number): JournalEntryInput => ({ ...deposit(order.id, amount), lines: [
+          { accountId: code("2-1300"), debit: amount, credit: 0, orderId: order.id }, { accountId: code("1-1200"), debit: 0, credit: amount, orderId: order.id }] });
+        await expectCode(repos.journals.postJournal(refund(1_500_001)), "INVALID_DEPOSIT");
+        await repos.journals.postJournal(refund(500_000));
+        // Void DP 1,5 jt saat 0,5 jt sudah dikembalikan → saldo −0,5 jt → ditolak.
+        await expectCode(repos.journals.postJournal(buildReversalInput(posted, "2026-03-06")), "INVALID_DEPOSIT");
+        // Void pengembalian dulu, lalu DP: pembalik membawa tag dan saldo kembali nol.
+        const refundEntry = (await repos.journals.listByWorkspace(order.workspaceId)).find((j) => j.source === "deposit" && j.lines[0].debit === 500_000)!;
+        await repos.journals.postJournal(buildReversalInput(refundEntry, "2026-03-06"));
+        const reversal = await repos.journals.postJournal(buildReversalInput(posted, "2026-03-06"));
+        expect(reversal.lines.every((l) => l.orderId === order.id)).toBe(true);
+        expect(reversal.source).toBe("reversal");
+      });
+
+      it("selesai: faktur terbit + DP melunasi faktur, atomik; pesanan selesai menolak DP baru", async () => {
+        const { ws, input, deposit, code, client } = await setupCatering();
+        const order = await repos.catering.saveOrder(input(), "QUO");
+        const invoice: InvoiceInput = { workspaceId: ws.id, kind: "sale", contactId: client.id, invoiceDate: "2026-03-20", dueDate: "2026-03-27", reference: order.number, notes: null, applyTax: false, discount: null, lines: order.lines };
+        const journal = (orderId: string | null): JournalEntryInput => ({ workspaceId: ws.id, entryDate: "2026-03-20", description: "Faktur (nomor otomatis) · Bu Sari", source: "revenue", counterparty: "Bu Sari",
+          lines: [{ accountId: code("1-1400"), debit: 4_000_000, credit: 0, orderId }, { accountId: code("4-1000"), debit: 0, credit: 4_000_000, orderId }] });
+        const contact = { name: "Bu Sari", address: null, phone: null, email: null, npwp: null };
+        await expectCode(repos.catering.completeOrder(order.id, invoice, journal(order.id), contact, "INV"), "INVALID_ORDER");
+        await repos.catering.confirmOrder(order.id);
+        await repos.journals.postJournal(deposit(order.id, 1_000_000));
+        await expectCode(repos.catering.completeOrder(order.id, invoice, journal(null), contact, "INV"), "INVALID_ORDER");
+        expect(await repos.invoices.listInvoices(ws.id)).toEqual([]);
+        const done = await repos.catering.completeOrder(order.id, invoice, journal(order.id), contact, "INV");
+        expect(done.state).toBe("completed");
+        const issued = (await repos.invoices.getInvoice(done.invoiceId!))!;
+        expect(issued).toMatchObject({ status: "issued", number: "INV/2026/03/0001", reference: order.number });
+        const settlements = await repos.journals.listActiveSettlementsOf(issued.journalEntryId!);
+        expect(settlements).toHaveLength(1);
+        expect(settlements[0].lines.map((l) => [l.accountId, l.debit, l.credit, l.orderId])).toEqual([
+          [code("2-1300"), 1_000_000, 0, order.id], [code("1-1400"), 0, 1_000_000, order.id]]);
+        await expectCode(repos.journals.postJournal(deposit(order.id, 1)), "INVALID_DEPOSIT");
+        await expectCode(repos.catering.cancelOrder(order.id, null, "x"), "INVALID_ORDER");
+        await expectCode(repos.catering.saveOrder(input(), "QUO", order.id), "INVALID_ORDER");
+        // DP yang sudah dipakai tidak bisa di-void (saldo DP akan negatif).
+        const dpEntry = (await repos.journals.listByWorkspace(ws.id)).find((j) => j.source === "deposit")!;
+        await expectCode(repos.journals.postJournal(buildReversalInput(dpEntry, "2026-03-21")), "INVALID_DEPOSIT");
+        const logs = await repos.auditLogs.listByWorkspace(ws.id, { entityType: "catering_order", entityId: order.id });
+        expect(logs.map((l) => l.action)).toEqual(expect.arrayContaining(["create", "confirm", "complete"]));
+      });
+
+      it("batal: jurnal harus menolkan saldo DP, alasan wajib, atomik", async () => {
+        const { input, deposit, code } = await setupCatering();
+        const order = await repos.catering.saveOrder(input(), "QUO");
+        await repos.catering.confirmOrder(order.id);
+        await repos.journals.postJournal(deposit(order.id, 1_000_000));
+        await expectCode(repos.catering.cancelOrder(order.id, null, "Batal"), "INVALID_DEPOSIT");
+        const cancelJournal = (refund: number): JournalEntryInput => ({ ...deposit(order.id, 0), description: "Pembatalan",
+          lines: [
+            { accountId: code("2-1300"), debit: 1_000_000, credit: 0, orderId: order.id },
+            { accountId: code("1-1200"), debit: 0, credit: refund, orderId: order.id },
+            { accountId: code("4-1200"), debit: 0, credit: 1_000_000 - refund, orderId: order.id },
+          ] });
+        await expectCode(repos.catering.cancelOrder(order.id, cancelJournal(750_000), "  "), "EMPTY_REASON");
+        await expectCode(repos.catering.cancelOrder(order.id, { ...cancelJournal(750_000), source: "manual" }, "Batal"), "INVALID_DEPOSIT");
+        expect((await repos.catering.getOrder(order.id))!.state).toBe("confirmed");
+        const cancelled = await repos.catering.cancelOrder(order.id, cancelJournal(750_000), "Acara diundur");
+        expect(cancelled).toMatchObject({ state: "cancelled", cancelReason: "Acara diundur" });
+        expect(cancelled.cancelledAt).not.toBeNull();
+        await expectCode(repos.journals.postJournal(deposit(order.id, 1)), "INVALID_DEPOSIT");
+        await expectCode(repos.catering.cancelOrder(order.id, null, "Lagi"), "INVALID_ORDER");
+        const logs = await repos.auditLogs.listByWorkspace(cancelled.workspaceId, { entityType: "catering_order", entityId: order.id });
+        expect(logs.find((l) => l.action === "cancel")?.reason).toBe("Acara diundur");
+      });
+    });
+
     describe("pulihkan backup (ADR 023)", () => {
       async function backupOf(id: string): Promise<WorkspaceBackup> {
-        const [ws, accounts, periods, journals, items, auditLogs, stockCounts, menus, recipes, portionSummaries, menuSales, profile, contacts, invoices] =
+        const [ws, accounts, periods, journals, items, auditLogs, stockCounts, menus, recipes, portionSummaries, menuSales, profile, contacts, invoices, cateringOrders, orderBills] =
           await Promise.all([
             repos.workspaces.getById(id),
             repos.accounts.listByWorkspace(id),
@@ -900,9 +1052,11 @@ export function describeRepositoryContract(
             repos.invoices.getProfile(id),
             repos.invoices.listContacts(id),
             repos.invoices.listInvoices(id),
+            repos.catering.listOrders(id),
+            repos.catering.listBills(id),
           ]);
         return JSON.parse(JSON.stringify(buildBackup(
-          { workspace: ws!, accounts, periods, journals, items, auditLogs, stockCounts, menus, recipes, portionSummaries, menuSales, profile, contacts, invoices },
+          { workspace: ws!, accounts, periods, journals, items, auditLogs, stockCounts, menus, recipes, portionSummaries, menuSales, profile, contacts, invoices, cateringOrders, orderBills },
           "2026-10-05T08:00:00.000Z",
         )));
       }
@@ -965,6 +1119,53 @@ export function describeRepositoryContract(
           lines: [{ accountId: (await repos.accounts.listByWorkspace(restored.id)).find((a) => a.code === "1-1100")!.id, debit: 5_000, credit: 0 },
             { accountId: (await repos.accounts.listByWorkspace(restored.id)).find((a) => a.code === "4-1000")!.id, debit: 0, credit: 5_000 }] });
         expect(next.entryNumber).toBe(`JU-2026-${String(backup.journals.filter((j) => j.status === "posted").length + 1).padStart(4, "0")}`);
+      });
+
+      it("memulihkan workspace katering: pesanan, invoice DP, tag pesanan, faktur pesanan", async () => {
+        const ws = await repos.workspaces.createWithSeed(
+          { ownerId: actors.owner.ownerId, name: "Katering R", templateType: "catering", booksStartDate: "2026-01-01", salesTax: CATERING_TEMPLATE.salesTaxDefaults },
+          CATERING_TEMPLATE.accounts,
+          monthlyPeriodsForYear(2026),
+        );
+        const accs = await repos.accounts.listByWorkspace(ws.id);
+        const code = (c: string) => accs.find((a) => a.code === c)!.id;
+        const client = await repos.invoices.createContact(ws.id, { name: "Bu R", isCustomer: true, isSupplier: false, address: null, phone: null, email: null, npwp: null, paymentTermDays: 0, notes: null, cancellationPolicy: { kind: "forfeit_all", forfeitBps: 0 } });
+        const orderInput = (eventDate: string): CateringOrderInput => ({
+          workspaceId: ws.id, contactId: client.id, serviceType: "box", eventDate, eventTime: null, location: null, pax: 10,
+          quoteDate: "2026-03-01", validUntil: "2026-03-08", applyTax: false, discount: null, notes: null, cancellationPolicy: { kind: "refund", forfeitBps: 0 },
+          lines: [{ description: "Nasi box", quantity: 10, unit: "box", unitPrice: 30_000, accountId: code("4-1000"), itemId: null }],
+        });
+        const done = await repos.catering.saveOrder(orderInput("2026-03-20"), "QUO");
+        const cancelled = await repos.catering.saveOrder(orderInput("2026-03-25"), "QUO");
+        await repos.catering.createBill({ workspaceId: ws.id, orderId: done.id, billDate: "2026-03-02", dueDate: "2026-03-05", amount: 100_000, note: null }, "INV-DP");
+        await repos.catering.confirmOrder(done.id);
+        await repos.journals.postJournal({
+          workspaceId: ws.id, entryDate: "2026-03-03", description: "DP", source: "deposit", counterparty: "Bu R",
+          lines: [{ accountId: code("1-1100"), debit: 100_000, credit: 0, orderId: done.id }, { accountId: code("2-1300"), debit: 0, credit: 100_000, orderId: done.id }],
+        });
+        await repos.catering.completeOrder(done.id,
+          { workspaceId: ws.id, kind: "sale", contactId: client.id, invoiceDate: "2026-03-20", dueDate: "2026-03-20", reference: done.number, notes: null, applyTax: false, discount: null, lines: done.lines },
+          { workspaceId: ws.id, entryDate: "2026-03-20", description: "Faktur (nomor otomatis) · Bu R", source: "revenue", counterparty: "Bu R",
+            lines: [{ accountId: code("1-1400"), debit: 300_000, credit: 0, orderId: done.id }, { accountId: code("4-1000"), debit: 0, credit: 300_000, orderId: done.id }] },
+          { name: "Bu R", address: null, phone: null, email: null, npwp: null }, "INV");
+        await repos.catering.cancelOrder(cancelled.id, null, "Batal");
+
+        const backup = await backupOf(ws.id);
+        expect(backup.cateringOrders).toHaveLength(2);
+        const restored = await repos.workspaces.restoreFromBackup(actors.owner.ownerId, "Katering R (pulihan)", backup);
+        expect(restored.templateType).toBe("catering");
+        const orders = await repos.catering.listOrders(restored.id);
+        const byNumber = new Map(orders.map((o) => [o.number, o]));
+        expect(byNumber.get(done.number)).toMatchObject({ state: "completed", pax: 10, serviceType: "box" });
+        expect(byNumber.get(cancelled.number)).toMatchObject({ state: "cancelled", cancelReason: "Batal" });
+        const restoredDone = byNumber.get(done.number)!;
+        const [inv] = await repos.invoices.listInvoices(restored.id);
+        expect(restoredDone.invoiceId).toBe(inv.id);
+        expect((await repos.catering.listBills(restored.id))[0]).toMatchObject({ orderId: restoredDone.id, number: "INV-DP/2026/03/0001", amount: 100_000 });
+        const tagged = (await repos.journals.listByWorkspace(restored.id)).flatMap((j) => j.lines).filter((l) => l.orderId);
+        expect(tagged.length).toBe(6);
+        expect(tagged.every((l) => l.orderId === restoredDone.id)).toBe(true);
+        expect((await repos.invoices.listContacts(restored.id))[0].cancellationPolicy).toEqual({ kind: "forfeit_all", forfeitBps: 0 });
       });
 
       it("backup tidak seimbang ditolak tanpa membuat workspace", async () => {

@@ -16,6 +16,8 @@ export function reverseLines(entry: JournalEntry): JournalLineInput[] {
     // Barang & qty ikut dibalik sehingga stok kembali (ADR 017).
     itemId: line.itemId,
     quantity: line.quantity,
+    // Tag pesanan ikut agar saldo DP per pesanan kembali (ADR 024).
+    orderId: line.orderId,
   }));
 }
 

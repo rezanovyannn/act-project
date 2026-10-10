@@ -14,8 +14,8 @@ export interface SalesTaxSettings {
 }
 
 /** Nama pajak penjualan yang tampil di UI & akun (ADR 015). Mekanismenya sama. */
-export type SalesTaxLabel = "PB1" | "PPN";
-export const SALES_TAX_LABELS: readonly SalesTaxLabel[] = ["PB1", "PPN"];
+export type SalesTaxLabel = "PB1" | "PPN" | "PBJT";
+export const SALES_TAX_LABELS: readonly SalesTaxLabel[] = ["PB1", "PPN", "PBJT"];
 
 /** `simple`: pajak keluaran saja (PB1/PPN); `full_vat`: PPN Keluaran & Masukan (ADR 016). */
 export type SalesTaxMode = "simple" | "full_vat";
@@ -42,7 +42,7 @@ export function assertValidTaxSettings(settings: WorkspaceTaxSettings): void {
     fail("INVALID_AMOUNT", "Tarif pajak harus antara 0% dan 100%");
   }
   if (!SALES_TAX_LABELS.includes(settings.label)) {
-    fail("INVALID_TAX_LABEL", "Jenis pajak penjualan harus PB1 atau PPN");
+    fail("INVALID_TAX_LABEL", "Jenis pajak penjualan harus PB1, PPN, atau PBJT");
   }
   if (settings.mode !== "simple" && settings.mode !== "full_vat") {
     fail("INVALID_TAX_LABEL", "Mode pajak tidak dikenal");

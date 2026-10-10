@@ -52,7 +52,11 @@ export type ValidationCode =
   | "INVOICE_NOT_FOUND"
   | "INVALID_INVOICE"
   | "INVALID_PROFILE"
-  | "INVALID_BACKUP";
+  | "INVALID_BACKUP"
+  | "ORDER_NOT_FOUND"
+  | "INVALID_ORDER"
+  | "ORDER_IN_USE"
+  | "INVALID_DEPOSIT";
 
 export interface ValidationIssue {
   code: ValidationCode;

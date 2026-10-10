@@ -104,7 +104,7 @@ describe("pulihkan backup", () => {
     });
     await env.invoiceService.saveProfile(workspaceId, {
       displayName: "Kedai A", address: null, phone: null, email: null, npwp: null, bankInfo: "BCA 1", invoiceNotes: null,
-      invoicePrefix: "KDA", purchasePrefix: "PB", logoDataUrl: null,
+      invoicePrefix: "KDA", purchasePrefix: "PB", quotationPrefix: "QUO", logoDataUrl: null,
     });
     await env.invoiceService.issue({
       workspaceId, kind: "sale", contactId: contact.id, invoiceDate: "2026-01-25", dueDate: "2026-02-24", reference: null, notes: null, applyTax: true,

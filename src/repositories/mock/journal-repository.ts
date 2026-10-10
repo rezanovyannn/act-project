@@ -11,6 +11,44 @@ import { validateSettlement } from "@/core/settlement";
 import type { JournalEntry, JournalEntryInput, JournalLine } from "@/core/types";
 import type { MockDatabase, MockState } from "./mock-database";
 
+/**
+ * Meniru pemeriksaan tag pesanan di RPC posting (ADR 024): pesanan ada di
+ * workspace yang sama, jurnal uang muka hanya untuk pesanan yang belum
+ * dibatalkan (pesanan selesai hanya boleh pengembalian), dan saldo Uang Muka
+ * Pelanggan tiap pesanan tidak boleh negatif.
+ */
+function assertOrderLines(state: MockState, input: JournalEntryInput): void {
+  const tagged = input.lines.filter((l) => l.orderId);
+  const depositIds = new Set(
+    state.accounts.filter((a) => a.workspaceId === input.workspaceId && a.systemRole === "customer_deposits").map((a) => a.id),
+  );
+  if (input.source === "deposit") {
+    const orderIds = new Set(input.lines.map((l) => l.orderId ?? ""));
+    if (orderIds.size !== 1 || orderIds.has("") || !input.lines.some((l) => depositIds.has(l.accountId))) {
+      fail("INVALID_DEPOSIT", "Jurnal uang muka harus bertag satu pesanan dan memakai akun Uang Muka Pelanggan");
+    }
+  }
+  const touched = new Set<string>();
+  for (const line of tagged) {
+    const order = state.cateringOrders.find((o) => o.id === line.orderId && o.deletedAt === null);
+    if (!order || order.workspaceId !== input.workspaceId) fail("ORDER_NOT_FOUND", "Pesanan pada baris jurnal tidak ditemukan");
+    if (input.source === "deposit" && order.state === "cancelled") fail("INVALID_DEPOSIT", "Pesanan sudah dibatalkan");
+    if (input.source === "deposit" && order.state === "completed" && depositIds.has(line.accountId) && line.credit > 0) {
+      fail("INVALID_DEPOSIT", "Pesanan sudah selesai; pembayaran dicatat sebagai pelunasan faktur");
+    }
+    if (depositIds.has(line.accountId)) touched.add(order.id);
+  }
+  for (const orderId of touched) {
+    let balance = 0;
+    for (const entry of state.journals) {
+      if (entry.status !== "posted" || entry.deletedAt !== null) continue;
+      for (const l of entry.lines) if (l.orderId === orderId && depositIds.has(l.accountId)) balance += l.credit - l.debit;
+    }
+    for (const l of input.lines) if (l.orderId === orderId && depositIds.has(l.accountId)) balance += l.credit - l.debit;
+    if (balance < 0) fail("INVALID_DEPOSIT", "Saldo DP pesanan tidak boleh negatif (DP mungkin sudah dipakai atau dikembalikan)");
+  }
+}
+
 function findActive(state: MockState, id: string): JournalEntry | undefined {
   return state.journals.find((j) => j.id === id && j.deletedAt === null);
 }
@@ -226,6 +264,8 @@ export class MockJournalRepository implements IJournalRepository {
         );
       }
 
+      assertOrderLines(state, input);
+
       const now = this.db.now();
       const existing = draftId ? requireDraft(state, draftId) : undefined;
       const entry = this.buildEntry(input, "posted", now, existing);
@@ -268,6 +308,7 @@ export class MockJournalRepository implements IJournalRepository {
       credit: line.credit,
       itemId: line.itemId ?? null,
       quantity: line.itemId ? (line.quantity ?? 0) : null,
+      orderId: line.orderId ?? null,
     }));
     return {
       id: existing?.id ?? this.db.generateId(),

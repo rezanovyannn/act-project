@@ -136,7 +136,7 @@ export class MockWorkspaceRepository implements IWorkspaceRepository {
 
   /** Meniru RPC restore_workspace (ADR 023): validasi ulang, ID baru, isi persis, atomik. */
   async restoreFromBackup(ownerId: string, name: string, raw: WorkspaceBackup): Promise<Workspace> {
-    const { backup } = parseBackup(raw, ["fnb", "retail"]);
+    const { backup } = parseBackup(raw, ["fnb", "retail", "catering"]);
     if (name.trim() === "") fail("EMPTY_NAME", "Nama workspace wajib diisi");
     return this.db.write((state) => {
       const ids = new Map<string, string>();
@@ -163,7 +163,7 @@ export class MockWorkspaceRepository implements IWorkspaceRepository {
           reversalOf: ref(j.reversalOf),
           correctionOf: ref(j.correctionOf),
           returnOf: ref(j.returnOf),
-          lines: j.lines.map((l) => ({ ...l, id: id(l.id), accountId: l.accountId ? id(l.accountId) : l.accountId, itemId: ref(l.itemId) })),
+          lines: j.lines.map((l) => ({ ...l, id: id(l.id), accountId: l.accountId ? id(l.accountId) : l.accountId, itemId: ref(l.itemId), orderId: ref(l.orderId ?? null) })),
         })),
       );
       state.stockCounts.push(
@@ -199,6 +199,18 @@ export class MockWorkspaceRepository implements IWorkspaceRepository {
           deletedAt: null,
         })),
       );
+      state.cateringOrders.push(
+        ...(backup.cateringOrders ?? []).map((o) => ({
+          ...o,
+          id: id(o.id),
+          workspaceId: wsId,
+          contactId: id(o.contactId),
+          invoiceId: ref(o.invoiceId),
+          lines: o.lines.map((l) => ({ ...l, accountId: l.accountId ? id(l.accountId) : "" })),
+          deletedAt: null,
+        })),
+      );
+      state.orderBills.push(...(backup.orderBills ?? []).map((b) => ({ ...b, id: id(b.id), workspaceId: wsId, orderId: id(b.orderId), deletedAt: null })));
       // Riwayat audit lama ikut, entity_id dipetakan; lalu satu catatan pemulihan.
       state.auditLogs.push(
         ...backup.auditLogs.map((log) => ({

@@ -38,6 +38,8 @@ Nama kolom ditulis `snake_case` (DB); di TypeScript memakai padanan `camelCase`.
 
 7. Template (`src/modules/<template>/`) menyediakan seed CoA lengkap dengan `account_type`, `normal_balance`, `cash_flow_category`, `is_cash`, dan `system_role`. Template F&B menyertakan Piutang Usaha, Utang Usaha, dan Utang PB1 (ADR 012).
 
+8. **Pembaruan ADR 024 (Oktober 2026):** `journal_lines.order_id` (opsional) menandai baris jurnal ke pesanan katering di workspace yang sama; jurnal pembalik menyalin tagnya. Sumber jurnal bertambah `deposit` (uang muka pelanggan) dan peran akun bertambah `customer_deposits`.
+
 ## Konsekuensi
 ### Positif:
 - Satu bentuk data untuk core, mock, dan Supabase; contract test bisa memverifikasi keduanya.

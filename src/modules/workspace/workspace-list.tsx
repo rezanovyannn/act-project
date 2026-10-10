@@ -23,9 +23,10 @@ interface WorkspaceCardData {
 const TEMPLATE_STYLES: Record<TemplateType, string> = {
   fnb: "bg-primary/10 text-primary",
   retail: "bg-ring/10 text-ring",
+  catering: "bg-success-pale text-success-deep",
 }
 
-const FILTER_LABELS: Record<TemplateType, string> = { fnb: "F&B", retail: "Retail" }
+const FILTER_LABELS: Record<TemplateType, string> = { fnb: "F&B", retail: "Retail", catering: "Katering" }
 
 /** "Kedai Kopi Rasa" → "KK". */
 function initialsOf(name: string): string {

@@ -4,6 +4,7 @@ import type {
   Account,
   AuditLog,
   BusinessProfile,
+  CateringOrder,
   Contact,
   Invoice,
   Item,
@@ -11,6 +12,7 @@ import type {
   JournalEntry,
   Menu,
   MenuSaleLine,
+  OrderBill,
   Period,
   PortionSummary,
   Recipe,
@@ -138,6 +140,7 @@ export const toProfile = (r: any): Omit<BusinessProfile, "workspaceId"> & { work
   invoiceNotes: r.invoice_notes ?? null,
   invoicePrefix: r.invoice_prefix,
   purchasePrefix: r.purchase_prefix,
+  quotationPrefix: r.quotation_prefix ?? "QUO",
   logoDataUrl: r.logo_data_url ?? null,
   updatedAt: r.updated_at,
 });
@@ -154,6 +157,7 @@ export const toContact = (r: any): Contact => ({
   npwp: r.npwp ?? null,
   paymentTermDays: r.payment_term_days,
   notes: r.notes ?? null,
+  cancellationPolicy: r.cancellation_policy ?? null,
   createdAt: r.created_at,
   updatedAt: r.updated_at,
   deletedAt: r.deleted_at,
@@ -186,6 +190,50 @@ export const toInvoice = (r: any): Invoice => ({
     accountId: l.account_id ?? "",
     itemId: l.item_id ?? null,
   })),
+});
+
+export const toCateringOrder = (r: any): CateringOrder => ({
+  id: r.id,
+  workspaceId: r.workspace_id,
+  number: r.number,
+  contactId: r.contact_id,
+  serviceType: r.service_type,
+  eventDate: r.event_date,
+  eventTime: r.event_time ?? null,
+  location: r.location ?? null,
+  pax: r.pax,
+  quoteDate: r.quote_date,
+  validUntil: r.valid_until,
+  applyTax: r.apply_tax,
+  discount: r.discount_kind ? { kind: r.discount_kind, value: toAmount(r.discount_value) } : null,
+  notes: r.notes ?? null,
+  cancellationPolicy: { kind: r.cancellation_policy.kind, forfeitBps: Number(r.cancellation_policy.forfeitBps ?? 0) },
+  lines: (r.lines ?? []).map((l: any) => ({
+    description: l.description ?? "",
+    quantity: toAmount(l.quantity),
+    unit: l.unit ?? null,
+    unitPrice: toAmount(l.unitPrice),
+    accountId: l.accountId ?? "",
+    itemId: null,
+  })),
+  state: r.state,
+  invoiceId: r.invoice_id ?? null,
+  cancelledAt: r.cancelled_at ?? null,
+  cancelReason: r.cancel_reason ?? null,
+  createdAt: r.created_at,
+  updatedAt: r.updated_at,
+});
+
+export const toOrderBill = (r: any): OrderBill => ({
+  id: r.id,
+  workspaceId: r.workspace_id,
+  orderId: r.order_id,
+  number: r.number,
+  billDate: r.bill_date,
+  dueDate: r.due_date,
+  amount: toAmount(r.amount),
+  note: r.note ?? null,
+  createdAt: r.created_at,
 });
 
 export const toMenu = (r: any): Menu => ({
@@ -270,6 +318,7 @@ export const toJournal = (r: any): JournalEntry => ({
       credit: toAmount(l.credit),
       itemId: l.item_id ?? null,
       quantity: l.quantity === null || l.quantity === undefined ? null : toAmount(l.quantity),
+      orderId: l.order_id ?? null,
     })),
 });
 

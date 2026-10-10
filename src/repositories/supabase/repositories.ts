@@ -8,6 +8,7 @@ import { defaultProfile } from "@/core/invoice";
 import type {
   AccountPatch,
   AuditLogFilter,
+  ICateringRepository,
   IAccountRepository,
   IAuditLogRepository,
   IInvoiceRepository,
@@ -32,6 +33,10 @@ import type {
   ItemInput,
   BusinessProfile,
   BusinessProfileInput,
+  CateringOrder,
+  CateringOrderInput,
+  OrderBill,
+  OrderBillInput,
   Contact,
   ContactInput,
   ContactSnapshot,
@@ -60,6 +65,8 @@ import {
   JOURNAL_SELECT,
   toAccount,
   toAuditLog,
+  toCateringOrder,
+  toOrderBill,
   toContact,
   toInvoice,
   toItem,
@@ -462,6 +469,66 @@ export class SupabaseInvoiceRepository implements IInvoiceRepository {
   }
 }
 
+/** Pesanan katering & invoice DP (ADR 024): baca SELECT, tulis RPC. */
+export class SupabaseCateringRepository implements ICateringRepository {
+  constructor(private readonly client: Client) {}
+
+  async listOrders(workspaceId: string): Promise<CateringOrder[]> {
+    const rows = await unwrapRows(
+      this.client.from("catering_orders").select("*").eq("workspace_id", workspaceId).is("deleted_at", null)
+        .order("event_date", { ascending: false }).order("created_at", { ascending: false }),
+    );
+    return rows.map(toCateringOrder);
+  }
+
+  async getOrder(id: string): Promise<CateringOrder | null> {
+    const row = await unwrap(this.client.from("catering_orders").select("*").eq("id", id).is("deleted_at", null).maybeSingle());
+    return row ? toCateringOrder(row) : null;
+  }
+
+  async saveOrder(input: CateringOrderInput, prefix: string, id?: string): Promise<CateringOrder> {
+    const saved = (await unwrap(this.client.rpc("save_catering_order", { p_order: input, p_prefix: prefix, p_id: id ?? null }))) as string;
+    return required(await this.getOrder(saved), "Pesanan");
+  }
+
+  async confirmOrder(id: string): Promise<CateringOrder> {
+    await unwrap(this.client.rpc("confirm_catering_order", { p_id: id }));
+    return required(await this.getOrder(id), "Pesanan");
+  }
+
+  async deleteOrder(id: string): Promise<void> {
+    await unwrap(this.client.rpc("delete_catering_order", { p_id: id }));
+  }
+
+  async listBills(workspaceId: string): Promise<OrderBill[]> {
+    const rows = await unwrapRows(
+      this.client.from("catering_order_bills").select("*").eq("workspace_id", workspaceId).is("deleted_at", null)
+        .order("bill_date", { ascending: false }).order("created_at", { ascending: false }),
+    );
+    return rows.map(toOrderBill);
+  }
+
+  async createBill(input: OrderBillInput, prefix: string): Promise<OrderBill> {
+    const id = (await unwrap(this.client.rpc("create_order_bill", { p_bill: input, p_prefix: prefix }))) as string;
+    const row = await unwrap(this.client.from("catering_order_bills").select("*").eq("id", id).maybeSingle());
+    return toOrderBill(required(row, "Invoice DP"));
+  }
+
+  async deleteBill(id: string): Promise<void> {
+    await unwrap(this.client.rpc("delete_order_bill", { p_id: id }));
+  }
+
+  async completeOrder(id: string, invoice: InvoiceInput, journal: JournalEntryInput, contact: ContactSnapshot, invoicePrefix: string): Promise<CateringOrder> {
+    await unwrap(this.client.rpc("complete_catering_order", { p_id: id, p_invoice: invoice, p_journal: journal, p_contact: contact, p_prefix: invoicePrefix }));
+    return required(await this.getOrder(id), "Pesanan");
+  }
+
+  async cancelOrder(id: string, journal: JournalEntryInput | null, reason: string): Promise<CateringOrder> {
+    await unwrap(this.client.rpc("cancel_catering_order", { p_id: id, p_journal: journal, p_reason: reason }));
+    return required(await this.getOrder(id), "Pesanan");
+  }
+}
+
 type SaleLineRow = { journal_entry_id: string; journal_entries: { entry_date: string } } & Record<string, unknown>;
 
 /** Menu, resep, rekap porsi, penjualan menu (ADR 021): baca SELECT, tulis RPC. */
@@ -590,6 +657,7 @@ export function createSupabaseRepositories(client: Client) {
     journals,
     menus: new SupabaseMenuRepository(client, journals),
     invoices: new SupabaseInvoiceRepository(client),
+    catering: new SupabaseCateringRepository(client),
     items: new SupabaseItemRepository(client),
     stockCounts: new SupabaseStockCountRepository(client),
     auditLogs: new SupabaseAuditLogRepository(client),

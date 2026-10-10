@@ -38,6 +38,7 @@ const MODE_LABELS: Record<SalesTaxMode, string> = {
 const LABEL_HINTS: Record<SalesTaxLabel, string> = {
   PB1: "PB1/PBJT restoran; tarif ditetapkan per daerah, umumnya 10%.",
   PPN: "PPN tanpa pengkreditan PPN Masukan; isi 0% bila belum PKP.",
+  PBJT: "PBJT makanan & minuman (jasa boga/katering, bukan objek PPN); tarif per daerah, maks. 10%. Isi 0% bila belum memungut.",
 }
 
 type TransitionChoice = "forward" | "expense_input_vat"
@@ -256,6 +257,18 @@ export function TaxTab({
       <Button type="submit" className="w-fit" disabled={saving}>
         {saving ? "Menyimpan…" : "Simpan pengaturan pajak"}
       </Button>
+      {workspace.templateType === "catering" && (
+        <section className="grid gap-2 rounded-2xl bg-card p-4 text-sm">
+          <label className="flex items-center gap-3">
+            <Switch checked={false} disabled aria-label="PPh 23 dipotong pelanggan" />
+            <span className="font-medium text-ink">PPh 23 dipotong pelanggan (nonaktif)</span>
+          </label>
+          <p className="text-xs text-muted-foreground">
+            Pelanggan badan dapat memotong PPh 23 sebesar 2% atas jasa katering, kecuali Anda menyerahkan Suket PP 55/2022. Pencatatan potongan saat pelunasan
+            (akun PPh 23 Dibayar Dimuka) disiapkan untuk tahap berikutnya (ROADMAP Fase 10B). Katering bukan objek PPN; pajak penjualannya PBJT.
+          </p>
+        </section>
+      )}
     </form>
   )
 }

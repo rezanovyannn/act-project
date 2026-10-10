@@ -194,12 +194,13 @@ Aplikasi dapat dipasang (install) di desktop (Chrome/Edge) dan HP (Android; iPho
 
 ---
 
-## Fase 10 (Siap dikerjakan): Template Katering
+## Fase 10: Template Katering (ADR 024)
 Template ketiga `catering` untuk usaha katering: acara (nikahan, syukuran), nasi box/kantor, dan langganan harian. F&B dan Retail ditahan dulu (tidak ada fitur baru) selama fase ini (user, 10 Oktober 2026). Engine jurnal, laporan, persediaan, faktur, kontak, pajak penjualan, PWA, dan backup dipakai ulang.
 
 **Catatan pajak (riset):** jasa boga/katering bukan objek PPN (UU PPN Pasal 4A; kriteria PMK 70/2022). Yang berlaku adalah PBJT makanan & minuman (UU HKPD, tarif per daerah, maksimal 10%), sama mekanismenya dengan PB1 (ADR 012). Pelanggan badan dapat memotong PPh 23 sebesar 2% kecuali penyedia menyerahkan Suket PP 55/2022.
 
-### Sub-fase 10A: Template, Pesanan, DP, Quotation & Invoice
+### Sub-fase 10A: Template, Pesanan, DP, Quotation & Invoice (selesai, menunggu review)
+- **Terealisasi:** template `catering` (CoA dengan Uang Muka Pelanggan, Utang PBJT, Pendapatan Pembatalan; PBJT 0%); menu **Pesanan** dengan tab Pesanan, Kalender, Tagihan, dan Per Klien; penawaran bernomor QUO/SPH yang dapat dicetak; invoice DP `INV-DP/…`; terima DP/pelunasan/pengembalian dengan rekening dipilih setiap kali; selesaikan pesanan (faktur pelunasan + DP dipakai otomatis, atomik); batalkan pesanan sesuai kebijakan (kembali/hangus); kebijakan pembatalan default per kontak; opsi PPh 23 tampil nonaktif di Pengaturan → Pajak; tag pesanan di baris jurnal; backup & pulihkan menyertakan pesanan dan invoice DP.
 - **Pekerjaan:**
   - **Template & CoA Katering:** Kas, Bank, Persediaan Bahan, Piutang Usaha, Uang Muka Pelanggan (utang), PPh 23 Dibayar Dimuka, Peralatan Katering + Akumulasi Penyusutan, Utang Usaha, Utang PBJT, Pendapatan Katering, Pendapatan Lain (ongkir/sewa alat), Pendapatan Pembatalan, HPP Bahan, Beban Tenaga Lepas, Beban Sewa Alat, Beban Transport/Pengiriman, Beban Kemasan, beban umum, Prive & ekuitas standar.
   - **Pengaturan pajak:** PBJT tersedia tetapi nonaktif (belum memungut; tarif dapat diisi kelak). PPh 23 dipotong pelanggan tersedia sebagai opsi pengaturan (nonaktif dulu).

@@ -3,7 +3,7 @@
 import { useRef, useState } from "react"
 import { ImageIcon, Trash2Icon, UploadIcon } from "lucide-react"
 import { toast } from "sonner"
-import { formatInvoiceNumber, LOGO_MAX_LENGTH } from "@/core/invoice"
+import { formatInvoiceNumber, LOGO_MAX_LENGTH, QUOTATION_PREFIXES } from "@/core/invoice"
 import { todayIsoDate } from "@/core/format"
 import type { AppServices } from "@/core/services"
 import type { BusinessProfileInput, Workspace } from "@/core/types"
@@ -11,6 +11,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { LoadingState } from "@/components/ui/page-header"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Textarea } from "@/components/ui/textarea"
 import { errorMessage, useLoader } from "@/lib/utils"
 
@@ -63,7 +64,7 @@ function ProfileForm({
   const [saving, setSaving] = useState(false)
   const fileRef = useRef<HTMLInputElement>(null)
   const set = <K extends keyof BusinessProfileInput>(key: K, value: BusinessProfileInput[K]) => setForm((f) => ({ ...f, [key]: value }))
-  const text = (key: Exclude<keyof BusinessProfileInput, "logoDataUrl" | "invoicePrefix" | "purchasePrefix">) => ({
+  const text = (key: Exclude<keyof BusinessProfileInput, "logoDataUrl" | "invoicePrefix" | "purchasePrefix" | "quotationPrefix">) => ({
     value: form[key] ?? "",
     onChange: (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => set(key, e.target.value),
   })
@@ -190,6 +191,22 @@ function ProfileForm({
             Nomor internal: <strong>{formatInvoiceNumber(form.purchasePrefix || "PB", todayIsoDate(), 1)}</strong>; nomor faktur pemasok disimpan terpisah.
           </p>
         </div>
+        {workspace.templateType === "catering" && (
+          <div className="grid content-start gap-2">
+            <Label htmlFor="profile-quotation-prefix">Nomor penawaran pesanan</Label>
+            <Select value={form.quotationPrefix} onValueChange={(v) => set("quotationPrefix", v)}>
+              <SelectTrigger id="profile-quotation-prefix" className="w-56 bg-background"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                {QUOTATION_PREFIXES.map((p) => (
+                  <SelectItem key={p} value={p}>{p === "QUO" ? "QUO · Quotation" : "SPH · Surat Penawaran Harga"}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <p className="text-xs text-muted-foreground">
+              Contoh: <strong>{formatInvoiceNumber(form.quotationPrefix, todayIsoDate(), 1)}</strong>; invoice DP bernomor <strong>{formatInvoiceNumber(`${form.invoicePrefix || "INV"}-DP`, todayIsoDate(), 1)}</strong>.
+            </p>
+          </div>
+        )}
       </section>
       {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
       <Button type="submit" className="w-fit" disabled={saving}>{saving ? "Menyimpan…" : "Simpan profil"}</Button>

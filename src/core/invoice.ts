@@ -3,6 +3,7 @@
  * faktur terbit menjadi jurnal kredit (piutang/utang) yang tetap melewati
  * validasi posting; status pembayaran diturunkan dari pelunasan (ADR 012).
  */
+import { validatePolicy } from "./cancellation-policy";
 import { addDays, isValidIsoDate } from "./dates";
 import { fail } from "./errors";
 import { outflowLines, purchaseCorrections, type PerpetualContext } from "./perpetual";
@@ -35,6 +36,9 @@ const trimOrNull = (value: string | null | undefined) => value?.trim() || null;
 
 export const DEFAULT_INVOICE_PREFIX = "INV";
 export const DEFAULT_PURCHASE_PREFIX = "PB";
+/** Pilihan prefix nomor quotation pesanan katering (ADR 024). */
+export const QUOTATION_PREFIXES = ["QUO", "SPH"] as const;
+export const DEFAULT_QUOTATION_PREFIX = "QUO";
 export const LOGO_MAX_LENGTH = 200_000;
 export const PREFIX_PATTERN = /^[A-Z0-9-]{1,12}$/;
 export const LOGO_PATTERN = /^data:image\/(png|jpeg|webp);base64,[A-Za-z0-9+/]+=*$/;
@@ -50,6 +54,7 @@ export function defaultProfile(): BusinessProfileInput {
     invoiceNotes: null,
     invoicePrefix: DEFAULT_INVOICE_PREFIX,
     purchasePrefix: DEFAULT_PURCHASE_PREFIX,
+    quotationPrefix: DEFAULT_QUOTATION_PREFIX,
     logoDataUrl: null,
   };
 }
@@ -57,7 +62,8 @@ export function defaultProfile(): BusinessProfileInput {
 export function validateProfile(input: BusinessProfileInput): BusinessProfileInput {
   const prefix = input.invoicePrefix.trim().toUpperCase();
   const purchasePrefix = (input.purchasePrefix ?? DEFAULT_PURCHASE_PREFIX).trim().toUpperCase();
-  if (!PREFIX_PATTERN.test(prefix) || !PREFIX_PATTERN.test(purchasePrefix)) {
+  const quotationPrefix = (input.quotationPrefix ?? DEFAULT_QUOTATION_PREFIX).trim().toUpperCase();
+  if (!PREFIX_PATTERN.test(prefix) || !PREFIX_PATTERN.test(purchasePrefix) || !PREFIX_PATTERN.test(quotationPrefix)) {
     fail("INVALID_PROFILE", "Prefix nomor faktur 1–12 karakter: huruf, angka, atau tanda hubung");
   }
   const logo = input.logoDataUrl || null;
@@ -76,6 +82,7 @@ export function validateProfile(input: BusinessProfileInput): BusinessProfileInp
     invoiceNotes: trimOrNull(input.invoiceNotes),
     invoicePrefix: prefix,
     purchasePrefix,
+    quotationPrefix,
     logoDataUrl: logo,
   };
 }
@@ -103,6 +110,7 @@ export function validateContact(input: ContactInput, existing: readonly Contact[
     npwp: trimOrNull(input.npwp),
     paymentTermDays: input.paymentTermDays,
     notes: trimOrNull(input.notes),
+    cancellationPolicy: input.cancellationPolicy ? validatePolicy(input.cancellationPolicy) : null,
   };
 }
 

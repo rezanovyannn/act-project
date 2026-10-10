@@ -14,6 +14,7 @@ export const SOURCE_LABELS: Record<JournalSource, string> = {
   reversal: "Pembalik",
   closing: "Penutup",
   return: "Retur",
+  deposit: "Uang muka",
 }
 
 /** Badge status sesuai docs/DESIGN_SYSTEM.md (tidak hanya mengandalkan warna). */

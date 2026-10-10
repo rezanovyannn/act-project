@@ -51,7 +51,7 @@ export class MockInvoiceRepository implements IInvoiceRepository {
       if (!state.workspaces.some((w) => w.id === workspaceId && w.deletedAt === null)) fail("NOT_FOUND", "Workspace tidak ditemukan");
       // Meniru constraint tabel workspace_profiles.
       const logoOk = !input.logoDataUrl || (input.logoDataUrl.length <= LOGO_MAX_LENGTH && LOGO_PATTERN.test(input.logoDataUrl));
-      if (!PREFIX_PATTERN.test(input.invoicePrefix) || !PREFIX_PATTERN.test(input.purchasePrefix) || !logoOk) fail("INVALID_PROFILE", "Prefix nomor faktur atau logo tidak valid");
+      if (!PREFIX_PATTERN.test(input.invoicePrefix) || !PREFIX_PATTERN.test(input.purchasePrefix) || !PREFIX_PATTERN.test(input.quotationPrefix) || !logoOk) fail("INVALID_PROFILE", "Prefix nomor faktur atau logo tidak valid");
       const profile: BusinessProfile = { ...input, workspaceId, updatedAt: this.db.now() };
       state.profiles = [...state.profiles.filter((p) => p.workspaceId !== workspaceId), profile];
       return { ...profile };
@@ -93,6 +93,9 @@ export class MockInvoiceRepository implements IInvoiceRepository {
       if (state.invoices.some((i) => i.deletedAt === null && i.contactId === id)) {
         fail("CONTACT_IN_USE", "Kontak sudah dipakai faktur; tidak bisa dihapus");
       }
+      if (state.cateringOrders.some((o) => o.deletedAt === null && o.contactId === id)) {
+        fail("CONTACT_IN_USE", "Kontak sudah dipakai pesanan; tidak bisa dihapus");
+      }
       contact.deletedAt = this.db.now();
       this.db.audit(state, { workspaceId: contact.workspaceId, entityType: "contact", entityId: id, action: "delete", before: contact, after: null });
     });
@@ -112,7 +115,12 @@ export class MockInvoiceRepository implements IInvoiceRepository {
   }
 
   async saveDraft(input: InvoiceInput, id?: string): Promise<Invoice> {
-    return this.db.write((state) => {
+    return this.db.write((state) => this.saveDraftInState(state, input, id));
+  }
+
+  /** Simpan draft di dalam write() yang sedang berjalan (dipakai pesanan katering). */
+  saveDraftInState(state: MockState, input: InvoiceInput, id?: string): Invoice {
+    {
       // Meniru validasi RPC save_invoice_draft.
       if (input.kind !== "sale" && input.kind !== "purchase") fail("INVALID_INVOICE", "Jenis faktur tidak dikenal");
       if (!isValidIsoDate(input.invoiceDate) || !isValidIsoDate(input.dueDate)) fail("INVALID_DATE", "Tanggal faktur/jatuh tempo tidak valid");
@@ -166,7 +174,7 @@ export class MockInvoiceRepository implements IInvoiceRepository {
       state.invoices.push(invoice);
       this.db.audit(state, { workspaceId: input.workspaceId, entityType: "invoice", entityId: invoice.id, action: "create", before: null, after: invoice });
       return strip(invoice);
-    });
+    }
   }
 
   async deleteDraft(id: string): Promise<void> {
@@ -180,7 +188,12 @@ export class MockInvoiceRepository implements IInvoiceRepository {
   }
 
   async issue(id: string, journal: JournalEntryInput, contact: ContactSnapshot, prefix: string): Promise<Invoice> {
-    return this.db.write((state) => {
+    return this.db.write((state) => this.issueInState(state, id, journal, contact, prefix));
+  }
+
+  /** Terbitkan faktur di dalam write() yang sedang berjalan. */
+  issueInState(state: MockState, id: string, journal: JournalEntryInput, contact: ContactSnapshot, prefix: string): Invoice {
+    {
       const invoice = state.invoices.find((i) => i.id === id && i.deletedAt === null);
       if (!invoice) fail("INVOICE_NOT_FOUND", "Faktur tidak ditemukan");
       if (invoice.status !== "draft") fail("INVALID_INVOICE", "Faktur sudah terbit");
@@ -208,6 +221,6 @@ export class MockInvoiceRepository implements IInvoiceRepository {
       });
       this.db.audit(state, { workspaceId: invoice.workspaceId, entityType: "invoice", entityId: id, action: "issue", before, after: invoice });
       return strip(invoice);
-    });
+    }
   }
 }

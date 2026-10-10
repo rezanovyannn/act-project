@@ -10,7 +10,7 @@ export type IsoTimestamp = string;
 
 import type { SalesTaxLabel, SalesTaxMode, WorkspaceTaxSettings } from "./sales-tax";
 
-export type TemplateType = "fnb" | "retail";
+export type TemplateType = "fnb" | "retail" | "catering";
 export type Currency = "IDR";
 
 export type AccountType =
@@ -38,7 +38,9 @@ export type SystemRole =
   | "income_summary"
   | "input_vat"
   | "non_creditable_vat"
-  | "sales_returns";
+  | "sales_returns"
+  /** Uang Muka Pelanggan (DP pesanan katering), ADR 024. */
+  | "customer_deposits";
 
 export type PeriodStatus = "open" | "closed";
 
@@ -56,7 +58,9 @@ export type JournalSource =
   | "reversal"
   | "closing"
   /** Retur tunai barang (ADR 017); retur yang mengurangi tagihan bersumber settlement. */
-  | "return";
+  | "return"
+  /** Uang muka pelanggan: terima, kembalikan, atau hangus (ADR 024). */
+  | "deposit";
 
 /** Metode persediaan per workspace (ADR 007, 015 & 017). */
 export type InventoryMethod = "periodic" | "perpetual";
@@ -137,6 +141,8 @@ export interface JournalLine {
   /** Barang & kuantitas (satuan dasar, bilangan bulat ≥ 0), ADR 017. */
   itemId: string | null;
   quantity: number | null;
+  /** Pesanan katering yang terkait baris ini (ADR 024). */
+  orderId: string | null;
 }
 
 export interface JournalEntry {
@@ -171,6 +177,7 @@ export interface JournalLineInput {
   credit: number;
   itemId?: string | null;
   quantity?: number | null;
+  orderId?: string | null;
 }
 
 /** Data jurnal sebelum disimpan (draft) atau diposting. */
@@ -210,7 +217,7 @@ export interface WorkspaceTemplate {
 
 export type TemplateRegistry = Record<TemplateType, WorkspaceTemplate>;
 
-export type AuditEntity = "workspace" | "account" | "period" | "journal" | "item" | "menu" | "recipe" | "portion_summary" | "contact" | "invoice";
+export type AuditEntity = "workspace" | "account" | "period" | "journal" | "item" | "menu" | "recipe" | "portion_summary" | "contact" | "invoice" | "catering_order" | "order_bill";
 
 /** Master barang untuk persediaan perpetual (ADR 017). */
 export interface Item {
@@ -254,6 +261,8 @@ export interface BusinessProfileInput {
   invoicePrefix: string;
   /** Prefix nomor internal faktur pembelian, mis. "PB". */
   purchasePrefix: string;
+  /** Prefix nomor quotation pesanan katering: "QUO" atau "SPH" (ADR 024). */
+  quotationPrefix: string;
   /** Logo kecil sebagai data URL image/png|jpeg|webp. */
   logoDataUrl: string | null;
 }
@@ -275,6 +284,15 @@ export interface ContactInput {
   /** Termin bayar default (hari). */
   paymentTermDays: number;
   notes: string | null;
+  /** Default kebijakan pembatalan pesanan katering (ADR 024); null = belum diatur. */
+  cancellationPolicy?: CancellationPolicy | null;
+}
+
+/** Kebijakan DP saat pesanan dibatalkan (ADR 024). */
+export interface CancellationPolicy {
+  kind: "refund" | "forfeit_percent" | "forfeit_all";
+  /** Persen DP yang hangus, basis poin (hanya forfeit_percent). */
+  forfeitBps: number;
 }
 
 export interface Contact extends ContactInput {
@@ -333,6 +351,58 @@ export interface Invoice extends InvoiceInput {
   issuedAt: IsoTimestamp | null;
   createdAt: IsoTimestamp;
   updatedAt: IsoTimestamp;
+}
+
+export type CateringServiceType = "event" | "box" | "subscription";
+export type CateringOrderState = "quotation" | "confirmed" | "completed" | "cancelled";
+
+/** Pesanan katering yang dapat diubah selama penawaran/dikonfirmasi (ADR 024). */
+export interface CateringOrderInput {
+  workspaceId: string;
+  contactId: string;
+  serviceType: CateringServiceType;
+  /** Tanggal acara/pengiriman. */
+  eventDate: IsoDate;
+  /** Jam acara "HH:MM", opsional. */
+  eventTime: string | null;
+  location: string | null;
+  pax: number;
+  quoteDate: IsoDate;
+  validUntil: IsoDate;
+  applyTax: boolean;
+  discount: InvoiceDiscount | null;
+  notes: string | null;
+  cancellationPolicy: CancellationPolicy;
+  /** Baris seperti faktur penjualan (tanpa barang). */
+  lines: InvoiceLine[];
+}
+
+export interface CateringOrder extends CateringOrderInput {
+  id: string;
+  number: string;
+  state: CateringOrderState;
+  /** Faktur penjualan saat pesanan selesai. */
+  invoiceId: string | null;
+  cancelledAt: IsoTimestamp | null;
+  cancelReason: string | null;
+  createdAt: IsoTimestamp;
+  updatedAt: IsoTimestamp;
+}
+
+/** Invoice DP: dokumen tagihan uang muka, tanpa jurnal (ADR 024). */
+export interface OrderBillInput {
+  workspaceId: string;
+  orderId: string;
+  billDate: IsoDate;
+  dueDate: IsoDate;
+  amount: number;
+  note: string | null;
+}
+
+export interface OrderBill extends OrderBillInput {
+  id: string;
+  number: string;
+  createdAt: IsoTimestamp;
 }
 
 /** Menu yang dijual (ADR 021). */

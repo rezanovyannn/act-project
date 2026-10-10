@@ -7,7 +7,7 @@ import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { beforeAll, describe, expect, it } from "vitest";
 import { AccountingError } from "@/core/errors";
 import { monthlyPeriodsForYear } from "@/core/periods";
-import type { JournalEntryInput, Workspace } from "@/core/types";
+import type { CateringOrderInput, JournalEntryInput, Workspace } from "@/core/types";
 import { FNB_TEMPLATE } from "@/modules/fnb/template";
 import { createSupabaseRepositories } from "@/repositories/supabase/repositories";
 import { describeRepositoryContract, type ContractActor } from "./repository-contract";
@@ -56,6 +56,7 @@ describe("RLS: user B tidak dapat membaca atau menulis data user A", () => {
   let menuA: string;
   let contactA: string;
   let invoiceA: string;
+  let orderA: string;
 
   const sale = (workspaceId: string, amount: number): JournalEntryInput => ({
     workspaceId,
@@ -66,6 +67,12 @@ describe("RLS: user B tidak dapat membaca atau menulis data user A", () => {
       { accountId: kasA, debit: amount, credit: 0 },
       { accountId: jualA, debit: 0, credit: amount },
     ],
+  });
+
+  const orderInput = (): CateringOrderInput => ({
+    workspaceId: workspaceA.id, contactId: contactA, serviceType: "event", eventDate: "2026-03-20", eventTime: null, location: null, pax: 10,
+    quoteDate: "2026-03-01", validUntil: "2026-03-08", applyTax: false, discount: null, notes: null, cancellationPolicy: { kind: "refund", forfeitBps: 0 },
+    lines: [{ description: "Rahasia", quantity: 10, unit: null, unitPrice: 1000, accountId: jualA, itemId: null }],
   });
 
   beforeAll(async () => {
@@ -80,7 +87,8 @@ describe("RLS: user B tidak dapat membaca atau menulis data user A", () => {
     postedA = (await userA.repos.journals.postJournal(sale(workspaceA.id, 1000))).id;
     menuA = (await userA.repos.menus.createMenu(workspaceA.id, { code: "M-1", name: "Rahasia", price: 1000, revenueAccountId: jualA })).id;
     contactA = (await userA.repos.invoices.createContact(workspaceA.id, { name: "Pelanggan A", isCustomer: true, isSupplier: false, address: null, phone: null, email: null, npwp: null, paymentTermDays: 0, notes: null })).id;
-    await userA.repos.invoices.saveProfile(workspaceA.id, { displayName: "Rahasia", address: null, phone: null, email: null, npwp: null, bankInfo: "BCA 1", invoiceNotes: null, invoicePrefix: "INV", purchasePrefix: "PB", logoDataUrl: null });
+    await userA.repos.invoices.saveProfile(workspaceA.id, { displayName: "Rahasia", address: null, phone: null, email: null, npwp: null, bankInfo: "BCA 1", invoiceNotes: null, invoicePrefix: "INV", purchasePrefix: "PB", quotationPrefix: "QUO", logoDataUrl: null });
+    orderA = (await userA.repos.catering.saveOrder(orderInput(), "QUO")).id;
     invoiceA = (await userA.repos.invoices.saveDraft({ workspaceId: workspaceA.id, kind: "sale", contactId: contactA, invoiceDate: "2026-03-10", dueDate: "2026-03-10", reference: null, notes: null, applyTax: false, lines: [] })).id;
   });
 
@@ -102,6 +110,9 @@ describe("RLS: user B tidak dapat membaca atau menulis data user A", () => {
     expect(await b.invoices.listInvoices(workspaceA.id)).toEqual([]);
     expect(await b.invoices.getInvoice(invoiceA)).toBeNull();
     expect((await b.invoices.getProfile(workspaceA.id)).bankInfo).toBeNull();
+    expect(await b.catering.listOrders(workspaceA.id)).toEqual([]);
+    expect(await b.catering.getOrder(orderA)).toBeNull();
+    expect(await b.catering.listBills(workspaceA.id)).toEqual([]);
     // Pembanding: A sendiri dapat membacanya.
     expect(await userA.repos.journals.getById(postedA)).not.toBeNull();
   });
@@ -125,10 +136,16 @@ describe("RLS: user B tidak dapat membaca atau menulis data user A", () => {
       ["hapus menu", () => b.menus.deleteMenu(menuA)],
       ["rekap porsi", () => b.menus.createPortionSummary({ workspaceId: workspaceA.id, dateFrom: "2026-03-01", dateTo: "2026-03-02", note: null, lines: [{ menuId: menuA, portions: 1 }] })],
       ["penjualan menu", () => b.menus.postMenuSale(sale(workspaceA.id, 1000), [{ menuId: menuA, portions: 1, amount: 1000 }])],
-      ["profil usaha", () => b.invoices.saveProfile(workspaceA.id, { displayName: "Diretas", address: null, phone: null, email: null, npwp: null, bankInfo: null, invoiceNotes: null, invoicePrefix: "INV", purchasePrefix: "PB", logoDataUrl: null })],
+      ["profil usaha", () => b.invoices.saveProfile(workspaceA.id, { displayName: "Diretas", address: null, phone: null, email: null, npwp: null, bankInfo: null, invoiceNotes: null, invoicePrefix: "INV", purchasePrefix: "PB", quotationPrefix: "QUO", logoDataUrl: null })],
       ["kontak baru", () => b.invoices.createContact(workspaceA.id, { name: "X", isCustomer: true, isSupplier: false, address: null, phone: null, email: null, npwp: null, paymentTermDays: 0, notes: null })],
       ["hapus kontak", () => b.invoices.deleteContact(contactA)],
       ["ubah draft faktur", () => b.invoices.saveDraft({ workspaceId: workspaceA.id, kind: "sale", contactId: null, invoiceDate: "2026-03-10", dueDate: "2026-03-10", reference: null, notes: null, applyTax: false, lines: [] }, invoiceA)],
+      ["pesanan baru", () => b.catering.saveOrder(orderInput(), "QUO")],
+      ["ubah pesanan", () => b.catering.saveOrder(orderInput(), "QUO", orderA)],
+      ["konfirmasi pesanan", () => b.catering.confirmOrder(orderA)],
+      ["hapus pesanan", () => b.catering.deleteOrder(orderA)],
+      ["invoice DP", () => b.catering.createBill({ workspaceId: workspaceA.id, orderId: orderA, billDate: "2026-03-02", dueDate: "2026-03-02", amount: 1, note: null }, "INV-DP")],
+      ["batalkan pesanan", () => b.catering.cancelOrder(orderA, null, "Diretas")],
       ["terbitkan faktur", () => b.invoices.issue(invoiceA, sale(workspaceA.id, 1000), { name: "X", address: null, phone: null, email: null, npwp: null }, "INV")],
     ];
     for (const [label, attempt] of attempts) {
@@ -155,6 +172,8 @@ describe("RLS: user B tidak dapat membaca atau menulis data user A", () => {
       await userA.client.from("workspaces").update({ name: "ubah langsung" }).eq("id", workspaceA.id),
       await userA.client.from("menus").update({ price: 1 }).eq("id", menuA),
       await userA.client.from("invoices").update({ status: "issued" }).eq("id", invoiceA),
+      await userA.client.from("catering_orders").update({ state: "confirmed" }).eq("id", orderA),
+      await userA.client.from("catering_order_bills").insert({ workspace_id: workspaceA.id, order_id: orderA, number: "X", number_year: 2026, number_seq: 1, bill_date: "2026-03-01", due_date: "2026-03-01", amount: 1 }),
       await userA.client.from("workspace_profiles").update({ bank_info: "ubah langsung" }).eq("workspace_id", workspaceA.id),
       await userA.client.from("menu_sale_lines").insert({ journal_entry_id: postedA, workspace_id: workspaceA.id, line_no: 1, menu_id: menuA, portions: 1, amount: 1 }),
     ];

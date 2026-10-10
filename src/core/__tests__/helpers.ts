@@ -7,11 +7,13 @@ import { PeriodService } from "@/core/services/period-service";
 import { StockCountService } from "@/core/services/stock-count-service";
 import { MenuService } from "@/core/services/menu-service";
 import { InvoiceService } from "@/core/services/invoice-service";
+import { CateringService } from "@/core/services/catering-service";
 import { TaxService } from "@/core/services/tax-service";
 import { WorkspaceService } from "@/core/services/workspace-service";
 import type { Account, JournalEntryInput, JournalLineInput } from "@/core/types";
 import { FNB_TEMPLATE } from "@/modules/fnb/template";
 import { RETAIL_TEMPLATE } from "@/modules/retail/template";
+import { CATERING_TEMPLATE } from "@/modules/catering/template";
 import {
   createMockRepositories,
   emptyMockState,
@@ -45,12 +47,13 @@ export function createTestEnv(seed: () => MockState = emptyMockState) {
     stockCountService: new StockCountService(repos),
     menuService: new MenuService({ ...repos, journalService }),
     invoiceService: new InvoiceService({ ...repos, journalService }),
+    cateringService: new CateringService({ ...repos, journalService }),
     accountService: new AccountService(repos),
     periodService: new PeriodService(repos),
     closingService: new ClosingService(repos),
     workspaceService: new WorkspaceService({
       workspaces: repos.workspaces,
-      templates: { fnb: FNB_TEMPLATE, retail: RETAIL_TEMPLATE },
+      templates: { fnb: FNB_TEMPLATE, retail: RETAIL_TEMPLATE, catering: CATERING_TEMPLATE },
     }),
   };
 }

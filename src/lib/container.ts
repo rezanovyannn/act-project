@@ -14,19 +14,21 @@ import { PeriodService } from "@/core/services/period-service";
 import { StockCountService } from "@/core/services/stock-count-service";
 import { MenuService } from "@/core/services/menu-service";
 import { InvoiceService } from "@/core/services/invoice-service";
+import { CateringService } from "@/core/services/catering-service";
 import { TaxService } from "@/core/services/tax-service";
 import { WorkspaceService } from "@/core/services/workspace-service";
 import type { TemplateRegistry } from "@/core/types";
 import { buildFnbMockState, MOCK_OWNER_ID } from "@/mocks/fnb/dataset";
 import { FNB_TEMPLATE } from "@/modules/fnb/template";
 import { RETAIL_TEMPLATE } from "@/modules/retail/template";
+import { CATERING_TEMPLATE } from "@/modules/catering/template";
 import { createMockRepositories, MockDatabase } from "@/repositories/mock";
 import { createSupabaseRepositories } from "@/repositories/supabase/repositories";
 import { SupabaseAuthService } from "./supabase/auth";
 import { getSupabaseBrowserClient } from "./supabase/browser";
 import { dataSource, type DataSource } from "./supabase/config";
 
-const TEMPLATES: TemplateRegistry = { fnb: FNB_TEMPLATE, retail: RETAIL_TEMPLATE };
+const TEMPLATES: TemplateRegistry = { fnb: FNB_TEMPLATE, retail: RETAIL_TEMPLATE, catering: CATERING_TEMPLATE };
 
 export interface Container extends AppServices {
   dataSource: DataSource;
@@ -36,7 +38,7 @@ export interface Container extends AppServices {
   resetMockData?: () => void;
 }
 
-type Repositories = Omit<AppServices, "ownerId" | "workspaceService" | "journalService" | "accountService" | "periodService" | "closingService" | "taxService" | "itemService" | "inventoryService" | "stockCountService" | "menuService" | "invoiceService">;
+type Repositories = Omit<AppServices, "ownerId" | "workspaceService" | "journalService" | "accountService" | "periodService" | "closingService" | "taxService" | "itemService" | "inventoryService" | "stockCountService" | "menuService" | "invoiceService" | "cateringService">;
 
 function buildServices(repositories: Repositories, ownerId: string): AppServices {
   const journalService = new JournalService(repositories);
@@ -54,6 +56,7 @@ function buildServices(repositories: Repositories, ownerId: string): AppServices
     stockCountService: new StockCountService(repositories),
     menuService: new MenuService({ ...repositories, journalService }),
     invoiceService: new InvoiceService({ ...repositories, journalService }),
+    cateringService: new CateringService({ ...repositories, journalService }),
   };
 }
 

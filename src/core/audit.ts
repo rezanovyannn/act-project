@@ -17,6 +17,8 @@ export const AUDIT_ENTITY_LABELS: Record<AuditEntity, string> = {
   portion_summary: "Rekap porsi",
   contact: "Kontak",
   invoice: "Faktur",
+  catering_order: "Pesanan",
+  order_bill: "Invoice DP",
 };
 
 const ACTION_LABELS: Record<string, string> = {
@@ -34,6 +36,9 @@ const ACTION_LABELS: Record<string, string> = {
   update_inventory_settings: "Pengaturan persediaan diubah",
   issue: "Diterbitkan",
   restore: "Dipulihkan dari backup",
+  confirm: "Dikonfirmasi",
+  complete: "Diselesaikan",
+  cancel: "Dibatalkan",
 };
 
 export function auditActionLabel(action: string): string {
@@ -76,6 +81,9 @@ export function auditSubject(log: Pick<AuditLog, "entityType" | "entityId" | "be
       return text("name") ?? log.entityId;
     case "invoice":
       return text("number") ?? `Draft faktur ${text("invoiceDate") ?? ""}`.trim();
+    case "catering_order":
+    case "order_bill":
+      return text("number") ?? log.entityId;
     case "portion_summary":
       return text("dateFrom") ? `${text("dateFrom")} s.d. ${text("dateTo")}` : log.entityId;
   }

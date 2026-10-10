@@ -9,6 +9,10 @@ import type {
   AuditLog,
   BusinessProfile,
   BusinessProfileInput,
+  CateringOrder,
+  CateringOrderInput,
+  OrderBill,
+  OrderBillInput,
   Contact,
   ContactInput,
   ContactSnapshot,
@@ -111,6 +115,33 @@ export interface IInvoiceRepository {
    * dan menandai faktur terbit beserta salinan kontaknya.
    */
   issue(id: string, journal: JournalEntryInput, contact: ContactSnapshot, prefix: string): Promise<Invoice>;
+}
+
+/** Pesanan katering & invoice DP (ADR 024). */
+export interface ICateringRepository {
+  /** Pesanan yang belum dihapus, terbaru dulu. */
+  listOrders(workspaceId: string): Promise<CateringOrder[]>;
+  getOrder(id: string): Promise<CateringOrder | null>;
+  /**
+   * Buat pesanan baru (penawaran; nomor `prefix/yyyy/mm/urut` diberikan di sini)
+   * atau ubah pesanan penawaran/dikonfirmasi.
+   */
+  saveOrder(input: CateringOrderInput, prefix: string, id?: string): Promise<CateringOrder>;
+  /** Penawaran → dikonfirmasi. */
+  confirmOrder(id: string): Promise<CateringOrder>;
+  /** Hapus penawaran tanpa DP & invoice DP (ORDER_IN_USE bila ada). */
+  deleteOrder(id: string): Promise<void>;
+  listBills(workspaceId: string): Promise<OrderBill[]>;
+  /** Invoice DP bernomor `prefix/yyyy/mm/urut` (urut per tahun), tanpa jurnal. */
+  createBill(input: OrderBillInput, prefix: string): Promise<OrderBill>;
+  deleteBill(id: string): Promise<void>;
+  /**
+   * Atomik: terbitkan faktur penjualan dari pesanan (nomor faktur `invoicePrefix`),
+   * pakai saldo DP untuk melunasinya (min(saldo, total)), tandai pesanan selesai.
+   */
+  completeOrder(id: string, invoice: InvoiceInput, journal: JournalEntryInput, contact: ContactSnapshot, invoicePrefix: string): Promise<CateringOrder>;
+  /** Atomik: posting jurnal pembatalan (bila ada saldo DP; harus menolkan saldo) lalu tandai dibatalkan. */
+  cancelOrder(id: string, journal: JournalEntryInput | null, reason: string): Promise<CateringOrder>;
 }
 
 export type MenuPatch = Partial<MenuInput & { isActive: boolean }>;

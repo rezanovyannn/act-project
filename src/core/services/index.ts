@@ -1,6 +1,7 @@
 import type {
   IAccountRepository,
   IAuditLogRepository,
+  ICateringRepository,
   IInvoiceRepository,
   IItemRepository,
   IMenuRepository,
@@ -10,6 +11,7 @@ import type {
   IWorkspaceRepository,
 } from "../ports";
 import type { AccountService } from "./account-service";
+import type { CateringService } from "./catering-service";
 import type { ClosingService } from "./closing-service";
 import type { InventoryService } from "./inventory-service";
 import type { InvoiceService } from "./invoice-service";
@@ -22,6 +24,7 @@ import type { TaxService } from "./tax-service";
 import type { WorkspaceService } from "./workspace-service";
 
 export { AccountService } from "./account-service";
+export { CateringService } from "./catering-service";
 export { ClosingService } from "./closing-service";
 export { InventoryService } from "./inventory-service";
 export { InvoiceService } from "./invoice-service";
@@ -51,6 +54,7 @@ export interface AppServices {
   stockCountService: StockCountService;
   menuService: MenuService;
   invoiceService: InvoiceService;
+  cateringService: CateringService;
   auditLogs: IAuditLogRepository;
   workspaces: IWorkspaceRepository;
   accounts: IAccountRepository;
@@ -60,4 +64,5 @@ export interface AppServices {
   stockCounts: IStockCountRepository;
   menus: IMenuRepository;
   invoices: IInvoiceRepository;
+  catering: ICateringRepository;
 }

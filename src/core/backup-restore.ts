@@ -22,6 +22,7 @@ export interface RestoreSummary {
     contacts: number;
     invoices: number;
     menus: number;
+    orders: number;
     stockCounts: number;
     auditLogs: number;
   };
@@ -67,6 +68,8 @@ export function parseBackup(raw: unknown, templates: readonly TemplateType[]): {
     menuSales: arr("menuSales", false),
     contacts: arr("contacts", false),
     invoices: arr("invoices", false),
+    cateringOrders: arr("cateringOrders", false),
+    orderBills: arr("orderBills", false),
     profile: isObject(raw.profile) ? (raw.profile as unknown as WorkspaceBackup["profile"]) : null,
   } as WorkspaceBackup;
 
@@ -91,6 +94,8 @@ export function parseBackup(raw: unknown, templates: readonly TemplateType[]): {
   const journals = ids("Jurnal", backup.journals);
   const menus = ids("Menu", backup.menus);
   const contacts = ids("Kontak", backup.contacts);
+  const orders = ids("Pesanan", backup.cateringOrders);
+  const invoices = ids("Faktur", backup.invoices);
   ids("Periode", backup.periods);
 
   for (const p of backup.periods) {
@@ -112,6 +117,7 @@ export function parseBackup(raw: unknown, templates: readonly TemplateType[]): {
     for (const l of j.lines) {
       if (l.accountId && !accounts.has(l.accountId)) issue(`${label}: akun tidak ada di backup`);
       if (l.itemId && !items.has(l.itemId)) issue(`${label}: barang tidak ada di backup`);
+      if (l.orderId && !orders.has(l.orderId)) issue(`${label}: pesanan tidak ada di backup`);
       if (!isCount(l.debit) || !isCount(l.credit)) issue(`${label}: nominal bukan bilangan bulat ≥ 0`);
     }
     if (j.status === "posted") {
@@ -146,6 +152,15 @@ export function parseBackup(raw: unknown, templates: readonly TemplateType[]): {
     if (inv.journalEntryId && !journals.has(inv.journalEntryId)) issue(`${label}: jurnal tidak ada di backup`);
     if (inv.lines.some((l) => (l.accountId && !accounts.has(l.accountId)) || (l.itemId && !items.has(l.itemId)))) issue(`${label}: akun/barang tidak ada di backup`);
   }
+  for (const o of backup.cateringOrders) {
+    const label = `Pesanan ${o.number}`;
+    if (!contacts.has(o.contactId)) issue(`${label}: klien tidak ada di backup`);
+    if (o.invoiceId && !invoices.has(o.invoiceId)) issue(`${label}: faktur tidak ada di backup`);
+    if (o.lines.some((l) => l.accountId && !accounts.has(l.accountId))) issue(`${label}: akun tidak ada di backup`);
+  }
+  for (const b of backup.orderBills) {
+    if (!orders.has(b.orderId) || !isCount(b.amount)) issue(`Invoice DP ${b.number}: pesanan tidak ada di backup atau nominal rusak`);
+  }
   if (issues.length > 0) fail("INVALID_BACKUP", `Backup tidak dapat dipulihkan: ${issues.join("; ")}`);
 
   posted.sort();
@@ -165,6 +180,7 @@ export function parseBackup(raw: unknown, templates: readonly TemplateType[]): {
         contacts: backup.contacts.length,
         invoices: backup.invoices.length,
         menus: backup.menus.length,
+        orders: backup.cateringOrders.length,
         stockCounts: backup.stockCounts.length,
         auditLogs: backup.auditLogs.length,
       },

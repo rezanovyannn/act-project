@@ -6,6 +6,7 @@ import { usePathname } from "next/navigation"
 import {
   BookOpenIcon,
   BoxesIcon,
+  CalendarCheckIcon,
   ChefHatIcon,
   ClipboardCheckIcon,
   ContactIcon,
@@ -61,6 +62,8 @@ function navGroups(workspaceId: string, template: WorkspaceTemplate, openClaims:
       items: [
         { label: "Dashboard", href: routes.dashboard(workspaceId), icon: LayoutDashboardIcon, exact: true },
         { label: "Input Transaksi", href: routes.transactions(workspaceId), icon: ReceiptIcon },
+        // Pesanan, DP & quotation khusus katering (ADR 024).
+        ...(template.type === "catering" ? [{ label: "Pesanan", href: routes.orders(workspaceId), icon: CalendarCheckIcon }] : []),
         {
           label: "Piutang & Utang",
           href: routes.credits(workspaceId),

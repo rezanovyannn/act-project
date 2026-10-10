@@ -144,8 +144,8 @@ describe("detail penyajian", () => {
       id: "je-odd",
       entryNumber: "JU-2025-9999",
       lines: [
-        { id: "l1", accountId: accountByCode("1-1100").id, lineNo: 1, description: null, debit: 1_000, credit: 0, itemId: null, quantity: null },
-        { id: "l2", accountId: accountByCode("3-3000").id, lineNo: 2, description: null, debit: 0, credit: 1_000, itemId: null, quantity: null },
+        { id: "l1", accountId: accountByCode("1-1100").id, lineNo: 1, description: null, debit: 1_000, credit: 0, itemId: null, quantity: null, orderId: null },
+        { id: "l2", accountId: accountByCode("3-3000").id, lineNo: 2, description: null, debit: 0, credit: 1_000, itemId: null, quantity: null, orderId: null },
       ],
     };
     const cf = cashFlowStatement(accounts, [...journals, odd], { fromDate: "2025-01-01", toDate: "2025-12-31" });
@@ -168,6 +168,7 @@ describe("setelah tutup buku 2025 (jurnal penutup)", () => {
     credit: r.debit,
     itemId: null as string | null,
     quantity: null as number | null,
+    orderId: null as string | null,
   }));
   const net = closingLines.reduce((sum, l) => sum + l.debit - l.credit, 0);
   closingLines.push({
@@ -179,6 +180,7 @@ describe("setelah tutup buku 2025 (jurnal penutup)", () => {
     credit: net,
     itemId: null,
     quantity: null,
+    orderId: null,
   });
   const closing: JournalEntry = {
     ...journals.find((e) => e.id === "je-depreciation-2025")!,

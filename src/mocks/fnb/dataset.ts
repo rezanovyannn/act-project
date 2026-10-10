@@ -230,6 +230,7 @@ function buildJournals(): JournalEntry[] {
         credit,
         itemId: null,
         quantity: null,
+        orderId: null,
       })),
     } satisfies JournalEntry;
   });
@@ -297,6 +298,8 @@ export function buildFnbMockState(): MockState {
     profiles: [],
     contacts: [],
     invoices: [],
+    cateringOrders: [],
+    orderBills: [],
     auditLogs: [],
   };
 }

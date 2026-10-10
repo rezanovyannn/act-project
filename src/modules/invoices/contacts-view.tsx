@@ -3,9 +3,11 @@
 import { useState } from "react"
 import { MoreHorizontalIcon, PlusIcon, SearchIcon, UsersIcon } from "lucide-react"
 import { toast } from "sonner"
+import { policyLabel } from "@/core/cancellation-policy"
 import type { AppServices } from "@/core/services"
 import type { Contact, ContactInput } from "@/core/types"
 import { Badge } from "@/components/ui/badge"
+import { CancellationPolicyField } from "@/components/ui/cancellation-policy-field"
 import { Button } from "@/components/ui/button"
 import {
   Dialog,
@@ -40,6 +42,7 @@ const EMPTY: ContactInput = {
   npwp: null,
   paymentTermDays: 0,
   notes: null,
+  cancellationPolicy: null,
 }
 
 export function roleLabel(c: Pick<Contact, "isCustomer" | "isSupplier">): string {
@@ -47,7 +50,16 @@ export function roleLabel(c: Pick<Contact, "isCustomer" | "isSupplier">): string
 }
 
 /** Daftar kontak pelanggan & pemasok (ADR 022). */
-export function ContactsView({ services, workspaceId }: { services: AppServices; workspaceId: string }) {
+export function ContactsView({
+  services,
+  workspaceId,
+  withCancellationPolicy = false,
+}: {
+  services: AppServices
+  workspaceId: string
+  /** Workspace katering: default kebijakan pembatalan per klien (ADR 024). */
+  withCancellationPolicy?: boolean
+}) {
   const data = useLoader(() => services.invoices.listContacts(workspaceId), [services, workspaceId])
   const [editing, setEditing] = useState<Contact | "new" | null>(null)
   const [search, setSearch] = useState("")
@@ -96,6 +108,7 @@ export function ContactsView({ services, workspaceId }: { services: AppServices;
                 <th className="px-4 py-2.5">Nama</th>
                 <th className="px-3 py-2.5">Kontak</th>
                 <th className="px-3 py-2.5">NPWP</th>
+                {withCancellationPolicy && <th className="px-3 py-2.5">Pembatalan</th>}
                 <th className="px-3 py-2.5 text-right">Termin</th>
                 <th className="w-12" />
               </tr>
@@ -110,6 +123,9 @@ export function ContactsView({ services, workspaceId }: { services: AppServices;
                   </td>
                   <td className="px-3 py-2.5 text-muted-foreground">{[c.phone, c.email].filter(Boolean).join(" · ") || "—"}</td>
                   <td className="px-3 py-2.5 tabular-nums text-muted-foreground">{c.npwp ?? "—"}</td>
+                  {withCancellationPolicy && (
+                    <td className="px-3 py-2.5 text-muted-foreground">{c.cancellationPolicy ? policyLabel(c.cancellationPolicy) : "—"}</td>
+                  )}
                   <td className="px-3 py-2.5 text-right tabular-nums">{c.paymentTermDays} hari</td>
                   <td className="px-2 py-2.5">
                     <DropdownMenu>
@@ -126,7 +142,7 @@ export function ContactsView({ services, workspaceId }: { services: AppServices;
                 </tr>
               ))}
               {contacts.length === 0 && (
-                <tr><td colSpan={5} className="px-4 py-6 text-center text-muted-foreground">Tidak ada kontak yang cocok.</td></tr>
+                <tr><td colSpan={withCancellationPolicy ? 6 : 5} className="px-4 py-6 text-center text-muted-foreground">Tidak ada kontak yang cocok.</td></tr>
               )}
             </tbody>
           </table>
@@ -137,6 +153,7 @@ export function ContactsView({ services, workspaceId }: { services: AppServices;
           services={services}
           workspaceId={workspaceId}
           contact={editing === "new" ? null : editing}
+          withCancellationPolicy={withCancellationPolicy}
           onClose={() => setEditing(null)}
           onSaved={() => {
             setEditing(null)
@@ -148,12 +165,13 @@ export function ContactsView({ services, workspaceId }: { services: AppServices;
   )
 }
 
-/** Dialog tambah/ubah kontak; dipakai juga dari editor faktur. */
+/** Dialog tambah/ubah kontak; dipakai juga dari editor faktur & pesanan katering. */
 export function ContactDialog({
   services,
   workspaceId,
   contact,
   defaults,
+  withCancellationPolicy = false,
   onClose,
   onSaved,
 }: {
@@ -161,11 +179,13 @@ export function ContactDialog({
   workspaceId: string
   contact: Contact | null
   defaults?: Partial<ContactInput>
+  withCancellationPolicy?: boolean
   onClose: () => void
   onSaved: (contact: Contact) => void
 }) {
   const [form, setForm] = useState<ContactInput>(() => (contact ? { ...contact } : { ...EMPTY, ...defaults }))
   const [term, setTerm] = useState(String(contact?.paymentTermDays ?? defaults?.paymentTermDays ?? 0))
+  const [policyValid, setPolicyValid] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
   const set = <K extends keyof ContactInput>(key: K, value: ContactInput[K]) => setForm((f) => ({ ...f, [key]: value }))
@@ -176,6 +196,7 @@ export function ContactDialog({
 
   async function submit(event: React.FormEvent) {
     event.preventDefault()
+    if (!policyValid) return setError("Lengkapi persen DP hangus pada kebijakan pembatalan")
     setSaving(true)
     setError(null)
     const input = { ...form, paymentTermDays: /^\d+$/.test(term) ? Number(term) : -1 }
@@ -235,6 +256,17 @@ export function ContactDialog({
               </InputGroup>
             </div>
           </div>
+          {withCancellationPolicy && (
+            <CancellationPolicyField
+              label="Default kebijakan pembatalan pesanan"
+              allowNone
+              value={form.cancellationPolicy ?? null}
+              onChange={(policy, valid) => {
+                setPolicyValid(valid)
+                set("cancellationPolicy", policy)
+              }}
+            />
+          )}
           <div className="grid gap-2">
             <Label htmlFor="contact-notes">Catatan</Label>
             <Textarea id="contact-notes" rows={2} {...text("notes")} />

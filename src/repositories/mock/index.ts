@@ -1,5 +1,6 @@
 import { MockAccountRepository } from "./account-repository";
 import { MockAuditLogRepository } from "./audit-log-repository";
+import { MockCateringRepository } from "./catering-repository";
 import { MockInvoiceRepository } from "./invoice-repository";
 import { MockItemRepository } from "./item-repository";
 import { MockJournalRepository } from "./journal-repository";
@@ -13,6 +14,7 @@ export * from "./mock-database";
 
 export function createMockRepositories(db: MockDatabase) {
   const journals = new MockJournalRepository(db);
+  const invoices = new MockInvoiceRepository(db, journals);
   return {
     workspaces: new MockWorkspaceRepository(db),
     accounts: new MockAccountRepository(db),
@@ -20,7 +22,8 @@ export function createMockRepositories(db: MockDatabase) {
     journals,
     stockCounts: new MockStockCountRepository(db, journals),
     menus: new MockMenuRepository(db, journals),
-    invoices: new MockInvoiceRepository(db, journals),
+    invoices,
+    catering: new MockCateringRepository(db, journals, invoices),
     items: new MockItemRepository(db),
     auditLogs: new MockAuditLogRepository(db),
   };
