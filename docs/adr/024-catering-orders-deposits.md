@@ -54,6 +54,12 @@ Keputusan user yang relevan untuk 10A:
 20. **Baris pesanan ber-paket** (`packageId` di baris pesanan): memilih paket mengisi keterangan (nama + isi), qty = jumlah pax, satuan pax, harga per pax, akun pendapatan paket. Estimasi bahan baku pesanan otomatis = Σ resep × pax × harga (pecahan eksak, dibulatkan ke rupiah) sampai user mengetik angka sendiri.
 21. **Daftar belanja** dari pesanan berstatus dikonfirmasi dengan tanggal acara dalam rentang: kebutuhan tiap bahan digabung lintas pesanan (pecahan eksak), jumlah dibeli dibulatkan ke atas ke satuan dasar, perkiraan biaya, rincian per pesanan; dapat dicetak dan diekspor CSV/Excel. Baris pesanan tanpa paket tidak dihitung dan disebutkan jumlahnya.
 
+## Keputusan Fase 10D (dijawab user, 11 Oktober 2026 — Catatan Keputusan 95–98)
+22. **Katering langganan pascabayar** (`catering_subscriptions`): klien, nama, mulai & berakhir (opsional), harga per porsi, akun pendapatan, porsi default per hari kirim, hari kirim ISO (1 = Senin … 7 = Minggu), PBJT ya/tidak, catatan. Porsi tanggal = ubahan per tanggal (`day_overrides`) bila ada, selain itu porsi default pada hari kirim dalam masa kontrak.
+23. **Tagihan bulanan.** Setelah sebuah bulan berakhir dan belum ditagih (ada porsi > 0), halaman Pesanan menampilkan pengingat; 1 klik membuat **draft faktur penjualan** (tanggal = akhir bulan, jatuh tempo = + termin klien, satu baris "nama · bulan": total porsi × harga per porsi, referensi "Langganan yyyy-mm") dan mencatat bulan itu di `billed_months` secara atomik. Faktur ditinjau lalu diterbitkan seperti biasa (ADR 022), sehingga pendapatan diakui di bulan pengiriman.
+24. **Bulan yang sudah ditagih dikunci** (porsi tidak dapat diubah) selama fakturnya draft atau terbit dan belum dibatalkan. Menghapus draft atau membatalkan faktur membuka bulan itu untuk ditagih ulang. Langganan yang pernah ditagih tidak dapat dihapus (isi tanggal berakhir).
+25. **Sewa alat** tetap sebagai baris pesanan (Pendapatan Ongkir & Sewa Alat); deposit jaminan tidak dicatat.
+
 ## Konsekuensi
 ### Positif:
 - Pendapatan katering berbasis akrual tanpa jurnal manual. DP dan sisa tagihan selalu cocok dengan Neraca (Uang Muka Pelanggan & Piutang Usaha).

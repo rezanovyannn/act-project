@@ -24,6 +24,7 @@ export const routes = {
   newOrder: (workspaceId: string) => `/w/${workspaceId}/orders/new`,
   order: (workspaceId: string, orderId: string) => `/w/${workspaceId}/orders/${orderId}`,
   packages: (workspaceId: string) => `/w/${workspaceId}/packages`,
+  subscription: (workspaceId: string, id: string) => `/w/${workspaceId}/subscriptions/${id}`,
   purchaseInvoices: (workspaceId: string) => `/w/${workspaceId}/purchase-invoices`,
   newPurchaseInvoice: (workspaceId: string) => `/w/${workspaceId}/purchase-invoices/new`,
   purchaseInvoice: (workspaceId: string, invoiceId: string) => `/w/${workspaceId}/purchase-invoices/${invoiceId}`,

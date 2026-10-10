@@ -222,7 +222,8 @@ Template ketiga `catering` untuk usaha katering: acara (nikahan, syukuran), nasi
 - **Pekerjaan:** paket menu dengan resep per pax (memakai ulang Menu & Resep, ADR 021); daftar belanja bahan per tanggal dari pesanan yang dikonfirmasi (beberapa pesanan dalam satu hari digabung); estimasi biaya bahan di quotation.
 - **Kriteria Selesai (Stop & Review):** kebutuhan bahan = resep × pax teruji unit; daftar belanja dapat dicetak/diekspor.
 
-### Sub-fase 10D: Katering Langganan & Sewa Alat
+### Sub-fase 10D: Katering Langganan & Sewa Alat (selesai, menunggu review)
+- **Terealisasi:** tab **Langganan** di halaman Pesanan: kontrak per klien (harga per porsi, porsi per hari kirim, hari kirim, mulai/berakhir, PBJT); halaman langganan dengan **kalender porsi harian** per bulan (ubah per tanggal: libur 0, tambahan; kosongkan = kembali default); **pengingat tagihan** setelah bulan berakhir dengan 1 klik membuat **draft Faktur Penjualan** (tanggal akhir bulan, jatuh tempo + termin klien); bulan yang sudah ditagih dikunci, dapat ditagih ulang bila draft dihapus atau faktur dibatalkan. Sewa alat tetap sebagai baris pesanan biasa, **tanpa** deposit jaminan (Catatan Keputusan 98).
 - **Pekerjaan:** kontrak langganan bulanan (porsi harian, harga per porsi), dengan draft invoice otomatis akhir bulan; sewa/peminjaman alat ke klien beserta deposit jaminan (utang sampai dikembalikan).
 - **Kriteria Selesai (Stop & Review):** tagihan langganan & jurnal jaminan benar; teruji unit dan E2E.
 
@@ -376,3 +377,7 @@ Template ketiga `catering` untuk usaha katering: acara (nikahan, syukuran), nasi
 | 92 | Estimasi bahan di pesanan | Otomatis dari resep × pax, tetap bisa diubah | Fase 10C |
 | 93 | Daftar belanja | Per rentang tanggal acara, gabungan pesanan dikonfirmasi; cetak & ekspor CSV/Excel | Fase 10C |
 | 94 | Fitur disembunyikan di workspace Katering | Faktur Pembelian, Pemakaian Barang, Retur Barang (menu & pencarian) dan tab Penjualan di Input Transaksi; data & halaman tetap ada, dapat dimunculkan lagi | Fase 10 |
+| 95 | Porsi katering langganan | Kalender harian: hari kirim × porsi default, dapat diubah per tanggal | Fase 10D |
+| 96 | Tagihan langganan | Pengingat setelah bulan berakhir + 1 klik membuat draft Faktur Penjualan | Fase 10D |
+| 97 | Pembayaran langganan | Pascabayar: ditagih akhir bulan sesuai porsi terkirim; pendapatan di bulan pengiriman | Fase 10D |
+| 98 | Deposit jaminan sewa alat | Tidak dipakai; sewa alat cukup sebagai baris pesanan | Fase 10D |

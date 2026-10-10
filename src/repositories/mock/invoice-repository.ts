@@ -96,6 +96,9 @@ export class MockInvoiceRepository implements IInvoiceRepository {
       if (state.cateringOrders.some((o) => o.deletedAt === null && o.contactId === id)) {
         fail("CONTACT_IN_USE", "Kontak sudah dipakai pesanan; tidak bisa dihapus");
       }
+      if (state.subscriptions.some((s) => s.deletedAt === null && s.contactId === id)) {
+        fail("CONTACT_IN_USE", "Kontak sudah dipakai langganan; tidak bisa dihapus");
+      }
       contact.deletedAt = this.db.now();
       this.db.audit(state, { workspaceId: contact.workspaceId, entityType: "contact", entityId: id, action: "delete", before: contact, after: null });
     });

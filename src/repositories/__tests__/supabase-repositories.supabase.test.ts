@@ -113,6 +113,8 @@ describe("RLS: user B tidak dapat membaca atau menulis data user A", () => {
     expect(await b.catering.listOrders(workspaceA.id)).toEqual([]);
     expect(await b.catering.getOrder(orderA)).toBeNull();
     expect(await b.catering.listBills(workspaceA.id)).toEqual([]);
+    expect(await b.catering.listSubscriptions(workspaceA.id)).toEqual([]);
+    expect(await b.catering.listPackages(workspaceA.id)).toEqual([]);
     // Pembanding: A sendiri dapat membacanya.
     expect(await userA.repos.journals.getById(postedA)).not.toBeNull();
   });
@@ -146,6 +148,8 @@ describe("RLS: user B tidak dapat membaca atau menulis data user A", () => {
       ["hapus pesanan", () => b.catering.deleteOrder(orderA)],
       ["invoice DP", () => b.catering.createBill({ workspaceId: workspaceA.id, orderId: orderA, billDate: "2026-03-02", dueDate: "2026-03-02", amount: 1, note: null }, "INV-DP")],
       ["batalkan pesanan", () => b.catering.cancelOrder(orderA, null, "Diretas")],
+      ["langganan baru", () => b.catering.saveSubscription(workspaceA.id, { contactId: contactA, name: "X", startDate: "2026-03-01", endDate: null, pricePerPortion: 1, revenueAccountId: jualA, defaultPortions: 1, weekdays: [1], applyTax: false, notes: null })],
+      ["paket baru", () => b.catering.savePackage(workspaceA.id, { code: "X", name: "X", description: null, pricePerPax: 1, revenueAccountId: null, yieldPax: 1, lines: [] })],
       ["terbitkan faktur", () => b.invoices.issue(invoiceA, sale(workspaceA.id, 1000), { name: "X", address: null, phone: null, email: null, npwp: null }, "INV")],
     ];
     for (const [label, attempt] of attempts) {

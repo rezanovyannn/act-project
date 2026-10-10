@@ -233,7 +233,7 @@ export interface WorkspaceTemplate {
 
 export type TemplateRegistry = Record<TemplateType, WorkspaceTemplate>;
 
-export type AuditEntity = "workspace" | "account" | "period" | "journal" | "item" | "menu" | "recipe" | "portion_summary" | "contact" | "invoice" | "catering_order" | "order_bill" | "catering_package";
+export type AuditEntity = "workspace" | "account" | "period" | "journal" | "item" | "menu" | "recipe" | "portion_summary" | "contact" | "invoice" | "catering_order" | "order_bill" | "catering_package" | "subscription";
 
 /** Master barang untuk persediaan perpetual (ADR 017). */
 export interface Item {
@@ -407,6 +407,36 @@ export interface CateringPackage extends CateringPackageInput {
   id: string;
   workspaceId: string;
   isActive: boolean;
+  createdAt: IsoTimestamp;
+  updatedAt: IsoTimestamp;
+  deletedAt: IsoTimestamp | null;
+}
+
+/** Katering langganan pascabayar (Fase 10D): porsi harian, ditagih per bulan. */
+export interface SubscriptionInput {
+  contactId: string;
+  /** Nama langganan, mis. "Makan siang kantor". */
+  name: string;
+  startDate: IsoDate;
+  /** Null = berjalan terus. */
+  endDate: IsoDate | null;
+  pricePerPortion: number;
+  revenueAccountId: string;
+  /** Porsi default per hari kirim. */
+  defaultPortions: number;
+  /** Hari kirim ISO (1 = Senin … 7 = Minggu). */
+  weekdays: number[];
+  applyTax: boolean;
+  notes: string | null;
+}
+
+export interface Subscription extends SubscriptionInput {
+  id: string;
+  workspaceId: string;
+  /** Porsi per tanggal yang berbeda dari default (0 = libur). */
+  dayOverrides: Record<IsoDate, number>;
+  /** Bulan (yyyy-mm) yang sudah dibuatkan tagihan → id faktur penjualan. */
+  billedMonths: Record<string, string>;
   createdAt: IsoTimestamp;
   updatedAt: IsoTimestamp;
   deletedAt: IsoTimestamp | null;

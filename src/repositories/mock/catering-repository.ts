@@ -6,6 +6,10 @@ import { isValidIsoDate } from "@/core/dates";
 import { fail } from "@/core/errors";
 import type { ICateringRepository } from "@/core/ports";
 import type {
+  Subscription,
+  SubscriptionInput,
+  Invoice,
+  IsoDate,
   CateringOrder,
   CateringPackage,
   CateringPackageInput,
@@ -292,6 +296,88 @@ export class MockCateringRepository implements ICateringRepository {
       }
       pkg.deletedAt = this.db.now();
       this.db.audit(state, { workspaceId: pkg.workspaceId, entityType: "catering_package", entityId: id, action: "delete", before: pkg, after: null });
+    });
+  }
+
+  async listSubscriptions(workspaceId: string): Promise<Subscription[]> {
+    return this.db
+      .read()
+      .subscriptions.filter((s) => s.workspaceId === workspaceId && s.deletedAt === null)
+      .sort((a, b) => a.name.localeCompare(b.name, "id"));
+  }
+
+  async saveSubscription(workspaceId: string, input: SubscriptionInput, id?: string): Promise<Subscription> {
+    return this.db.write((state) => {
+      // Meniru validasi RPC save_subscription.
+      const contact = state.contacts.find((c) => c.id === input.contactId && c.deletedAt === null);
+      if (!contact || contact.workspaceId !== workspaceId) fail("CONTACT_NOT_FOUND", "Pilih klien dari daftar kontak");
+      if (!state.accounts.some((a) => a.id === input.revenueAccountId && a.workspaceId === workspaceId && a.accountType === "revenue")) fail("INVALID_ACCOUNT", "Pilih akun pendapatan");
+      if (!isValidIsoDate(input.startDate) || (input.endDate !== null && (!isValidIsoDate(input.endDate) || input.endDate < input.startDate))) fail("INVALID_DATE", "Tanggal langganan tidak valid");
+      if (!Number.isSafeInteger(input.pricePerPortion) || input.pricePerPortion <= 0 || !Number.isSafeInteger(input.defaultPortions) || input.defaultPortions < 0) {
+        fail("INVALID_AMOUNT", "Harga per porsi atau porsi per hari tidak valid");
+      }
+      if (input.weekdays.length === 0 || input.weekdays.some((d) => !Number.isInteger(d) || d < 1 || d > 7)) fail("INVALID_ORDER", "Pilih minimal satu hari kirim");
+      const now = this.db.now();
+      const fields = { ...input, weekdays: [...input.weekdays] };
+      if (id) {
+        const sub = state.subscriptions.find((s) => s.id === id && s.deletedAt === null);
+        if (!sub || sub.workspaceId !== workspaceId) fail("NOT_FOUND", "Langganan tidak ditemukan");
+        const before = { ...sub };
+        Object.assign(sub, fields, { updatedAt: now });
+        this.db.audit(state, { workspaceId, entityType: "subscription", entityId: id, action: "update", before, after: sub });
+        return structuredClone(sub);
+      }
+      const sub: Subscription = { ...fields, id: this.db.generateId(), workspaceId, dayOverrides: {}, billedMonths: {}, createdAt: now, updatedAt: now, deletedAt: null };
+      state.subscriptions.push(sub);
+      this.db.audit(state, { workspaceId, entityType: "subscription", entityId: sub.id, action: "create", before: null, after: sub });
+      return structuredClone(sub);
+    });
+  }
+
+  async setSubscriptionDays(id: string, changes: Record<IsoDate, number | null>): Promise<Subscription> {
+    return this.db.write((state) => {
+      const sub = state.subscriptions.find((s) => s.id === id && s.deletedAt === null);
+      if (!sub) fail("NOT_FOUND", "Langganan tidak ditemukan");
+      const before = structuredClone(sub);
+      const overrides = { ...sub.dayOverrides };
+      for (const [date, portions] of Object.entries(changes)) {
+        if (!isValidIsoDate(date)) fail("INVALID_DATE", "Tanggal porsi tidak valid");
+        if (portions === null) delete overrides[date];
+        else if (!Number.isSafeInteger(portions) || portions < 0) fail("INVALID_QUANTITY", "Porsi harus bilangan bulat ≥ 0");
+        else overrides[date] = portions;
+      }
+      sub.dayOverrides = overrides;
+      sub.updatedAt = this.db.now();
+      this.db.audit(state, { workspaceId: sub.workspaceId, entityType: "subscription", entityId: id, action: "update", before, after: sub });
+      return structuredClone(sub);
+    });
+  }
+
+  async deleteSubscription(id: string): Promise<void> {
+    this.db.write((state) => {
+      const sub = state.subscriptions.find((s) => s.id === id && s.deletedAt === null);
+      if (!sub) fail("NOT_FOUND", "Langganan tidak ditemukan");
+      if (Object.keys(sub.billedMonths).length > 0) fail("ORDER_IN_USE", "Langganan sudah pernah ditagih; isi tanggal berakhir saja, tidak bisa dihapus");
+      sub.deletedAt = this.db.now();
+      this.db.audit(state, { workspaceId: sub.workspaceId, entityType: "subscription", entityId: id, action: "delete", before: sub, after: null });
+    });
+  }
+
+  async createSubscriptionInvoice(id: string, month: string, invoice: InvoiceInput): Promise<Invoice> {
+    return this.db.write((state) => {
+      const sub = state.subscriptions.find((s) => s.id === id && s.deletedAt === null);
+      if (!sub) fail("NOT_FOUND", "Langganan tidak ditemukan");
+      if (!/^\d{4}-(0[1-9]|1[0-2])$/.test(month)) fail("INVALID_DATE", "Bulan tagihan tidak valid");
+      if (invoice.workspaceId !== sub.workspaceId || invoice.kind !== "sale" || invoice.contactId !== sub.contactId) fail("INVALID_INVOICE", "Faktur harus faktur penjualan untuk klien langganan ini");
+      const existing = sub.billedMonths[month] ? state.invoices.find((i) => i.id === sub.billedMonths[month] && i.deletedAt === null) : undefined;
+      const reversed = existing?.journalEntryId ? state.journals.some((j) => j.reversalOf === existing.journalEntryId && j.status === "posted" && j.deletedAt === null) : false;
+      if (existing && !reversed) fail("INVALID_INVOICE", "Bulan ini sudah punya tagihan langganan");
+      const draft = this.invoices.saveDraftInState(state, invoice);
+      const before = structuredClone(sub);
+      sub.billedMonths = { ...sub.billedMonths, [month]: draft.id };
+      sub.updatedAt = this.db.now();
+      this.db.audit(state, { workspaceId: sub.workspaceId, entityType: "subscription", entityId: id, action: "update", before, after: sub });
+      return draft;
     });
   }
 }

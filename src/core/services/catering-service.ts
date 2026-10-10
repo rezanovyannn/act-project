@@ -34,7 +34,8 @@ import {
   type PaymentInput,
 } from "../catering";
 import { fail } from "../errors";
-import { buildSaleInvoice, contactSnapshot, withDiscountAccount, type InvoicePlan } from "../invoice";
+import { billingOf, dueBillings, subscriptionInvoiceInput, validateDayChanges, validateSubscription, type DueBilling } from "../subscription";
+import { buildSaleInvoice, contactSnapshot, summarizeInvoices, withDiscountAccount, type InvoicePlan } from "../invoice";
 import type { IAccountRepository, ICateringRepository, IInvoiceRepository, IItemRepository, IJournalRepository, IWorkspaceRepository } from "../ports";
 import type {
   Account,
@@ -46,6 +47,8 @@ import type {
   CateringPackageInput,
   Item,
   OrderLine,
+  Subscription,
+  SubscriptionInput,
   Contact,
   Invoice,
   IsoDate,
@@ -69,6 +72,8 @@ export interface CateringData {
   /** Bahan & paket menu untuk estimasi dan daftar belanja (Fase 10C). */
   items: Item[];
   packages: CateringPackage[];
+  /** Katering langganan (Fase 10D). */
+  subscriptions: Subscription[];
 }
 
 export interface CompletionInput {
@@ -92,7 +97,7 @@ export class CateringService {
   ) {}
 
   async data(workspaceId: string): Promise<CateringData> {
-    const [workspace, profile, accounts, contacts, journals, invoices, orders, bills, items, packages] = await Promise.all([
+    const [workspace, profile, accounts, contacts, journals, invoices, orders, bills, items, packages, subscriptions] = await Promise.all([
       this.deps.workspaces.getById(workspaceId),
       this.deps.invoices.getProfile(workspaceId),
       this.deps.accounts.listByWorkspace(workspaceId),
@@ -103,9 +108,10 @@ export class CateringService {
       this.deps.catering.listBills(workspaceId),
       this.deps.items.listByWorkspace(workspaceId),
       this.deps.catering.listPackages(workspaceId),
+      this.deps.catering.listSubscriptions(workspaceId),
     ]);
     if (!workspace) fail("NOT_FOUND", "Workspace tidak ditemukan");
-    return { workspace, profile, accounts, contacts, journals, invoices, orders, bills, items, packages };
+    return { workspace, profile, accounts, contacts, journals, invoices, orders, bills, items, packages, subscriptions };
   }
 
   summaries(data: CateringData, today: IsoDate): OrderSummary[] {
@@ -181,6 +187,48 @@ export class CateringService {
   /** Daftar belanja pesanan dikonfirmasi bertanggal acara [from, to]; harga per tanggal `to`. */
   shopping(data: CateringData, from: IsoDate, to: IsoDate): ShoppingList {
     return shoppingList(data.orders, data.packages, data.items, this.prices(data, to), from, to);
+  }
+
+  // ---------- Katering langganan (Fase 10D) ----------
+
+  private invoiceSummaries(data: CateringData, today: IsoDate) {
+    return new Map(summarizeInvoices(data.invoices, data.journals, data.accounts, today).map((s) => [s.invoice.id, s]));
+  }
+
+  billing(data: CateringData, sub: Subscription, month: string, today: IsoDate) {
+    return billingOf(sub, month, data.invoices, this.invoiceSummaries(data, today));
+  }
+
+  dueBillings(data: CateringData, today: IsoDate): DueBilling[] {
+    return dueBillings(data.subscriptions, data.invoices, this.invoiceSummaries(data, today), today);
+  }
+
+  async saveSubscription(workspaceId: string, input: SubscriptionInput, id?: string): Promise<Subscription> {
+    const data = await this.data(workspaceId);
+    return this.deps.catering.saveSubscription(workspaceId, validateSubscription(input, data.contacts, data.accounts), id);
+  }
+
+  /** Ubah porsi harian; bulan yang sudah punya tagihan aktif dikunci. */
+  async setSubscriptionDays(sub: Subscription, changes: Record<IsoDate, number | null>, today: IsoDate): Promise<Subscription> {
+    validateDayChanges(sub, changes);
+    const data = await this.data(sub.workspaceId);
+    for (const month of new Set(Object.keys(changes).map((d) => d.slice(0, 7)))) {
+      if (this.billing(data, sub, month, today).state !== "none") fail("INVALID_INVOICE", `Porsi ${month} sudah ditagih; hapus draft atau batalkan fakturnya dulu`);
+    }
+    return this.deps.catering.setSubscriptionDays(sub.id, changes);
+  }
+
+  deleteSubscription(id: string): Promise<void> {
+    return this.deps.catering.deleteSubscription(id);
+  }
+
+  /** 1 klik: draft faktur penjualan langganan bulan itu (Catatan Keputusan 96). */
+  async createSubscriptionInvoice(sub: Subscription, month: string, today: IsoDate): Promise<Invoice> {
+    const data = await this.data(sub.workspaceId);
+    if (this.billing(data, sub, month, today).state !== "none") fail("INVALID_INVOICE", "Bulan ini sudah punya tagihan langganan");
+    const contact = data.contacts.find((c) => c.id === sub.contactId);
+    if (!contact) fail("CONTACT_NOT_FOUND", "Klien langganan tidak ditemukan");
+    return this.deps.catering.createSubscriptionInvoice(sub.id, month, subscriptionInvoiceInput(sub, month, contact));
   }
 
   // ---------- Pesanan ----------

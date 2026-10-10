@@ -14,6 +14,8 @@ import type {
   CateringOrderInput,
   CateringPackage,
   CateringPackageInput,
+  Subscription,
+  SubscriptionInput,
   OrderBill,
   OrderBillInput,
   Contact,
@@ -154,6 +156,18 @@ export interface ICateringRepository {
   setPackageActive(id: string, isActive: boolean): Promise<CateringPackage>;
   /** Ditolak (ORDER_IN_USE) bila paket dipakai baris pesanan. */
   deletePackage(id: string): Promise<void>;
+  /** Langganan yang belum dihapus (Fase 10D). */
+  listSubscriptions(workspaceId: string): Promise<Subscription[]>;
+  saveSubscription(workspaceId: string, input: SubscriptionInput, id?: string): Promise<Subscription>;
+  /** Ubah porsi per tanggal; null = kembali ke porsi default. */
+  setSubscriptionDays(id: string, changes: Record<IsoDate, number | null>): Promise<Subscription>;
+  /** Ditolak (ORDER_IN_USE) bila langganan sudah pernah ditagih. */
+  deleteSubscription(id: string): Promise<void>;
+  /**
+   * Atomik: simpan draft faktur penjualan langganan bulan `month` lalu catat bulan
+   * itu sebagai ditagih. Ditolak bila bulan itu sudah punya faktur aktif.
+   */
+  createSubscriptionInvoice(id: string, month: string, invoice: InvoiceInput): Promise<Invoice>;
 }
 
 export type MenuPatch = Partial<MenuInput & { isActive: boolean }>;

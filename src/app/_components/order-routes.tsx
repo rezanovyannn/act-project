@@ -19,6 +19,7 @@ export function orderRoutes(workspaceId: string): OrderRoutes {
     tax: routes.settings(workspaceId, "tax"),
     items: routes.inventoryItems(workspaceId),
     packages: routes.packages(workspaceId),
+    subscription: (id) => routes.subscription(workspaceId, id),
   }
 }
 

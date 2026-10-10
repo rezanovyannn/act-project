@@ -982,6 +982,36 @@ export function describeRepositoryContract(
         expect((await repos.catering.listPackages(ws.id)).map((p) => p.code)).toEqual(["PA"]);
       });
 
+      it("langganan: simpan, porsi per tanggal, draft tagihan atomik, tagihan ganda ditolak, hapus", async () => {
+        const { ws, client, code } = await setupCatering();
+        const subInput = { contactId: client.id, name: "Makan siang", startDate: "2026-03-02", endDate: null, pricePerPortion: 25_000,
+          revenueAccountId: code("4-1000"), defaultPortions: 50, weekdays: [1, 2, 3, 4, 5], applyTax: false, notes: null };
+        const sub = await repos.catering.saveSubscription(ws.id, subInput);
+        expect(sub).toMatchObject({ name: "Makan siang", pricePerPortion: 25_000, defaultPortions: 50, weekdays: [1, 2, 3, 4, 5], dayOverrides: {}, billedMonths: {} });
+        await expectCode(repos.catering.saveSubscription(ws.id, { ...subInput, weekdays: [] }), "INVALID_ORDER");
+        await expectCode(repos.catering.saveSubscription(ws.id, { ...subInput, pricePerPortion: 0 }), "INVALID_AMOUNT");
+        let days = await repos.catering.setSubscriptionDays(sub.id, { "2026-03-05": 0, "2026-03-07": 30 });
+        expect(days.dayOverrides).toEqual({ "2026-03-05": 0, "2026-03-07": 30 });
+        days = await repos.catering.setSubscriptionDays(sub.id, { "2026-03-07": null });
+        expect(days.dayOverrides).toEqual({ "2026-03-05": 0 });
+        await expectCode(repos.catering.setSubscriptionDays(sub.id, { "2026-03-06": -1 }), "INVALID_QUANTITY");
+        const invoice = (month: string, contactId = client.id): InvoiceInput => ({ workspaceId: ws.id, kind: "sale", contactId, invoiceDate: `${month}-28`, dueDate: `${month}-28`,
+          reference: `Langganan ${month}`, notes: null, applyTax: false, lines: [{ description: "Makan siang", quantity: 1_050, unit: "porsi", unitPrice: 25_000, accountId: code("4-1000"), itemId: null }] });
+        const draft = await repos.catering.createSubscriptionInvoice(sub.id, "2026-03", invoice("2026-03"));
+        expect(draft).toMatchObject({ status: "draft", reference: "Langganan 2026-03", lines: [{ quantity: 1_050, unit: "porsi" }] });
+        expect((await repos.catering.listSubscriptions(ws.id))[0].billedMonths).toEqual({ "2026-03": draft.id });
+        await expectCode(repos.catering.createSubscriptionInvoice(sub.id, "2026-03", invoice("2026-03")), "INVALID_INVOICE");
+        await expectCode(repos.catering.createSubscriptionInvoice(sub.id, "2026-13", invoice("2026-03")), "INVALID_DATE");
+        await repos.invoices.deleteDraft(draft.id);
+        const again = await repos.catering.createSubscriptionInvoice(sub.id, "2026-03", invoice("2026-03"));
+        expect((await repos.catering.listSubscriptions(ws.id))[0].billedMonths).toEqual({ "2026-03": again.id });
+        await expectCode(repos.catering.deleteSubscription(sub.id), "ORDER_IN_USE");
+        await expectCode(repos.invoices.deleteContact(client.id), "CONTACT_IN_USE");
+        const spare = await repos.catering.saveSubscription(ws.id, { ...subInput, name: "Cadangan" });
+        await repos.catering.deleteSubscription(spare.id);
+        expect((await repos.catering.listSubscriptions(ws.id)).map((x) => x.name)).toEqual(["Makan siang"]);
+      });
+
       it("invoice DP: nomor INV-DP per tahun, validasi, hapus", async () => {
         const { ws, input } = await setupCatering();
         const order = await repos.catering.saveOrder(input(), "QUO");
@@ -1078,7 +1108,7 @@ export function describeRepositoryContract(
 
     describe("pulihkan backup (ADR 023)", () => {
       async function backupOf(id: string): Promise<WorkspaceBackup> {
-        const [ws, accounts, periods, journals, items, auditLogs, stockCounts, menus, recipes, portionSummaries, menuSales, profile, contacts, invoices, cateringOrders, orderBills, cateringPackages] =
+        const [ws, accounts, periods, journals, items, auditLogs, stockCounts, menus, recipes, portionSummaries, menuSales, profile, contacts, invoices, cateringOrders, orderBills, cateringPackages, subscriptions] =
           await Promise.all([
             repos.workspaces.getById(id),
             repos.accounts.listByWorkspace(id),
@@ -1097,9 +1127,10 @@ export function describeRepositoryContract(
             repos.catering.listOrders(id),
             repos.catering.listBills(id),
             repos.catering.listPackages(id),
+            repos.catering.listSubscriptions(id),
           ]);
         return JSON.parse(JSON.stringify(buildBackup(
-          { workspace: ws!, accounts, periods, journals, items, auditLogs, stockCounts, menus, recipes, portionSummaries, menuSales, profile, contacts, invoices, cateringOrders, orderBills, cateringPackages },
+          { workspace: ws!, accounts, periods, journals, items, auditLogs, stockCounts, menus, recipes, portionSummaries, menuSales, profile, contacts, invoices, cateringOrders, orderBills, cateringPackages, subscriptions },
           "2026-10-05T08:00:00.000Z",
         )));
       }
@@ -1195,6 +1226,11 @@ export function describeRepositoryContract(
         await repos.catering.cancelOrder(cancelled.id, null, "Batal");
         const bahan = await repos.items.create(ws.id, { code: "B-9", name: "Beras", unit: "gram", revenueAccountId: null, estimatedPrice: 14_000, estimatedPer: 1_000 });
         const pkg = await repos.catering.savePackage(ws.id, { code: "PX", name: "Paket X", description: null, pricePerPax: 30_000, revenueAccountId: null, yieldPax: 1, lines: [{ itemId: bahan.id, quantity: 120 }] });
+        const sub = await repos.catering.saveSubscription(ws.id, { contactId: client.id, name: "Rantangan", startDate: "2026-03-02", endDate: "2026-03-31", pricePerPortion: 20_000,
+          revenueAccountId: code("4-1000"), defaultPortions: 10, weekdays: [1, 3, 5], applyTax: false, notes: null });
+        await repos.catering.setSubscriptionDays(sub.id, { "2026-03-04": 0 });
+        const subInvoice = await repos.catering.createSubscriptionInvoice(sub.id, "2026-03", { workspaceId: ws.id, kind: "sale", contactId: client.id, invoiceDate: "2026-03-31",
+          dueDate: "2026-03-31", reference: "Langganan 2026-03", notes: null, applyTax: false, lines: [{ description: "Rantangan", quantity: 120, unit: "porsi", unitPrice: 20_000, accountId: code("4-1000"), itemId: null }] });
         const quote = await repos.catering.saveOrder({ ...orderInput("2026-03-28"), lines: [{ description: "Paket X", quantity: 10, unit: "pax", unitPrice: 30_000, accountId: code("4-1000"), itemId: null, packageId: pkg.id }] }, "QUO");
 
         const backup = await backupOf(ws.id);
@@ -1208,7 +1244,7 @@ export function describeRepositoryContract(
         expect(byNumber.get(done.number)).toMatchObject({ state: "completed", pax: 10, serviceType: "box", costEstimates: { labor: 50_000 } });
         expect(byNumber.get(cancelled.number)).toMatchObject({ state: "cancelled", cancelReason: "Batal" });
         const restoredDone = byNumber.get(done.number)!;
-        const [inv] = await repos.invoices.listInvoices(restored.id);
+        const inv = (await repos.invoices.listInvoices(restored.id)).find((i) => i.reference === done.number)!;
         expect(restoredDone.invoiceId).toBe(inv.id);
         expect((await repos.catering.listBills(restored.id))[0]).toMatchObject({ orderId: restoredDone.id, number: "INV-DP/2026/03/0001", amount: 100_000 });
         const tagged = (await repos.journals.listByWorkspace(restored.id)).flatMap((j) => j.lines).filter((l) => l.orderId);
@@ -1221,6 +1257,11 @@ export function describeRepositoryContract(
         expect(restoredPkg).toMatchObject({ code: "PX", pricePerPax: 30_000, lines: [{ itemId: restoredItem.id, quantity: 120 }] });
         expect(restoredPkg.id).not.toBe(pkg.id);
         expect(byNumber.get(quote.number)!.lines[0].packageId).toBe(restoredPkg.id);
+        const [restoredSub] = await repos.catering.listSubscriptions(restored.id);
+        const restoredInvoice = (await repos.invoices.listInvoices(restored.id)).find((i) => i.reference === "Langganan 2026-03")!;
+        expect(restoredSub).toMatchObject({ name: "Rantangan", weekdays: [1, 3, 5], endDate: "2026-03-31", dayOverrides: { "2026-03-04": 0 }, billedMonths: { "2026-03": restoredInvoice.id } });
+        expect(restoredInvoice.id).not.toBe(subInvoice.id);
+        expect(backup.subscriptions).toHaveLength(1);
       });
 
       it("backup tidak seimbang ditolak tanpa membuat workspace", async () => {

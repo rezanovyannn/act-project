@@ -38,6 +38,8 @@ import type {
   CateringOrderInput,
   CateringPackage,
   CateringPackageInput,
+  Subscription,
+  SubscriptionInput,
   OrderBill,
   OrderBillInput,
   Contact,
@@ -70,6 +72,7 @@ import {
   toAuditLog,
   toCateringOrder,
   toCateringPackage,
+  toSubscription,
   toOrderBill,
   toContact,
   toInvoice,
@@ -559,6 +562,36 @@ export class SupabaseCateringRepository implements ICateringRepository {
 
   async deletePackage(id: string): Promise<void> {
     await unwrap(this.client.rpc("delete_catering_package", { p_id: id }));
+  }
+
+  async listSubscriptions(workspaceId: string): Promise<Subscription[]> {
+    const rows = await unwrapRows(this.client.from("catering_subscriptions").select("*").eq("workspace_id", workspaceId).is("deleted_at", null).order("name"));
+    return rows.map(toSubscription);
+  }
+
+  private async getSubscription(id: string): Promise<Subscription> {
+    const row = await unwrap(this.client.from("catering_subscriptions").select("*").eq("id", id).maybeSingle());
+    return toSubscription(required(row, "Langganan"));
+  }
+
+  async saveSubscription(workspaceId: string, input: SubscriptionInput, id?: string): Promise<Subscription> {
+    const saved = (await unwrap(this.client.rpc("save_subscription", { p_workspace_id: workspaceId, p_subscription: input, p_id: id ?? null }))) as string;
+    return this.getSubscription(saved);
+  }
+
+  async setSubscriptionDays(id: string, changes: Record<IsoDate, number | null>): Promise<Subscription> {
+    await unwrap(this.client.rpc("set_subscription_days", { p_id: id, p_changes: changes }));
+    return this.getSubscription(id);
+  }
+
+  async deleteSubscription(id: string): Promise<void> {
+    await unwrap(this.client.rpc("delete_subscription", { p_id: id }));
+  }
+
+  async createSubscriptionInvoice(id: string, month: string, invoice: InvoiceInput): Promise<Invoice> {
+    const invoiceId = (await unwrap(this.client.rpc("create_subscription_invoice", { p_id: id, p_month: month, p_invoice: invoice }))) as string;
+    const row = await unwrap(this.client.from("invoices").select("*, invoice_lines(*)").eq("id", invoiceId).maybeSingle());
+    return toInvoice(required(row, "Faktur"));
   }
 }
 

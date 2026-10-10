@@ -26,6 +26,7 @@ import { cn, errorMessage, useLoader } from "@/lib/utils"
 import { PaymentDialog } from "./order-dialogs"
 import { ProfitList } from "./order-profit"
 import { ShoppingListTab } from "./shopping-list"
+import { DueBillingsBanner, SubscriptionsTab } from "./subscriptions-view"
 
 export interface OrderRoutes {
   list: string
@@ -39,6 +40,7 @@ export interface OrderRoutes {
   /** Daftar Barang (harga perkiraan bahan). */
   items: string
   packages: string
+  subscription: (id: string) => string
 }
 
 const STATUS_STYLES: Record<OrderStatus, string> = {
@@ -66,12 +68,12 @@ export function PaymentBadge({ status }: { status: PaymentStatus }) {
   return <Badge className={cn("border-0", PAYMENT_STYLES[status])}>{PAYMENT_STATUS_LABELS[status]}</Badge>
 }
 
-type Tab = "orders" | "calendar" | "bills" | "clients" | "profit" | "shopping"
+type Tab = "orders" | "calendar" | "bills" | "clients" | "profit" | "shopping" | "subscriptions"
 
 /** Pesanan katering: daftar, kalender, tagihan, dan DP & sisa per klien (ADR 024). */
 export function OrdersView({ services, workspaceId, routes, initialTab }: { services: AppServices; workspaceId: string; routes: OrderRoutes; initialTab?: string }) {
   const data = useLoader(() => services.cateringService.data(workspaceId), [services, workspaceId])
-  const [tab, setTab] = useState<Tab>((["orders", "calendar", "bills", "clients", "profit", "shopping"] as const).find((t) => t === initialTab) ?? "orders")
+  const [tab, setTab] = useState<Tab>((["orders", "calendar", "bills", "clients", "profit", "shopping", "subscriptions"] as const).find((t) => t === initialTab) ?? "orders")
 
   if (data.loading && !data.data) return <LoadingState />
   if (data.error) return <p role="alert" className="text-sm text-destructive">{errorMessage(data.error)}</p>
@@ -101,9 +103,11 @@ export function OrdersView({ services, workspaceId, routes, initialTab }: { serv
         <Stat label="DP dipegang" value={<Amount value={depositHeld} />} note="Uang Muka Pelanggan" />
         <Stat label="Sisa belum dibayar" value={<Amount value={outstanding} />} note="pesanan aktif & faktur" />
       </section>
+      <DueBillingsBanner services={services} data={current} routes={routes} onChanged={data.reload} />
       <Tabs value={tab} onValueChange={(v) => setTab(v as Tab)} className="grid grid-cols-1 gap-4">
         <TabsList className="print:hidden">
           <TabsTrigger value="orders">Pesanan</TabsTrigger>
+          <TabsTrigger value="subscriptions">Langganan</TabsTrigger>
           <TabsTrigger value="calendar">Kalender</TabsTrigger>
           <TabsTrigger value="shopping">Belanja</TabsTrigger>
           <TabsTrigger value="bills">Tagihan</TabsTrigger>
@@ -111,6 +115,7 @@ export function OrdersView({ services, workspaceId, routes, initialTab }: { serv
           <TabsTrigger value="profit">Laba</TabsTrigger>
         </TabsList>
         <TabsContent value="orders"><OrderList data={current} summaries={summaries} routes={routes} /></TabsContent>
+        <TabsContent value="subscriptions"><SubscriptionsTab services={services} data={current} routes={routes} onChanged={data.reload} /></TabsContent>
         <TabsContent value="shopping"><ShoppingListTab services={services} data={current} routes={routes} itemsHref={routes.items} /></TabsContent>
         <TabsContent value="calendar"><OrderCalendar data={current} summaries={summaries} routes={routes} /></TabsContent>
         <TabsContent value="bills"><BillsList services={services} data={current} summaries={summaries} routes={routes} onChanged={data.reload} /></TabsContent>

@@ -244,6 +244,17 @@ export class MockWorkspaceRepository implements IWorkspaceRepository {
           lines: p.lines.map((l) => ({ ...l, itemId: id(l.itemId) })),
         })),
       );
+      state.subscriptions.push(
+        ...(backup.subscriptions ?? []).map((s) => ({
+          ...s,
+          id: id(s.id),
+          workspaceId: wsId,
+          contactId: id(s.contactId),
+          revenueAccountId: id(s.revenueAccountId),
+          billedMonths: Object.fromEntries(Object.entries(s.billedMonths ?? {}).map(([m, inv]) => [m, id(inv)])),
+          deletedAt: null,
+        })),
+      );
       state.orderBills.push(...(backup.orderBills ?? []).map((b) => ({ ...b, id: id(b.id), workspaceId: wsId, orderId: id(b.orderId), deletedAt: null })));
       // Riwayat audit lama ikut, entity_id dipetakan; lalu satu catatan pemulihan.
       state.auditLogs.push(

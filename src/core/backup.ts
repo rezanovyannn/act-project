@@ -9,6 +9,7 @@ import type {
   BusinessProfile,
   CateringOrder,
   CateringPackage,
+  Subscription,
   Contact,
   Invoice,
   IsoTimestamp,
@@ -53,13 +54,15 @@ export interface WorkspaceBackup {
   orderBills: OrderBill[];
   /** Paket menu katering (Fase 10C). */
   cateringPackages: CateringPackage[];
+  /** Katering langganan (Fase 10D). */
+  subscriptions: Subscription[];
   auditLogs: AuditLog[];
   summary: { accounts: number; periods: number; journals: number; journalLines: number; items: number; auditLogs: number };
 }
 
 export function buildBackup(
   parts: Pick<WorkspaceBackup, "workspace" | "accounts" | "periods" | "journals" | "items" | "auditLogs"> &
-    Partial<Pick<WorkspaceBackup, "stockCounts" | "menus" | "recipes" | "portionSummaries" | "menuSales" | "profile" | "contacts" | "invoices" | "cateringOrders" | "orderBills" | "cateringPackages">>,
+    Partial<Pick<WorkspaceBackup, "stockCounts" | "menus" | "recipes" | "portionSummaries" | "menuSales" | "profile" | "contacts" | "invoices" | "cateringOrders" | "orderBills" | "cateringPackages" | "subscriptions">>,
   exportedAt: IsoTimestamp,
 ): WorkspaceBackup {
   return {
@@ -77,6 +80,7 @@ export function buildBackup(
     cateringOrders: [],
     orderBills: [],
     cateringPackages: [],
+    subscriptions: [],
     ...parts,
     summary: {
       accounts: parts.accounts.length,

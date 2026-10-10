@@ -1,4 +1,4 @@
-import type { Account, AuditEntity, AuditLog, BusinessProfile, CateringOrder, CateringPackage, Contact, Invoice, OrderBill, Item, JournalEntry, Menu, MenuSaleLine, Period, PortionSummary, Recipe, StockCount, Workspace } from "@/core/types";
+import type { Account, AuditEntity, AuditLog, BusinessProfile, CateringOrder, CateringPackage, Subscription, Contact, Invoice, OrderBill, Item, JournalEntry, Menu, MenuSaleLine, Period, PortionSummary, Recipe, StockCount, Workspace } from "@/core/types";
 
 /** Subset API `localStorage` yang dipakai; memudahkan test dengan storage memori. */
 export interface KeyValueStorage {
@@ -21,7 +21,7 @@ export class MemoryStorage implements KeyValueStorage {
 }
 
 /** Naikkan bila bentuk data berubah; data lama di browser akan diganti seed. */
-export const MOCK_SCHEMA_VERSION = 13;
+export const MOCK_SCHEMA_VERSION = 14;
 export const MOCK_STORAGE_KEY = "act-project:mock-db";
 
 export interface MockState {
@@ -48,6 +48,8 @@ export interface MockState {
   orderBills: (OrderBill & { deletedAt: string | null })[];
   /** Paket menu katering (Fase 10C). */
   cateringPackages: CateringPackage[];
+  /** Katering langganan (Fase 10D). */
+  subscriptions: Subscription[];
   auditLogs: AuditLog[];
 }
 
@@ -70,6 +72,7 @@ export function emptyMockState(): MockState {
     cateringOrders: [],
     orderBills: [],
     cateringPackages: [],
+    subscriptions: [],
     auditLogs: [],
   };
 }
