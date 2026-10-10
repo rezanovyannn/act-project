@@ -9,7 +9,9 @@ import { isValidIsoDate } from "./dates";
 import { fail } from "./errors";
 import { discountAmount, lineAmount, summarizeInvoices, validateDiscount, type InvoiceSummary } from "./invoice";
 import { computeSalesTax, effectiveTaxSettings } from "./sales-tax";
+import { addFraction, fractionValue, ZERO_FRACTION, type Fraction } from "./menu";
 import { mulDivRound } from "./stock";
+import { compareBySection, purchasesByItem, type QtyValue } from "./stock-count";
 import { accountByRole, buildExpense, type Payment } from "./transactions";
 import type {
   Account,
@@ -26,6 +28,10 @@ import type {
   OrderBill,
   OrderBillInput,
   CateringCostMode,
+  CateringPackage,
+  CateringPackageInput,
+  Item,
+  OrderLine,
   CateringSettings,
   CostCategory,
   CostEstimates,
@@ -64,7 +70,7 @@ export function validateOrderInput(input: CateringOrderInput): CateringOrderInpu
       fail("INVALID_QUANTITY", `Baris ${i + 1}: qty dan harga harus bilangan bulat ≥ 0`);
     }
     lineAmount(line);
-    return { description: line.description.trim(), quantity: line.quantity, unit: trimOrNull(line.unit), unitPrice: line.unitPrice, accountId: line.accountId, itemId: null };
+    return { description: line.description.trim(), quantity: line.quantity, unit: trimOrNull(line.unit), unitPrice: line.unitPrice, accountId: line.accountId, itemId: null, packageId: line.packageId || null };
   });
   return {
     ...input,
@@ -697,4 +703,184 @@ export function validateCateringSettings(settings: CateringSettings): CateringSe
     fail("INVALID_AMOUNT", "Tarif PPh 23 harus lebih dari 0% dan maksimal 100%");
   }
   return { costMode: settings.costMode, pph23Enabled: Boolean(settings.pph23Enabled), pph23RateBps: settings.pph23RateBps };
+}
+
+// ---------- Paket menu, estimasi bahan & daftar belanja (Fase 10C) ----------
+
+const PACKAGE_CODE = /^[A-Za-z0-9-]{1,20}$/;
+
+/** Validasi paket: kode unik, harga & resep bilangan bulat, bahan aktif di workspace. */
+export function validatePackage(
+  input: CateringPackageInput,
+  existing: readonly CateringPackage[],
+  items: readonly Item[],
+  exceptId?: string,
+): CateringPackageInput {
+  const code = input.code.trim().toUpperCase();
+  const name = input.name.trim();
+  if (!PACKAGE_CODE.test(code)) fail("INVALID_ORDER", "Kode paket 1–20 karakter: huruf, angka, atau tanda hubung");
+  if (name === "") fail("EMPTY_NAME", "Nama paket wajib diisi");
+  if (existing.some((p) => p.deletedAt === null && p.id !== exceptId && p.code.toUpperCase() === code)) fail("DUPLICATE_MENU_CODE", `Kode paket ${code} sudah dipakai`);
+  if (!Number.isSafeInteger(input.pricePerPax) || input.pricePerPax < 0) fail("INVALID_AMOUNT", "Harga per pax harus bilangan bulat ≥ 0");
+  if (!Number.isSafeInteger(input.yieldPax) || input.yieldPax < 1 || input.yieldPax > 100_000) fail("INVALID_RECIPE", "Resep untuk berapa pax: bilangan bulat ≥ 1");
+  if (input.lines.length > 100) fail("INVALID_RECIPE", "Resep paket maksimal 100 bahan");
+  const seen = new Set<string>();
+  const lines = input.lines.map((line, i) => {
+    const item = items.find((it) => it.id === line.itemId && it.deletedAt === null);
+    if (!item) fail("ITEM_NOT_FOUND", `Bahan ${i + 1}: pilih dari Daftar Barang`);
+    if (seen.has(item.id)) fail("INVALID_RECIPE", `Bahan ${item.name} tercantum dua kali`);
+    seen.add(item.id);
+    if (!Number.isSafeInteger(line.quantity) || line.quantity <= 0) fail("INVALID_QUANTITY", `Bahan ${item.name}: qty harus bilangan bulat > 0 (${item.unit})`);
+    return { itemId: item.id, quantity: line.quantity };
+  });
+  return { code, name, description: trimOrNull(input.description), pricePerPax: input.pricePerPax, revenueAccountId: input.revenueAccountId || null, yieldPax: input.yieldPax, lines };
+}
+
+export type PriceSource = "purchase" | "estimate";
+
+export interface ItemPrice {
+  /** Dasar harga: Rp `value` untuk `qty` satuan dasar. */
+  basis: QtyValue;
+  source: PriceSource;
+}
+
+/**
+ * Harga bahan untuk estimasi resep (Catatan Keputusan 91): pembelian terakhir
+ * lewat Persediaan s.d. `date`, bila tidak ada pakai harga perkiraan di Daftar Barang.
+ */
+export function itemPrices(items: readonly Item[], entries: readonly JournalEntry[], accounts: readonly Account[], date: IsoDate): Map<string, ItemPrice | null> {
+  const purchases = purchasesByItem(entries, accounts, null, date);
+  const result = new Map<string, ItemPrice | null>();
+  for (const item of items) {
+    const last = purchases.get(item.id)?.last;
+    if (last && last.qty > 0) result.set(item.id, { basis: last, source: "purchase" });
+    else if (item.estimatedPrice !== null && item.estimatedPer > 0) result.set(item.id, { basis: { qty: item.estimatedPer, value: item.estimatedPrice }, source: "estimate" });
+    else result.set(item.id, null);
+  }
+  return result;
+}
+
+/** Kebutuhan bahan paket untuk `pax` pax (pecahan eksak). */
+export function packageQuantities(pkg: Pick<CateringPackageInput, "lines" | "yieldPax">, pax: number): Map<string, Fraction> {
+  const result = new Map<string, Fraction>();
+  for (const line of pkg.lines) {
+    result.set(line.itemId, addFraction(result.get(line.itemId) ?? ZERO_FRACTION, { n: BigInt(line.quantity) * BigInt(pax), d: BigInt(pkg.yieldPax) }));
+  }
+  return result;
+}
+
+export interface MaterialsEstimate {
+  cost: number;
+  /** Bahan tanpa harga (pembelian/perkiraan belum ada). */
+  missing: string[];
+}
+
+/** Estimasi biaya bahan baris-baris pesanan yang merujuk paket (qty baris = jumlah pax paket). */
+export function materialsEstimate(
+  lines: readonly OrderLine[],
+  packages: readonly CateringPackage[],
+  prices: ReadonlyMap<string, ItemPrice | null>,
+): MaterialsEstimate {
+  const totals = new Map<string, Fraction>();
+  for (const line of lines) {
+    const pkg = line.packageId ? packages.find((p) => p.id === line.packageId) : null;
+    if (!pkg || line.quantity <= 0) continue;
+    for (const [itemId, qty] of packageQuantities(pkg, line.quantity)) totals.set(itemId, addFraction(totals.get(itemId) ?? ZERO_FRACTION, qty));
+  }
+  let cost = 0;
+  const missing: string[] = [];
+  for (const [itemId, qty] of totals) {
+    const price = prices.get(itemId) ?? null;
+    if (!price) missing.push(itemId);
+    cost += fractionValue(qty, price?.basis ?? null);
+  }
+  return { cost, missing };
+}
+
+/** Isi baris pesanan dari paket: keterangan, satuan pax, harga per pax, akun pendapatan. */
+export function lineFromPackage(pkg: CateringPackage, pax: number, fallbackAccountId: string): OrderLine {
+  return {
+    description: pkg.description ? `${pkg.name} (${pkg.description})` : pkg.name,
+    quantity: pax,
+    unit: "pax",
+    unitPrice: pkg.pricePerPax,
+    accountId: pkg.revenueAccountId ?? fallbackAccountId,
+    itemId: null,
+    packageId: pkg.id,
+  };
+}
+
+/** Pembulatan ke atas pecahan non-negatif (jumlah yang dibeli). */
+const ceilFraction = (f: Fraction) => Number((f.n + f.d - BigInt(1)) / f.d);
+
+export interface ShoppingRow {
+  item: Item;
+  /** Kebutuhan eksak. */
+  quantity: Fraction;
+  /** Dibulatkan ke atas ke satuan dasar. */
+  buyQuantity: number;
+  /** Perkiraan biaya; null bila belum ada harga. */
+  cost: number | null;
+  priceSource: PriceSource | null;
+  perOrder: { order: CateringOrder; quantity: Fraction }[];
+}
+
+export interface ShoppingList {
+  orders: CateringOrder[];
+  rows: ShoppingRow[];
+  totalCost: number;
+  /** Baris pesanan tanpa paket (tidak ikut daftar belanja). */
+  linesWithoutPackage: number;
+}
+
+/**
+ * Daftar belanja dari pesanan dikonfirmasi bertanggal acara dalam [from, to]:
+ * kebutuhan tiap bahan digabung lintas pesanan (Catatan Keputusan 93).
+ */
+export function shoppingList(
+  orders: readonly CateringOrder[],
+  packages: readonly CateringPackage[],
+  items: readonly Item[],
+  prices: ReadonlyMap<string, ItemPrice | null>,
+  from: IsoDate,
+  to: IsoDate,
+): ShoppingList {
+  const included = orders
+    .filter((o) => o.state === "confirmed" && o.eventDate >= from && o.eventDate <= to)
+    .sort((a, b) => a.eventDate.localeCompare(b.eventDate) || (a.eventTime ?? "").localeCompare(b.eventTime ?? ""));
+  const rows = new Map<string, ShoppingRow>();
+  let linesWithoutPackage = 0;
+  for (const order of included) {
+    const needs = new Map<string, Fraction>();
+    for (const line of order.lines) {
+      const pkg = line.packageId ? packages.find((p) => p.id === line.packageId) : null;
+      if (!pkg) {
+        linesWithoutPackage += 1;
+        continue;
+      }
+      for (const [itemId, qty] of packageQuantities(pkg, line.quantity)) needs.set(itemId, addFraction(needs.get(itemId) ?? ZERO_FRACTION, qty));
+    }
+    for (const [itemId, qty] of needs) {
+      const item = items.find((i) => i.id === itemId);
+      if (!item) continue;
+      const row = rows.get(itemId) ?? { item, quantity: ZERO_FRACTION, buyQuantity: 0, cost: null, priceSource: null, perOrder: [] };
+      row.quantity = addFraction(row.quantity, qty);
+      row.perOrder.push({ order, quantity: qty });
+      rows.set(itemId, row);
+    }
+  }
+  let totalCost = 0;
+  for (const row of rows.values()) {
+    row.buyQuantity = ceilFraction(row.quantity);
+    const price = prices.get(row.item.id) ?? null;
+    row.priceSource = price?.source ?? null;
+    row.cost = price ? fractionValue(row.quantity, price.basis) : null;
+    totalCost += row.cost ?? 0;
+  }
+  return {
+    orders: included,
+    rows: [...rows.values()].sort((a, b) => compareBySection(a.item, b.item)),
+    totalCost,
+    linesWithoutPackage,
+  };
 }

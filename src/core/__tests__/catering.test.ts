@@ -18,11 +18,19 @@
  *   transport 300.000 → laba kotor 2.400.000, margin 2.400.000/4.700.000 = 51,06% (5106 bps), per pax 24.000.
  *   Estimasi bahan 1.800.000 + transport 250.000 = 2.050.000.
  * PPh 23 2% × dasar 4.700.000 = 94.000; sisa piutang 3.170.000 → kas 3.076.000 + PPh 23 94.000.
+ *
+ * Paket & daftar belanja (Fase 10C): Paket A resep untuk 10 pax = beras 1.000 g, ayam 1.500 g, sayur 3 ikat.
+ *   Harga: beras perkiraan Rp 15.000 / 1.000 g (Rp 15/g); ayam beli terakhir 5.000 g Rp 200.000 (Rp 40/g,
+ *   mengalahkan perkiraan Rp 35/g); sayur tanpa harga.
+ *   Pesanan 100 pax: beras 10.000 g = 150.000, ayam 15.000 g = 600.000, sayur 30 ikat (tanpa harga) → 750.000.
+ *   Pesanan 15 pax: beras 1.500 g = 22.500, ayam 2.250 g = 90.000, sayur 4,5 ikat → dibeli 5.
+ *   Gabungan: beras 11.500 g = 172.500; ayam 17.250 g = 690.000; sayur 34,5 → 35 ikat; total 862.500.
  */
 import { beforeEach, describe, expect, it } from "vitest";
 import {
   buildCancellation,
   costCategoryOf,
+  lineFromPackage,
   defaultCostAccount,
   defaultWithholding,
   depositFlows,
@@ -390,6 +398,61 @@ describe("pesanan katering, DP & invoice", () => {
     // PPh 23 tidak berlaku untuk DP.
     const other = await env.cateringService.saveOrder(input());
     await expectCode(env.cateringService.receivePayment(other, { date: "2026-10-03", amount: 100, cashAccountId: byCode("1-1100").id }, 2), "INVALID_DEPOSIT");
+  });
+
+  it("paket menu: validasi, harga bahan (beli terakhir > perkiraan), estimasi resep, daftar belanja gabungan", async () => {
+    const item = (code: string, name: string, unit: string, estimatedPrice: number | null, estimatedPer = 1) =>
+      env.itemService.createItem(workspaceId, { code, name, unit, revenueAccountId: null, category: "Bahan", estimatedPrice, estimatedPer });
+    const beras = await item("B-1", "Beras", "gram", 15_000, 1_000);
+    const ayam = await item("B-2", "Ayam", "gram", 35_000, 1_000);
+    const sayur = await item("B-3", "Sayur asem", "ikat", null);
+    expect(beras).toMatchObject({ estimatedPrice: 15_000, estimatedPer: 1_000 });
+    await env.journalService.postJournal({
+      workspaceId, entryDate: "2026-10-01", description: "Beli ayam", source: "purchase",
+      lines: [{ accountId: byCode("1-1300").id, debit: 200_000, credit: 0, itemId: ayam.id, quantity: 5_000 }, { accountId: byCode("1-1100").id, debit: 0, credit: 200_000 }],
+    });
+    const lines = [{ itemId: beras.id, quantity: 1_000 }, { itemId: ayam.id, quantity: 1_500 }, { itemId: sayur.id, quantity: 3 }];
+    const pkg = await env.cateringService.savePackage(workspaceId, { code: "pa", name: "Prasmanan A", description: "Nasi, ayam bakar, sayur asem", pricePerPax: 45_000, revenueAccountId: null, yieldPax: 10, lines });
+    expect(pkg.code).toBe("PA");
+    await expectCode(env.cateringService.savePackage(workspaceId, { ...pkg, code: "PA" }), "DUPLICATE_MENU_CODE");
+    await expectCode(env.cateringService.savePackage(workspaceId, { ...pkg, code: "PB", lines: [...lines, { itemId: beras.id, quantity: 1 }] }), "INVALID_RECIPE");
+    await expectCode(env.cateringService.savePackage(workspaceId, { ...pkg, code: "PB", lines: [{ itemId: beras.id, quantity: 0 }] }), "INVALID_QUANTITY");
+
+    const line = lineFromPackage(pkg, 100, byCode("4-1000").id);
+    expect(line).toMatchObject({ description: "Prasmanan A (Nasi, ayam bakar, sayur asem)", quantity: 100, unit: "pax", unitPrice: 45_000, accountId: byCode("4-1000").id, packageId: pkg.id });
+    let d = await data();
+    const prices = env.cateringService.prices(d, "2026-10-20");
+    expect(prices.get(ayam.id)).toMatchObject({ source: "purchase", basis: { qty: 5_000, value: 200_000 } });
+    expect(prices.get(beras.id)).toMatchObject({ source: "estimate", basis: { qty: 1_000, value: 15_000 } });
+    expect(prices.get(sayur.id)).toBeNull();
+    expect(env.cateringService.materials(d, [line], "2026-10-20")).toEqual({ cost: 750_000, missing: [sayur.id] });
+
+    const big = await env.cateringService.saveOrder(input({ eventDate: "2026-10-20", lines: [line, input().lines[1]] }));
+    expect(big.lines[0].packageId).toBe(pkg.id);
+    await env.cateringService.confirm(big);
+    const small = await env.cateringService.saveOrder(input({ eventDate: "2026-10-21", pax: 15, lines: [lineFromPackage(pkg, 15, byCode("4-1000").id)] }));
+    await env.cateringService.confirm(small);
+    await env.cateringService.saveOrder(input({ eventDate: "2026-10-21", lines: [lineFromPackage(pkg, 999, byCode("4-1000").id)] })); // penawaran: tidak ikut
+    const later = await env.cateringService.saveOrder(input({ eventDate: "2026-11-02", lines: [lineFromPackage(pkg, 50, byCode("4-1000").id)] }));
+    await env.cateringService.confirm(later); // di luar rentang
+
+    d = await data();
+    const list = env.cateringService.shopping(d, "2026-10-20", "2026-10-21");
+    expect(list.orders.map((o) => o.id)).toEqual([big.id, small.id]);
+    expect(list.linesWithoutPackage).toBe(1);
+    expect(list.rows.map((r) => [r.item.name, r.buyQuantity, r.cost, r.priceSource])).toEqual([
+      ["Beras", 11_500, 172_500, "estimate"],
+      ["Ayam", 17_250, 690_000, "purchase"],
+      ["Sayur asem", 35, null, null],
+    ]);
+    expect(list.totalCost).toBe(862_500);
+    expect(list.rows[2].perOrder.map((p) => [p.order.id, Number(p.quantity.n) / Number(p.quantity.d)])).toEqual([[big.id, 30], [small.id, 4.5]]);
+
+    // Paket dipakai pesanan tidak bisa dihapus; bahan resep paket tidak bisa dihapus.
+    await expectCode(env.cateringService.deletePackage(pkg.id), "ORDER_IN_USE");
+    await expectCode(env.itemService.deleteItem(sayur.id), "ITEM_IN_USE");
+    const off = await env.cateringService.setPackageActive(pkg.id, false);
+    expect(off.isActive).toBe(false);
   });
 
   it("status invoice DP FIFO, urutan nomor per tahun, kalender per tanggal", () => {

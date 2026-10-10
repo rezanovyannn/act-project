@@ -63,7 +63,12 @@ function navGroups(workspaceId: string, template: WorkspaceTemplate, openClaims:
         { label: "Dashboard", href: routes.dashboard(workspaceId), icon: LayoutDashboardIcon, exact: true },
         { label: "Input Transaksi", href: routes.transactions(workspaceId), icon: ReceiptIcon },
         // Pesanan, DP & quotation khusus katering (ADR 024).
-        ...(template.type === "catering" ? [{ label: "Pesanan", href: routes.orders(workspaceId), icon: CalendarCheckIcon }] : []),
+        ...(template.type === "catering"
+          ? [
+              { label: "Pesanan", href: routes.orders(workspaceId), icon: CalendarCheckIcon },
+              { label: "Paket Menu", href: routes.packages(workspaceId), icon: ChefHatIcon },
+            ]
+          : []),
         {
           label: "Piutang & Utang",
           href: routes.credits(workspaceId),

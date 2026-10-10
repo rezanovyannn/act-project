@@ -17,6 +17,8 @@ export function orderRoutes(workspaceId: string): OrderRoutes {
     contacts: routes.contacts(workspaceId),
     profile: routes.settings(workspaceId, "profile"),
     tax: routes.settings(workspaceId, "tax"),
+    items: routes.inventoryItems(workspaceId),
+    packages: routes.packages(workspaceId),
   }
 }
 

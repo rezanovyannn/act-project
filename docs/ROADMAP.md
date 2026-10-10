@@ -217,7 +217,8 @@ Template ketiga `catering` untuk usaha katering: acara (nikahan, syukuran), nasi
 - **Pekerjaan:** biaya ditandai ke pesanan. Mode biaya dapat dipilih di pengaturan: **detail** (bahan, tenaga lepas, sewa alat, transport, kemasan, lain-lain) atau **bahan baku saja**. Laporan laba kotor per pesanan & per pax, estimasi (saat penawaran) vs realisasi. Pencatatan PPh 23 dipotong pelanggan saat pelunasan bila opsi pengaturan diaktifkan.
 - **Kriteria Selesai (Stop & Review):** angka laba per pesanan teruji unit & E2E dan totalnya cocok dengan Laba Rugi.
 
-### Sub-fase 10C: Paket Menu per Pax & Daftar Belanja
+### Sub-fase 10C: Paket Menu per Pax & Daftar Belanja (selesai, menunggu review)
+- **Terealisasi:** halaman **Paket Menu** khusus katering (kode, nama, isi paket, harga per pax, akun pendapatan, resep bahan untuk N pax, biaya bahan & margin per pax); **harga perkiraan** bahan di Daftar Barang (Rp per jumlah satuan); harga bahan = pembelian terakhir lewat Pembelian Bahan Baku, bila belum ada harga perkiraan; baris pesanan bisa memilih paket (keterangan, qty = pax, harga per pax terisi); estimasi bahan baku otomatis dari resep × pax (bisa diubah, ada tautan kembali ke hitungan resep); tab **Belanja** di halaman Pesanan: kebutuhan bahan gabungan pesanan dikonfirmasi per rentang tanggal acara, dibulatkan ke atas, perkiraan biaya, rincian per pesanan, cetak, CSV, Excel.
 - **Pekerjaan:** paket menu dengan resep per pax (memakai ulang Menu & Resep, ADR 021); daftar belanja bahan per tanggal dari pesanan yang dikonfirmasi (beberapa pesanan dalam satu hari digabung); estimasi biaya bahan di quotation.
 - **Kriteria Selesai (Stop & Review):** kebutuhan bahan = resep × pax teruji unit; daftar belanja dapat dicetak/diekspor.
 
@@ -370,3 +371,7 @@ Template ketiga `catering` untuk usaha katering: acara (nikahan, syukuran), nasi
 | 87 | Penandaan biaya ke pesanan | Dari halaman pesanan (Catat biaya) dan dari Input Transaksi → Beban operasional; Pembelian Bahan Baku tetap untuk stok umum (ke Persediaan) | Fase 10B |
 | 88 | Estimasi biaya pesanan | Diisi manual per kategori di form pesanan (10C: estimasi bahan dari resep) | Fase 10B |
 | 89 | PPh 23 dipotong pelanggan | Fitur di Pengaturan → Pajak (aktif/nonaktif + tarif, default 2%); nilai default tarif × tagihan tanpa PBJT, dapat diubah sesuai bukti potong | Fase 10B |
+| 90 | Paket menu katering | Daftar paket khusus katering (bukan Menu & Resep F&B): harga per pax + resep bahan untuk N pax | Fase 10C |
+| 91 | Harga bahan untuk estimasi | Pembelian terakhir (Pembelian Bahan Baku); bila belum ada, harga perkiraan di Daftar Barang | Fase 10C |
+| 92 | Estimasi bahan di pesanan | Otomatis dari resep × pax, tetap bisa diubah | Fase 10C |
+| 93 | Daftar belanja | Per rentang tanggal acara, gabungan pesanan dikonfirmasi; cetak & ekspor CSV/Excel | Fase 10C |

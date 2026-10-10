@@ -233,7 +233,7 @@ export interface WorkspaceTemplate {
 
 export type TemplateRegistry = Record<TemplateType, WorkspaceTemplate>;
 
-export type AuditEntity = "workspace" | "account" | "period" | "journal" | "item" | "menu" | "recipe" | "portion_summary" | "contact" | "invoice" | "catering_order" | "order_bill";
+export type AuditEntity = "workspace" | "account" | "period" | "journal" | "item" | "menu" | "recipe" | "portion_summary" | "contact" | "invoice" | "catering_order" | "order_bill" | "catering_package";
 
 /** Master barang untuk persediaan perpetual (ADR 017). */
 export interface Item {
@@ -247,6 +247,9 @@ export interface Item {
   revenueAccountId: string | null;
   /** Section/kategori bebas, mis. "Protein", "Sayur & Buah" (ADR 020). */
   category: string | null;
+  /** Harga perkiraan: Rp `estimatedPrice` per `estimatedPer` satuan dasar (estimasi resep katering, Fase 10C). */
+  estimatedPrice: number | null;
+  estimatedPer: number;
   isActive: boolean;
   createdAt: IsoTimestamp;
   updatedAt: IsoTimestamp;
@@ -259,6 +262,8 @@ export interface ItemInput {
   unit: string;
   revenueAccountId: string | null;
   category?: string | null;
+  estimatedPrice?: number | null;
+  estimatedPer?: number;
 }
 
 /** Identitas usaha di kop faktur (ADR 022). */
@@ -376,6 +381,37 @@ export type CostEstimates = Partial<Record<CostCategory, number>>;
 export type CateringOrderState = "quotation" | "confirmed" | "completed" | "cancelled";
 
 /** Pesanan katering yang dapat diubah selama penawaran/dikonfirmasi (ADR 024). */
+/** Baris pesanan: seperti baris faktur, boleh merujuk paket menu (qty = jumlah pax paket). */
+export type OrderLine = InvoiceLine & { packageId?: string | null };
+
+/** Bahan resep paket: qty satuan dasar untuk `yieldPax` pax. */
+export interface PackageLine {
+  itemId: string;
+  quantity: number;
+}
+
+/** Paket menu katering dengan harga per pax & resep bahan (Fase 10C). */
+export interface CateringPackageInput {
+  code: string;
+  name: string;
+  /** Keterangan isi paket untuk quotation, mis. "Nasi, ayam bakar, sayur asem, buah". */
+  description: string | null;
+  pricePerPax: number;
+  revenueAccountId: string | null;
+  /** Resep untuk N pax (bilangan bulat ≥ 1); qty per pax = qty ÷ N. */
+  yieldPax: number;
+  lines: PackageLine[];
+}
+
+export interface CateringPackage extends CateringPackageInput {
+  id: string;
+  workspaceId: string;
+  isActive: boolean;
+  createdAt: IsoTimestamp;
+  updatedAt: IsoTimestamp;
+  deletedAt: IsoTimestamp | null;
+}
+
 export interface CateringOrderInput {
   workspaceId: string;
   contactId: string;
@@ -394,8 +430,8 @@ export interface CateringOrderInput {
   cancellationPolicy: CancellationPolicy;
   /** Estimasi biaya per kategori untuk dibandingkan dengan realisasi (Fase 10B). */
   costEstimates: CostEstimates;
-  /** Baris seperti faktur penjualan (tanpa barang). */
-  lines: InvoiceLine[];
+  /** Baris seperti faktur penjualan (tanpa barang); boleh merujuk paket menu. */
+  lines: OrderLine[];
 }
 
 export interface CateringOrder extends CateringOrderInput {

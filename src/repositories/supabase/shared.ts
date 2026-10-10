@@ -5,6 +5,7 @@ import type {
   AuditLog,
   BusinessProfile,
   CateringOrder,
+  CateringPackage,
   Contact,
   Invoice,
   Item,
@@ -126,6 +127,8 @@ export const toItem = (r: any): Item => ({
   unit: r.unit,
   revenueAccountId: r.revenue_account_id,
   category: r.category ?? null,
+  estimatedPrice: r.estimated_price === null || r.estimated_price === undefined ? null : toAmount(r.estimated_price),
+  estimatedPer: r.estimated_per === undefined ? 1 : toAmount(r.estimated_per),
   isActive: r.is_active,
   createdAt: r.created_at,
   updatedAt: r.updated_at,
@@ -221,6 +224,7 @@ export const toCateringOrder = (r: any): CateringOrder => ({
     unitPrice: toAmount(l.unitPrice),
     accountId: l.accountId ?? "",
     itemId: null,
+    packageId: l.packageId ?? null,
   })),
   state: r.state,
   invoiceId: r.invoice_id ?? null,
@@ -228,6 +232,22 @@ export const toCateringOrder = (r: any): CateringOrder => ({
   cancelReason: r.cancel_reason ?? null,
   createdAt: r.created_at,
   updatedAt: r.updated_at,
+});
+
+export const toCateringPackage = (r: any): CateringPackage => ({
+  id: r.id,
+  workspaceId: r.workspace_id,
+  code: r.code,
+  name: r.name,
+  description: r.description ?? null,
+  pricePerPax: toAmount(r.price_per_pax),
+  revenueAccountId: r.revenue_account_id ?? null,
+  yieldPax: r.yield_pax,
+  lines: (r.lines ?? []).map((l: any) => ({ itemId: l.itemId, quantity: toAmount(l.quantity) })),
+  isActive: r.is_active,
+  createdAt: r.created_at,
+  updatedAt: r.updated_at,
+  deletedAt: r.deleted_at,
 });
 
 export const toOrderBill = (r: any): OrderBill => ({

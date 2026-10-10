@@ -178,7 +178,7 @@ export class MockWorkspaceRepository implements IWorkspaceRepository {
       state.workspaces.push(workspace);
       state.accounts.push(...backup.accounts.map((a) => ({ ...a, id: id(a.id), workspaceId: wsId })));
       state.periods.push(...backup.periods.map((p) => ({ ...p, id: id(p.id), workspaceId: wsId })));
-      state.items.push(...backup.items.map((i) => ({ ...i, id: id(i.id), workspaceId: wsId, revenueAccountId: ref(i.revenueAccountId) })));
+      state.items.push(...backup.items.map((i) => ({ ...i, estimatedPrice: i.estimatedPrice ?? null, estimatedPer: i.estimatedPer ?? 1, id: id(i.id), workspaceId: wsId, revenueAccountId: ref(i.revenueAccountId) })));
       state.journals.push(
         ...backup.journals.map((j) => ({
           ...j,
@@ -231,8 +231,17 @@ export class MockWorkspaceRepository implements IWorkspaceRepository {
           workspaceId: wsId,
           contactId: id(o.contactId),
           invoiceId: ref(o.invoiceId),
-          lines: o.lines.map((l) => ({ ...l, accountId: l.accountId ? id(l.accountId) : "" })),
+          lines: o.lines.map((l) => ({ ...l, accountId: l.accountId ? id(l.accountId) : "", packageId: ref(l.packageId ?? null) })),
           deletedAt: null,
+        })),
+      );
+      state.cateringPackages.push(
+        ...(backup.cateringPackages ?? []).map((p) => ({
+          ...p,
+          id: id(p.id),
+          workspaceId: wsId,
+          revenueAccountId: ref(p.revenueAccountId),
+          lines: p.lines.map((l) => ({ ...l, itemId: id(l.itemId) })),
         })),
       );
       state.orderBills.push(...(backup.orderBills ?? []).map((b) => ({ ...b, id: id(b.id), workspaceId: wsId, orderId: id(b.orderId), deletedAt: null })));

@@ -70,6 +70,7 @@ export function parseBackup(raw: unknown, templates: readonly TemplateType[]): {
     invoices: arr("invoices", false),
     cateringOrders: arr("cateringOrders", false),
     orderBills: arr("orderBills", false),
+    cateringPackages: arr("cateringPackages", false),
     profile: isObject(raw.profile) ? (raw.profile as unknown as WorkspaceBackup["profile"]) : null,
   } as WorkspaceBackup;
 
@@ -95,6 +96,7 @@ export function parseBackup(raw: unknown, templates: readonly TemplateType[]): {
   const menus = ids("Menu", backup.menus);
   const contacts = ids("Kontak", backup.contacts);
   const orders = ids("Pesanan", backup.cateringOrders);
+  const packages = ids("Paket", backup.cateringPackages);
   const invoices = ids("Faktur", backup.invoices);
   ids("Periode", backup.periods);
 
@@ -157,6 +159,10 @@ export function parseBackup(raw: unknown, templates: readonly TemplateType[]): {
     if (!contacts.has(o.contactId)) issue(`${label}: klien tidak ada di backup`);
     if (o.invoiceId && !invoices.has(o.invoiceId)) issue(`${label}: faktur tidak ada di backup`);
     if (o.lines.some((l) => l.accountId && !accounts.has(l.accountId))) issue(`${label}: akun tidak ada di backup`);
+    if (o.lines.some((l) => l.packageId && !packages.has(l.packageId))) issue(`${label}: paket tidak ada di backup`);
+  }
+  for (const p of backup.cateringPackages) {
+    if (p.lines.some((l) => !items.has(l.itemId)) || (p.revenueAccountId && !accounts.has(p.revenueAccountId))) issue(`Paket ${p.code}: bahan/akun tidak ada di backup`);
   }
   for (const b of backup.orderBills) {
     if (!orders.has(b.orderId) || !isCount(b.amount)) issue(`Invoice DP ${b.number}: pesanan tidak ada di backup atau nominal rusak`);

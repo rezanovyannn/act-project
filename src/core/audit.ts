@@ -19,6 +19,7 @@ export const AUDIT_ENTITY_LABELS: Record<AuditEntity, string> = {
   invoice: "Faktur",
   catering_order: "Pesanan",
   order_bill: "Invoice DP",
+  catering_package: "Paket menu",
 };
 
 const ACTION_LABELS: Record<string, string> = {
@@ -74,6 +75,7 @@ export function auditSubject(log: Pick<AuditLog, "entityType" | "entityId" | "be
       return text("name") ?? log.entityId;
     case "item":
     case "menu":
+    case "catering_package":
       return [text("code"), text("name")].filter(Boolean).join(" ") || log.entityId;
     case "recipe":
       return text("effectiveFrom") ? `Berlaku mulai ${text("effectiveFrom")}` : log.entityId;

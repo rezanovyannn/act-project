@@ -25,6 +25,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { cn, errorMessage, useLoader } from "@/lib/utils"
 import { PaymentDialog } from "./order-dialogs"
 import { ProfitList } from "./order-profit"
+import { ShoppingListTab } from "./shopping-list"
 
 export interface OrderRoutes {
   list: string
@@ -35,6 +36,9 @@ export interface OrderRoutes {
   contacts: string
   profile: string
   tax: string
+  /** Daftar Barang (harga perkiraan bahan). */
+  items: string
+  packages: string
 }
 
 const STATUS_STYLES: Record<OrderStatus, string> = {
@@ -62,12 +66,12 @@ export function PaymentBadge({ status }: { status: PaymentStatus }) {
   return <Badge className={cn("border-0", PAYMENT_STYLES[status])}>{PAYMENT_STATUS_LABELS[status]}</Badge>
 }
 
-type Tab = "orders" | "calendar" | "bills" | "clients" | "profit"
+type Tab = "orders" | "calendar" | "bills" | "clients" | "profit" | "shopping"
 
 /** Pesanan katering: daftar, kalender, tagihan, dan DP & sisa per klien (ADR 024). */
 export function OrdersView({ services, workspaceId, routes, initialTab }: { services: AppServices; workspaceId: string; routes: OrderRoutes; initialTab?: string }) {
   const data = useLoader(() => services.cateringService.data(workspaceId), [services, workspaceId])
-  const [tab, setTab] = useState<Tab>((["orders", "calendar", "bills", "clients", "profit"] as const).find((t) => t === initialTab) ?? "orders")
+  const [tab, setTab] = useState<Tab>((["orders", "calendar", "bills", "clients", "profit", "shopping"] as const).find((t) => t === initialTab) ?? "orders")
 
   if (data.loading && !data.data) return <LoadingState />
   if (data.error) return <p role="alert" className="text-sm text-destructive">{errorMessage(data.error)}</p>
@@ -82,6 +86,7 @@ export function OrdersView({ services, workspaceId, routes, initialTab }: { serv
   return (
     <div className="grid grid-cols-1 gap-5">
       <PageHeader
+        className="print:hidden"
         title="Pesanan"
         description="Penawaran, pesanan acara/nasi box/langganan, DP, dan pelunasan klien. Jurnal dibuat otomatis dari setiap pembayaran."
         actions={
@@ -90,21 +95,23 @@ export function OrdersView({ services, workspaceId, routes, initialTab }: { serv
           </Button>
         }
       />
-      <section aria-label="Ringkasan pesanan" className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+      <section aria-label="Ringkasan pesanan" className="grid grid-cols-2 gap-3 lg:grid-cols-4 print:hidden">
         <Stat label="Penawaran aktif" value={String(summaries.filter((s) => s.status === "quotation").length)} note="menunggu konfirmasi" />
         <Stat label="Pesanan mendatang" value={String(upcoming.length)} note={upcoming[0] ? `terdekat ${formatDate(upcoming[upcoming.length - 1].order.eventDate)}` : "belum ada"} />
         <Stat label="DP dipegang" value={<Amount value={depositHeld} />} note="Uang Muka Pelanggan" />
         <Stat label="Sisa belum dibayar" value={<Amount value={outstanding} />} note="pesanan aktif & faktur" />
       </section>
       <Tabs value={tab} onValueChange={(v) => setTab(v as Tab)} className="grid grid-cols-1 gap-4">
-        <TabsList>
+        <TabsList className="print:hidden">
           <TabsTrigger value="orders">Pesanan</TabsTrigger>
           <TabsTrigger value="calendar">Kalender</TabsTrigger>
+          <TabsTrigger value="shopping">Belanja</TabsTrigger>
           <TabsTrigger value="bills">Tagihan</TabsTrigger>
           <TabsTrigger value="clients">Per Klien</TabsTrigger>
           <TabsTrigger value="profit">Laba</TabsTrigger>
         </TabsList>
         <TabsContent value="orders"><OrderList data={current} summaries={summaries} routes={routes} /></TabsContent>
+        <TabsContent value="shopping"><ShoppingListTab services={services} data={current} routes={routes} itemsHref={routes.items} /></TabsContent>
         <TabsContent value="calendar"><OrderCalendar data={current} summaries={summaries} routes={routes} /></TabsContent>
         <TabsContent value="bills"><BillsList services={services} data={current} summaries={summaries} routes={routes} onChanged={data.reload} /></TabsContent>
         <TabsContent value="clients"><ClientsList services={services} data={current} routes={routes} /></TabsContent>

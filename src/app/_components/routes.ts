@@ -23,6 +23,7 @@ export const routes = {
   orders: (workspaceId: string, tab?: string) => `/w/${workspaceId}/orders${tab ? `?tab=${tab}` : ""}`,
   newOrder: (workspaceId: string) => `/w/${workspaceId}/orders/new`,
   order: (workspaceId: string, orderId: string) => `/w/${workspaceId}/orders/${orderId}`,
+  packages: (workspaceId: string) => `/w/${workspaceId}/packages`,
   purchaseInvoices: (workspaceId: string) => `/w/${workspaceId}/purchase-invoices`,
   newPurchaseInvoice: (workspaceId: string) => `/w/${workspaceId}/purchase-invoices/new`,
   purchaseInvoice: (workspaceId: string, invoiceId: string) => `/w/${workspaceId}/purchase-invoices/${invoiceId}`,

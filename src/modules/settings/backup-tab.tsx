@@ -26,7 +26,7 @@ export function BackupTab({ services, workspace }: { services: AppServices; work
   async function exportJson() {
     setBusy("json")
     try {
-      const [accounts, periods, journals, items, auditLogs, stockCounts, menus, recipes, portionSummaries, menuSales, profile, contacts, invoices, cateringOrders, orderBills] = await Promise.all([
+      const [accounts, periods, journals, items, auditLogs, stockCounts, menus, recipes, portionSummaries, menuSales, profile, contacts, invoices, cateringOrders, orderBills, cateringPackages] = await Promise.all([
         services.accounts.listByWorkspace(workspace.id),
         services.periods.listByWorkspace(workspace.id),
         services.journals.listByWorkspace(workspace.id),
@@ -42,9 +42,10 @@ export function BackupTab({ services, workspace }: { services: AppServices; work
         services.invoices.listInvoices(workspace.id),
         services.catering.listOrders(workspace.id),
         services.catering.listBills(workspace.id),
+        services.catering.listPackages(workspace.id),
       ])
       const backup = buildBackup(
-        { workspace, accounts, periods, journals, items, auditLogs, stockCounts, menus, recipes, portionSummaries, menuSales, profile, contacts, invoices, cateringOrders, orderBills },
+        { workspace, accounts, periods, journals, items, auditLogs, stockCounts, menus, recipes, portionSummaries, menuSales, profile, contacts, invoices, cateringOrders, orderBills, cateringPackages },
         new Date().toISOString(),
       )
       download(backupFileName(workspace.name, todayIsoDate(), "json"), JSON.stringify(backup, null, 2), "application/json")

@@ -954,6 +954,34 @@ export function describeRepositoryContract(
         await expectCode(repos.catering.saveOrder(input({ costEstimates: { materials: -1 } }), "QUO"), "INVALID_AMOUNT");
       });
 
+      it("paket menu & harga perkiraan bahan: simpan, kode unik, baris pesanan ber-paket, hapus ditolak bila dipakai", async () => {
+        const { ws, input, code } = await setupCatering();
+        const beras = await repos.items.create(ws.id, { code: "B-1", name: "Beras", unit: "gram", revenueAccountId: null, estimatedPrice: 15_000, estimatedPer: 1_000 });
+        expect(beras).toMatchObject({ estimatedPrice: 15_000, estimatedPer: 1_000 });
+        expect((await repos.items.update(beras.id, { estimatedPrice: null, estimatedPer: 1 }))).toMatchObject({ estimatedPrice: null, estimatedPer: 1 });
+        await expectCode(repos.items.update(beras.id, { estimatedPer: 0 }), "EMPTY_NAME");
+        const ayam = await repos.items.create(ws.id, { code: "B-2", name: "Ayam", unit: "gram", revenueAccountId: null });
+        expect(ayam).toMatchObject({ estimatedPrice: null, estimatedPer: 1 });
+        const input10 = { code: "PA", name: "Prasmanan A", description: "Nasi, ayam", pricePerPax: 45_000, revenueAccountId: code("4-1000"), yieldPax: 10,
+          lines: [{ itemId: beras.id, quantity: 1_000 }, { itemId: ayam.id, quantity: 1_500 }] };
+        const pkg = await repos.catering.savePackage(ws.id, input10);
+        expect(pkg).toMatchObject({ code: "PA", pricePerPax: 45_000, yieldPax: 10, isActive: true, lines: [{ itemId: beras.id, quantity: 1_000 }, { itemId: ayam.id, quantity: 1_500 }] });
+        await expectCode(repos.catering.savePackage(ws.id, input10), "DUPLICATE_MENU_CODE");
+        await expectCode(repos.catering.savePackage(ws.id, { ...input10, code: "PB", lines: [{ itemId: beras.id, quantity: 0 }] }), "INVALID_QUANTITY");
+        const changed = await repos.catering.savePackage(ws.id, { ...input10, pricePerPax: 50_000 }, pkg.id);
+        expect(changed.pricePerPax).toBe(50_000);
+        expect((await repos.catering.setPackageActive(pkg.id, false)).isActive).toBe(false);
+
+        const order = await repos.catering.saveOrder(input({ lines: [{ description: "Prasmanan A", quantity: 100, unit: "pax", unitPrice: 45_000, accountId: code("4-1000"), itemId: null, packageId: pkg.id }] }), "QUO");
+        expect(order.lines[0].packageId).toBe(pkg.id);
+        await expectCode(repos.catering.saveOrder(input({ lines: [{ description: "X", quantity: 1, unit: null, unitPrice: 1, accountId: code("4-1000"), itemId: null, packageId: beras.id }] }), "QUO"), "MENU_NOT_FOUND");
+        await expectCode(repos.catering.deletePackage(pkg.id), "ORDER_IN_USE");
+        await expectCode(repos.items.softDelete(ayam.id), "ITEM_IN_USE");
+        const spare = await repos.catering.savePackage(ws.id, { ...input10, code: "PC", lines: [] });
+        await repos.catering.deletePackage(spare.id);
+        expect((await repos.catering.listPackages(ws.id)).map((p) => p.code)).toEqual(["PA"]);
+      });
+
       it("invoice DP: nomor INV-DP per tahun, validasi, hapus", async () => {
         const { ws, input } = await setupCatering();
         const order = await repos.catering.saveOrder(input(), "QUO");
@@ -1050,7 +1078,7 @@ export function describeRepositoryContract(
 
     describe("pulihkan backup (ADR 023)", () => {
       async function backupOf(id: string): Promise<WorkspaceBackup> {
-        const [ws, accounts, periods, journals, items, auditLogs, stockCounts, menus, recipes, portionSummaries, menuSales, profile, contacts, invoices, cateringOrders, orderBills] =
+        const [ws, accounts, periods, journals, items, auditLogs, stockCounts, menus, recipes, portionSummaries, menuSales, profile, contacts, invoices, cateringOrders, orderBills, cateringPackages] =
           await Promise.all([
             repos.workspaces.getById(id),
             repos.accounts.listByWorkspace(id),
@@ -1068,9 +1096,10 @@ export function describeRepositoryContract(
             repos.invoices.listInvoices(id),
             repos.catering.listOrders(id),
             repos.catering.listBills(id),
+            repos.catering.listPackages(id),
           ]);
         return JSON.parse(JSON.stringify(buildBackup(
-          { workspace: ws!, accounts, periods, journals, items, auditLogs, stockCounts, menus, recipes, portionSummaries, menuSales, profile, contacts, invoices, cateringOrders, orderBills },
+          { workspace: ws!, accounts, periods, journals, items, auditLogs, stockCounts, menus, recipes, portionSummaries, menuSales, profile, contacts, invoices, cateringOrders, orderBills, cateringPackages },
           "2026-10-05T08:00:00.000Z",
         )));
       }
@@ -1164,9 +1193,13 @@ export function describeRepositoryContract(
             lines: [{ accountId: code("1-1400"), debit: 300_000, credit: 0, orderId: done.id }, { accountId: code("4-1000"), debit: 0, credit: 300_000, orderId: done.id }] },
           { name: "Bu R", address: null, phone: null, email: null, npwp: null }, "INV");
         await repos.catering.cancelOrder(cancelled.id, null, "Batal");
+        const bahan = await repos.items.create(ws.id, { code: "B-9", name: "Beras", unit: "gram", revenueAccountId: null, estimatedPrice: 14_000, estimatedPer: 1_000 });
+        const pkg = await repos.catering.savePackage(ws.id, { code: "PX", name: "Paket X", description: null, pricePerPax: 30_000, revenueAccountId: null, yieldPax: 1, lines: [{ itemId: bahan.id, quantity: 120 }] });
+        const quote = await repos.catering.saveOrder({ ...orderInput("2026-03-28"), lines: [{ description: "Paket X", quantity: 10, unit: "pax", unitPrice: 30_000, accountId: code("4-1000"), itemId: null, packageId: pkg.id }] }, "QUO");
 
         const backup = await backupOf(ws.id);
-        expect(backup.cateringOrders).toHaveLength(2);
+        expect(backup.cateringOrders).toHaveLength(3);
+        expect(backup.cateringPackages).toHaveLength(1);
         const restored = await repos.workspaces.restoreFromBackup(actors.owner.ownerId, "Katering R (pulihan)", backup);
         expect(restored.templateType).toBe("catering");
         expect(restored.cateringSettings).toEqual({ costMode: "detail", pph23Enabled: true, pph23RateBps: 200 });
@@ -1182,6 +1215,12 @@ export function describeRepositoryContract(
         expect(tagged.length).toBe(6);
         expect(tagged.every((l) => l.orderId === restoredDone.id)).toBe(true);
         expect((await repos.invoices.listContacts(restored.id))[0].cancellationPolicy).toEqual({ kind: "forfeit_all", forfeitBps: 0 });
+        const [restoredPkg] = await repos.catering.listPackages(restored.id);
+        const restoredItem = (await repos.items.listByWorkspace(restored.id)).find((i) => i.code === "B-9")!;
+        expect(restoredItem).toMatchObject({ estimatedPrice: 14_000, estimatedPer: 1_000 });
+        expect(restoredPkg).toMatchObject({ code: "PX", pricePerPax: 30_000, lines: [{ itemId: restoredItem.id, quantity: 120 }] });
+        expect(restoredPkg.id).not.toBe(pkg.id);
+        expect(byNumber.get(quote.number)!.lines[0].packageId).toBe(restoredPkg.id);
       });
 
       it("backup tidak seimbang ditolak tanpa membuat workspace", async () => {

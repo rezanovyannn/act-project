@@ -7,6 +7,8 @@ import { fail } from "@/core/errors";
 import type { ICateringRepository } from "@/core/ports";
 import type {
   CateringOrder,
+  CateringPackage,
+  CateringPackageInput,
   CateringOrderInput,
   ContactSnapshot,
   InvoiceInput,
@@ -76,6 +78,9 @@ export class MockCateringRepository implements ICateringRepository {
         if (line.accountId && !state.accounts.some((a) => a.id === line.accountId && a.workspaceId === input.workspaceId)) {
           fail("INVALID_ACCOUNT", "Akun pada baris pesanan tidak ditemukan di workspace ini");
         }
+        if (line.packageId && !state.cateringPackages.some((p) => p.id === line.packageId && p.workspaceId === input.workspaceId && p.deletedAt === null)) {
+          fail("MENU_NOT_FOUND", "Paket pada baris pesanan tidak ditemukan");
+        }
       }
       const policy = validatePolicy(input.cancellationPolicy);
       const now = this.db.now();
@@ -83,7 +88,7 @@ export class MockCateringRepository implements ICateringRepository {
       if (Object.entries(estimates).some(([k, v]) => !["materials", "labor", "equipment", "transport", "packaging", "other"].includes(k) || !Number.isSafeInteger(v) || (v as number) < 0)) {
         fail("INVALID_AMOUNT", "Estimasi biaya tidak valid");
       }
-      const fields = { ...input, costEstimates: { ...estimates }, cancellationPolicy: policy, lines: input.lines.map((l) => ({ ...l, itemId: null })) };
+      const fields = { ...input, costEstimates: { ...estimates }, cancellationPolicy: policy, lines: input.lines.map((l) => ({ ...l, itemId: null, packageId: l.packageId || null })) };
       if (id) {
         const order = requireOrder(state, id);
         if (order.workspaceId !== input.workspaceId) fail("ORDER_NOT_FOUND", "Pesanan tidak ditemukan");
@@ -224,6 +229,69 @@ export class MockCateringRepository implements ICateringRepository {
       Object.assign(order, { state: "cancelled", cancelledAt: now, cancelReason: reason.trim(), updatedAt: now });
       this.db.audit(state, { workspaceId: order.workspaceId, entityType: "catering_order", entityId: id, action: "cancel", before, after: order, reason: reason.trim() });
       return stripOrder(order);
+    });
+  }
+
+  async listPackages(workspaceId: string): Promise<CateringPackage[]> {
+    return this.db
+      .read()
+      .cateringPackages.filter((p) => p.workspaceId === workspaceId && p.deletedAt === null)
+      .sort((a, b) => a.code.localeCompare(b.code));
+  }
+
+  async savePackage(workspaceId: string, input: CateringPackageInput, id?: string): Promise<CateringPackage> {
+    return this.db.write((state) => {
+      // Meniru validasi RPC save_catering_package.
+      if (!state.workspaces.some((w) => w.id === workspaceId && w.deletedAt === null)) fail("NOT_FOUND", "Workspace tidak ditemukan");
+      const taken = state.cateringPackages.find((p) => p.workspaceId === workspaceId && p.deletedAt === null && p.id !== id && p.code === input.code);
+      if (taken) fail("DUPLICATE_MENU_CODE", `Kode paket ${input.code} sudah dipakai`);
+      if (!Number.isSafeInteger(input.pricePerPax) || input.pricePerPax < 0 || !Number.isSafeInteger(input.yieldPax) || input.yieldPax < 1) {
+        fail("INVALID_RECIPE", "Harga per pax atau jumlah pax resep tidak valid");
+      }
+      for (const line of input.lines) {
+        if (!state.items.some((i) => i.id === line.itemId && i.workspaceId === workspaceId && i.deletedAt === null)) fail("ITEM_NOT_FOUND", "Bahan resep tidak ditemukan");
+        if (!Number.isSafeInteger(line.quantity) || line.quantity <= 0) fail("INVALID_QUANTITY", "Qty bahan resep harus bilangan bulat > 0");
+      }
+      if (input.revenueAccountId && !state.accounts.some((a) => a.id === input.revenueAccountId && a.workspaceId === workspaceId && a.accountType === "revenue")) {
+        fail("INVALID_ACCOUNT", "Akun pendapatan paket tidak ditemukan");
+      }
+      const now = this.db.now();
+      const fields = { ...input, lines: input.lines.map((l) => ({ ...l })) };
+      if (id) {
+        const pkg = state.cateringPackages.find((p) => p.id === id && p.deletedAt === null);
+        if (!pkg || pkg.workspaceId !== workspaceId) fail("MENU_NOT_FOUND", "Paket tidak ditemukan");
+        const before = { ...pkg };
+        Object.assign(pkg, fields, { updatedAt: now });
+        this.db.audit(state, { workspaceId, entityType: "catering_package", entityId: id, action: "update", before, after: pkg });
+        return { ...pkg };
+      }
+      const pkg: CateringPackage = { ...fields, id: this.db.generateId(), workspaceId, isActive: true, createdAt: now, updatedAt: now, deletedAt: null };
+      state.cateringPackages.push(pkg);
+      this.db.audit(state, { workspaceId, entityType: "catering_package", entityId: pkg.id, action: "create", before: null, after: pkg });
+      return { ...pkg };
+    });
+  }
+
+  async setPackageActive(id: string, isActive: boolean): Promise<CateringPackage> {
+    return this.db.write((state) => {
+      const pkg = state.cateringPackages.find((p) => p.id === id && p.deletedAt === null);
+      if (!pkg) fail("MENU_NOT_FOUND", "Paket tidak ditemukan");
+      const before = { ...pkg };
+      Object.assign(pkg, { isActive, updatedAt: this.db.now() });
+      this.db.audit(state, { workspaceId: pkg.workspaceId, entityType: "catering_package", entityId: id, action: "update", before, after: pkg });
+      return { ...pkg };
+    });
+  }
+
+  async deletePackage(id: string): Promise<void> {
+    this.db.write((state) => {
+      const pkg = state.cateringPackages.find((p) => p.id === id && p.deletedAt === null);
+      if (!pkg) fail("MENU_NOT_FOUND", "Paket tidak ditemukan");
+      if (state.cateringOrders.some((o) => o.deletedAt === null && o.lines.some((l) => l.packageId === id))) {
+        fail("ORDER_IN_USE", "Paket sudah dipakai pesanan; nonaktifkan saja, tidak bisa dihapus");
+      }
+      pkg.deletedAt = this.db.now();
+      this.db.audit(state, { workspaceId: pkg.workspaceId, entityType: "catering_package", entityId: id, action: "delete", before: pkg, after: null });
     });
   }
 }

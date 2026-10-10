@@ -42,14 +42,14 @@ export interface Fraction {
   d: bigint;
 }
 
-const ZERO_FRACTION: Fraction = { n: BigInt(0), d: BigInt(1) };
+export const ZERO_FRACTION: Fraction = { n: BigInt(0), d: BigInt(1) };
 
 function gcd(a: bigint, b: bigint): bigint {
   while (b !== BigInt(0)) [a, b] = [b, a % b];
   return a < BigInt(0) ? -a : a;
 }
 
-function addFraction(a: Fraction, b: Fraction): Fraction {
+export function addFraction(a: Fraction, b: Fraction): Fraction {
   const n = a.n * b.d + b.n * a.d;
   const d = a.d * b.d;
   const g = gcd(n, d) || BigInt(1);

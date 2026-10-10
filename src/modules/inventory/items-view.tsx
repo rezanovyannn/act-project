@@ -10,6 +10,7 @@ import { mulDivRound, stockCard } from "@/core/stock"
 import type { Account, Item } from "@/core/types"
 import { Amount } from "@/components/ui/amount"
 import { Badge } from "@/components/ui/badge"
+import { AmountInput } from "@/components/ui/amount-input"
 import { Button } from "@/components/ui/button"
 import {
   Dialog,
@@ -62,6 +63,8 @@ export function ItemsView({
   const current = data.data!
   const snapshot = snapshotAt(current)
   const perpetual = current.workspace.inventoryMethod === "perpetual"
+  // Harga perkiraan untuk estimasi resep paket katering (Fase 10C).
+  const catering = current.workspace.templateType === "catering"
   const usedIds = new Set(current.journals.filter((j) => j.deletedAt === null).flatMap((j) => j.lines.map((l) => l.itemId)))
   const { reconciliation } = snapshot
 
@@ -122,6 +125,7 @@ export function ItemsView({
                 <TableHead className="w-24">Kode</TableHead>
                 <TableHead>Barang</TableHead>
                 <TableHead className="w-36">Section</TableHead>
+                {catering && <TableHead className="w-44 text-right">Harga perkiraan</TableHead>}
                 {perpetual && (
                   <>
                     <TableHead className="w-28 text-right">Stok</TableHead>
@@ -146,6 +150,11 @@ export function ItemsView({
                       {qty < 0 && <Badge variant="destructive" className="ml-2">Stok minus</Badge>}
                     </TableCell>
                     <TableCell className="text-muted-foreground">{item.category ?? "—"}</TableCell>
+                    {catering && (
+                      <TableCell className="text-right tabular-nums text-muted-foreground">
+                        {item.estimatedPrice === null ? "—" : `${formatAmount(item.estimatedPrice)} / ${item.estimatedPer.toLocaleString("id-ID")} ${item.unit}`}
+                      </TableCell>
+                    )}
                     {perpetual && (
                       <>
                         <TableCell className="text-right tabular-nums">
@@ -200,6 +209,7 @@ export function ItemsView({
           workspaceId={workspaceId}
           item={editing === "new" ? null : editing}
           sections={[...new Set(current.items.map((i) => i.category).filter((c): c is string => !!c))].sort()}
+          withEstimate={catering}
           revenueAccounts={current.accounts.filter((a) => a.accountType === "revenue" && a.isActive && a.systemRole !== "sales_returns")}
           onClose={() => setEditing(null)}
           onSaved={() => {
@@ -221,6 +231,7 @@ function ItemDialog({
   item,
   sections,
   revenueAccounts,
+  withEstimate = false,
   onClose,
   onSaved,
 }: {
@@ -229,6 +240,7 @@ function ItemDialog({
   item: Item | null
   sections: string[]
   revenueAccounts: Account[]
+  withEstimate?: boolean
   onClose: () => void
   onSaved: () => void
 }) {
@@ -237,6 +249,8 @@ function ItemDialog({
   const [unit, setUnit] = useState(item?.unit ?? "pcs")
   const [category, setCategory] = useState(item?.category ?? "")
   const [revenueAccountId, setRevenueAccountId] = useState(item?.revenueAccountId ?? revenueAccounts[0]?.id ?? NO_ACCOUNT)
+  const [estimatedPrice, setEstimatedPrice] = useState<number | null>(item?.estimatedPrice ?? null)
+  const [estimatedPer, setEstimatedPer] = useState(String(item?.estimatedPer ?? 1))
   const [error, setError] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
 
@@ -244,7 +258,14 @@ function ItemDialog({
     event.preventDefault()
     setSaving(true)
     setError(null)
-    const input = { code, name, unit, category, revenueAccountId: revenueAccountId === NO_ACCOUNT ? null : revenueAccountId }
+    const input = {
+      code,
+      name,
+      unit,
+      category,
+      revenueAccountId: revenueAccountId === NO_ACCOUNT ? null : revenueAccountId,
+      ...(withEstimate ? { estimatedPrice, estimatedPer: /^\d+$/.test(estimatedPer) ? Number(estimatedPer) : 0 } : {}),
+    }
     try {
       const saved = item ? await services.itemService.updateItem(item.id, input) : await services.itemService.createItem(workspaceId, input)
       toast.success(`${saved.code} · ${saved.name} disimpan`)
@@ -302,6 +323,18 @@ function ItemDialog({
             </datalist>
             <p className="text-xs text-muted-foreground">Mengelompokkan bahan di Stok Opname & COGS. Boleh dikosongkan.</p>
           </div>
+          {withEstimate && (
+            <div className="grid gap-2">
+              <Label htmlFor="item-estimate">Harga perkiraan (opsional)</Label>
+              <div className="flex flex-wrap items-center gap-2 text-sm">
+                <AmountInput id="item-estimate" className="w-40" value={estimatedPrice} onValueChange={setEstimatedPrice} />
+                <span className="text-muted-foreground">per</span>
+                <Input aria-label="Jumlah satuan harga perkiraan" inputMode="numeric" className="w-24 text-right tabular-nums" value={estimatedPer} onChange={(e) => setEstimatedPer(e.target.value.replace(/\D/g, ""))} />
+                <span className="text-muted-foreground">{unit || "satuan"}</span>
+              </div>
+              <p className="text-xs text-muted-foreground">Dipakai menghitung estimasi biaya resep paket katering bila belum ada pembelian lewat Pembelian Bahan Baku, mis. Rp 15.000 per 1.000 gram.</p>
+            </div>
+          )}
           {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
           <DialogFooter>
             <Button type="button" variant="secondary" onClick={onClose}>Batal</Button>

@@ -301,6 +301,7 @@ export function buildFnbMockState(): MockState {
     invoices: [],
     cateringOrders: [],
     orderBills: [],
+    cateringPackages: [],
     auditLogs: [],
   };
 }

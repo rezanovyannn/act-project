@@ -4,7 +4,7 @@ import { useState } from "react"
 import Link from "next/link"
 import { EyeIcon, InfoIcon, PencilIcon, PlusIcon, Trash2Icon, UserPlusIcon } from "lucide-react"
 import { toast } from "sonner"
-import { COST_CATEGORY_LABELS, costCategoriesFor, DEFAULT_CANCELLATION_POLICY, orderTotals, SERVICE_TYPE_LABELS } from "@/core/catering"
+import { COST_CATEGORY_LABELS, costCategoriesFor, DEFAULT_CANCELLATION_POLICY, lineFromPackage, orderTotals, SERVICE_TYPE_LABELS } from "@/core/catering"
 import { addDays } from "@/core/dates"
 import { todayIsoDate } from "@/core/format"
 import { formatPercentBps, parsePercentBps, safeLineAmount } from "@/core/invoice"
@@ -36,7 +36,11 @@ interface LineState {
   unit: string
   unitPrice: number | null
   accountId: string
+  /** Paket menu (Fase 10C); null = baris bebas. */
+  packageId: string | null
 }
+
+const NO_PACKAGE = "__none__"
 
 let lineKey = 0
 
@@ -89,11 +93,14 @@ export function OrderEditor({
   const [discountRupiah, setDiscountRupiah] = useState<number | null>(order?.discount?.kind === "amount" ? order.discount.value : null)
   const [lines, setLines] = useState<LineState[]>(() =>
     order?.lines.length
-      ? order.lines.map((l) => ({ key: ++lineKey, description: l.description, quantity: String(l.quantity), unit: l.unit ?? "", unitPrice: l.unitPrice, accountId: l.accountId }))
-      : [{ key: ++lineKey, description: "", quantity: "", unit: "pax", unitPrice: null, accountId: mainRevenue?.id ?? "" }],
+      ? order.lines.map((l) => ({ key: ++lineKey, description: l.description, quantity: String(l.quantity), unit: l.unit ?? "", unitPrice: l.unitPrice, accountId: l.accountId, packageId: l.packageId ?? null }))
+      : [{ key: ++lineKey, description: "", quantity: "", unit: "pax", unitPrice: null, accountId: mainRevenue?.id ?? "", packageId: null }],
   )
   const costCategories = costCategoriesFor(workspace.cateringSettings.costMode)
   const [estimates, setEstimates] = useState<Partial<Record<CostCategory, number | null>>>(() => ({ ...(order?.costEstimates ?? {}) }))
+  // Estimasi bahan otomatis dari resep paket sampai diubah manual (Catatan Keputusan 92).
+  const [materialsTouched, setMaterialsTouched] = useState(Boolean(order?.costEstimates.materials))
+  const packages = data.packages.filter((p) => p.isActive || order?.lines.some((l) => l.packageId === p.id))
   const [addingContact, setAddingContact] = useState(false)
   const [preview, setPreview] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -137,13 +144,16 @@ export function OrderEditor({
     discount,
     notes: notes || null,
     cancellationPolicy: policy ?? DEFAULT_CANCELLATION_POLICY,
-    costEstimates: Object.fromEntries(costCategories.flatMap((c) => (estimates[c] ? [[c, estimates[c]]] : []))) as CostEstimates,
+    costEstimates: {},
     lines: lines
-      .filter((l) => l.description.trim() || l.unitPrice)
-      .map((l) => ({ description: l.description, quantity: qtyOf(l), unit: l.unit || null, unitPrice: l.unitPrice ?? 0, accountId: l.accountId, itemId: null })),
+      .filter((l) => l.description.trim() || l.unitPrice || l.packageId)
+      .map((l) => ({ description: l.description, quantity: qtyOf(l), unit: l.unit || null, unitPrice: l.unitPrice ?? 0, accountId: l.accountId, itemId: null, packageId: l.packageId })),
   }
+  const recipe = input.lines.some((l) => l.packageId) ? services.cateringService.materials(data, input.lines, eventDate || today) : null
+  const effective: Partial<Record<CostCategory, number | null>> = { ...estimates, ...(recipe && !materialsTouched ? { materials: recipe.cost } : {}) }
+  input.costEstimates = Object.fromEntries(costCategories.flatMap((c) => (effective[c] ? [[c, effective[c]]] : []))) as CostEstimates
   const totals = orderTotals(input, workspace)
-  const estimateTotal = costCategories.reduce((t, c) => t + (estimates[c] ?? 0), 0)
+  const estimateTotal = costCategories.reduce((t, c) => t + (effective[c] ?? 0), 0)
 
   async function save() {
     setError(null)
@@ -239,7 +249,26 @@ export function OrderEditor({
             const n = index + 1
             return (
               <div key={line.key} className="grid gap-2 rounded-xl bg-card/60 p-3 ring-1 ring-border">
-                <Input aria-label={`Keterangan baris ${n}`} placeholder="mis. Paket prasmanan A, Ongkir, Sewa alat" value={line.description} onChange={(e) => update(line.key, { description: e.target.value })} className="bg-background" />
+                <div className="grid gap-2 sm:grid-cols-[14rem_minmax(0,1fr)]">
+                  <Select
+                    value={line.packageId ?? NO_PACKAGE}
+                    onValueChange={(v) => {
+                      const pkg = packages.find((p) => p.id === v)
+                      if (!pkg) return update(line.key, { packageId: null })
+                      const filled = lineFromPackage(pkg, paxNumber || 1, mainRevenue?.id ?? "")
+                      update(line.key, { packageId: pkg.id, description: filled.description, quantity: String(filled.quantity), unit: "pax", unitPrice: filled.unitPrice, accountId: filled.accountId })
+                    }}
+                  >
+                    <SelectTrigger aria-label={`Paket baris ${n}`} className="w-full bg-background"><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value={NO_PACKAGE}>Tanpa paket</SelectItem>
+                      {packages.map((p) => (
+                        <SelectItem key={p.id} value={p.id}>{p.code} · {p.name}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <Input aria-label={`Keterangan baris ${n}`} placeholder="mis. Paket prasmanan A, Ongkir, Sewa alat" value={line.description} onChange={(e) => update(line.key, { description: e.target.value })} className="bg-background" />
+                </div>
                 <div className="grid grid-cols-2 gap-2 sm:grid-cols-[6rem_6rem_9rem_minmax(0,1fr)_8rem_2.5rem] sm:items-center">
                   <Input aria-label={`Qty baris ${n}`} inputMode="numeric" placeholder="Qty" value={line.quantity} onChange={(e) => update(line.key, { quantity: e.target.value.replace(/\D/g, "") })} className="bg-background text-right tabular-nums" />
                   <Input aria-label={`Satuan baris ${n}`} placeholder="Satuan" value={line.unit} onChange={(e) => update(line.key, { unit: e.target.value })} className="bg-background" />
@@ -265,7 +294,7 @@ export function OrderEditor({
             variant="secondary"
             size="sm"
             className="w-fit"
-            onClick={() => setLines([...lines, { key: ++lineKey, description: "", quantity: "1", unit: "", unitPrice: null, accountId: mainRevenue?.id ?? "" }])}
+            onClick={() => setLines([...lines, { key: ++lineKey, description: "", quantity: "1", unit: "", unitPrice: null, accountId: mainRevenue?.id ?? "", packageId: null }])}
           >
             <PlusIcon data-icon="inline-start" /> Tambah baris
           </Button>
@@ -309,10 +338,29 @@ export function OrderEditor({
             {costCategories.map((c) => (
               <div key={c} className="grid gap-1">
                 <Label htmlFor={`order-estimate-${c}`} className="text-xs text-muted-foreground">{COST_CATEGORY_LABELS[c]}</Label>
-                <AmountInput id={`order-estimate-${c}`} value={estimates[c] ?? null} onValueChange={(v) => setEstimates((e) => ({ ...e, [c]: v }))} />
+                <AmountInput
+                  id={`order-estimate-${c}`}
+                  value={effective[c] ?? null}
+                  onValueChange={(v) => {
+                    if (c === "materials") setMaterialsTouched(true)
+                    setEstimates((e) => ({ ...e, [c]: v }))
+                  }}
+                />
               </div>
             ))}
           </div>
+          {recipe && (
+            <p className="text-xs text-muted-foreground">
+              Dari resep paket: bahan ≈ <Amount value={recipe.cost} />
+              {recipe.missing.length > 0 && <span className="text-destructive"> (belum ada harga: {recipe.missing.map((id) => data.items.find((i) => i.id === id)?.name).join(", ")})</span>}
+              {materialsTouched && recipe.cost !== (estimates.materials ?? 0) && (
+                <>
+                  {" · "}
+                  <button type="button" className="underline underline-offset-4" onClick={() => { setMaterialsTouched(false); setEstimates((e) => ({ ...e, materials: null })) }}>pakai hitungan resep</button>
+                </>
+              )}
+            </p>
+          )}
         </fieldset>
 
         <CancellationPolicyField key={policyKey} value={policy} onChange={(p) => setPolicy(p)} />

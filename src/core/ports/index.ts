@@ -12,6 +12,8 @@ import type {
   CateringSettings,
   CateringOrder,
   CateringOrderInput,
+  CateringPackage,
+  CateringPackageInput,
   OrderBill,
   OrderBillInput,
   Contact,
@@ -145,6 +147,13 @@ export interface ICateringRepository {
   completeOrder(id: string, invoice: InvoiceInput, journal: JournalEntryInput, contact: ContactSnapshot, invoicePrefix: string): Promise<CateringOrder>;
   /** Atomik: posting jurnal pembatalan (bila ada saldo DP; harus menolkan saldo) lalu tandai dibatalkan. */
   cancelOrder(id: string, journal: JournalEntryInput | null, reason: string): Promise<CateringOrder>;
+  /** Paket menu yang belum dihapus (aktif & nonaktif), urut kode (Fase 10C). */
+  listPackages(workspaceId: string): Promise<CateringPackage[]>;
+  /** Buat (tanpa id) atau ubah paket; kode unik per workspace (DUPLICATE_MENU_CODE). */
+  savePackage(workspaceId: string, input: CateringPackageInput, id?: string): Promise<CateringPackage>;
+  setPackageActive(id: string, isActive: boolean): Promise<CateringPackage>;
+  /** Ditolak (ORDER_IN_USE) bila paket dipakai baris pesanan. */
+  deletePackage(id: string): Promise<void>;
 }
 
 export type MenuPatch = Partial<MenuInput & { isActive: boolean }>;

@@ -9,18 +9,25 @@ import {
   buildOrderSettlement,
   depositFlows,
   orderInvoiceInput,
+  itemPrices,
+  materialsEstimate,
   orderProfits,
+  shoppingList,
   summarizeBills,
   summarizeClients,
   summarizeOrders,
   tagOrder,
   validateBill,
   validateCateringSettings,
+  validatePackage,
   validateOrderInput,
   type BillSummary,
   type CancellationInput,
   type CancellationPlan,
   type ClientSummary,
+  type ItemPrice,
+  type MaterialsEstimate,
+  type ShoppingList,
   type OrderCostInput,
   type OrderProfit,
   type OrderSummary,
@@ -28,13 +35,17 @@ import {
 } from "../catering";
 import { fail } from "../errors";
 import { buildSaleInvoice, contactSnapshot, withDiscountAccount, type InvoicePlan } from "../invoice";
-import type { IAccountRepository, ICateringRepository, IInvoiceRepository, IJournalRepository, IWorkspaceRepository } from "../ports";
+import type { IAccountRepository, ICateringRepository, IInvoiceRepository, IItemRepository, IJournalRepository, IWorkspaceRepository } from "../ports";
 import type {
   Account,
   BusinessProfile,
   CateringSettings,
   CateringOrder,
   CateringOrderInput,
+  CateringPackage,
+  CateringPackageInput,
+  Item,
+  OrderLine,
   Contact,
   Invoice,
   IsoDate,
@@ -55,6 +66,9 @@ export interface CateringData {
   invoices: Invoice[];
   orders: CateringOrder[];
   bills: OrderBill[];
+  /** Bahan & paket menu untuk estimasi dan daftar belanja (Fase 10C). */
+  items: Item[];
+  packages: CateringPackage[];
 }
 
 export interface CompletionInput {
@@ -71,13 +85,14 @@ export class CateringService {
       accounts: IAccountRepository;
       journals: IJournalRepository;
       invoices: IInvoiceRepository;
+      items: IItemRepository;
       catering: ICateringRepository;
       journalService: JournalService;
     },
   ) {}
 
   async data(workspaceId: string): Promise<CateringData> {
-    const [workspace, profile, accounts, contacts, journals, invoices, orders, bills] = await Promise.all([
+    const [workspace, profile, accounts, contacts, journals, invoices, orders, bills, items, packages] = await Promise.all([
       this.deps.workspaces.getById(workspaceId),
       this.deps.invoices.getProfile(workspaceId),
       this.deps.accounts.listByWorkspace(workspaceId),
@@ -86,9 +101,11 @@ export class CateringService {
       this.deps.invoices.listInvoices(workspaceId, "sale"),
       this.deps.catering.listOrders(workspaceId),
       this.deps.catering.listBills(workspaceId),
+      this.deps.items.listByWorkspace(workspaceId),
+      this.deps.catering.listPackages(workspaceId),
     ]);
     if (!workspace) fail("NOT_FOUND", "Workspace tidak ditemukan");
-    return { workspace, profile, accounts, contacts, journals, invoices, orders, bills };
+    return { workspace, profile, accounts, contacts, journals, invoices, orders, bills, items, packages };
   }
 
   summaries(data: CateringData, today: IsoDate): OrderSummary[] {
@@ -134,6 +151,36 @@ export class CateringService {
   async recordCost(order: CateringOrder, input: OrderCostInput): Promise<JournalEntry> {
     const data = await this.data(order.workspaceId);
     return this.deps.journalService.postJournal(buildOrderCost(order, input, data.accounts, data.workspace.cateringSettings.costMode));
+  }
+
+  // ---------- Paket menu, estimasi & daftar belanja (Fase 10C) ----------
+
+  async savePackage(workspaceId: string, input: CateringPackageInput, id?: string): Promise<CateringPackage> {
+    const [packages, items] = await Promise.all([this.deps.catering.listPackages(workspaceId), this.deps.items.listByWorkspace(workspaceId)]);
+    return this.deps.catering.savePackage(workspaceId, validatePackage(input, packages, items, id), id);
+  }
+
+  setPackageActive(id: string, isActive: boolean): Promise<CateringPackage> {
+    return this.deps.catering.setPackageActive(id, isActive);
+  }
+
+  deletePackage(id: string): Promise<void> {
+    return this.deps.catering.deletePackage(id);
+  }
+
+  /** Harga bahan per tanggal: pembelian terakhir, lalu harga perkiraan (Catatan Keputusan 91). */
+  prices(data: CateringData, date: IsoDate): Map<string, ItemPrice | null> {
+    return itemPrices(data.items, data.journals, data.accounts, date);
+  }
+
+  /** Estimasi biaya bahan baris pesanan ber-paket. */
+  materials(data: CateringData, lines: readonly OrderLine[], date: IsoDate): MaterialsEstimate {
+    return materialsEstimate(lines, data.packages, this.prices(data, date));
+  }
+
+  /** Daftar belanja pesanan dikonfirmasi bertanggal acara [from, to]; harga per tanggal `to`. */
+  shopping(data: CateringData, from: IsoDate, to: IsoDate): ShoppingList {
+    return shoppingList(data.orders, data.packages, data.items, this.prices(data, to), from, to);
   }
 
   // ---------- Pesanan ----------

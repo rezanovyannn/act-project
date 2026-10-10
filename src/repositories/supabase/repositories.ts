@@ -36,6 +36,8 @@ import type {
   CateringSettings,
   CateringOrder,
   CateringOrderInput,
+  CateringPackage,
+  CateringPackageInput,
   OrderBill,
   OrderBillInput,
   Contact,
@@ -67,6 +69,7 @@ import {
   toAccount,
   toAuditLog,
   toCateringOrder,
+  toCateringPackage,
   toOrderBill,
   toContact,
   toInvoice,
@@ -532,6 +535,30 @@ export class SupabaseCateringRepository implements ICateringRepository {
   async cancelOrder(id: string, journal: JournalEntryInput | null, reason: string): Promise<CateringOrder> {
     await unwrap(this.client.rpc("cancel_catering_order", { p_id: id, p_journal: journal, p_reason: reason }));
     return required(await this.getOrder(id), "Pesanan");
+  }
+
+  async listPackages(workspaceId: string): Promise<CateringPackage[]> {
+    const rows = await unwrapRows(this.client.from("catering_packages").select("*").eq("workspace_id", workspaceId).is("deleted_at", null).order("code"));
+    return rows.map(toCateringPackage);
+  }
+
+  private async getPackage(id: string): Promise<CateringPackage> {
+    const row = await unwrap(this.client.from("catering_packages").select("*").eq("id", id).maybeSingle());
+    return toCateringPackage(required(row, "Paket"));
+  }
+
+  async savePackage(workspaceId: string, input: CateringPackageInput, id?: string): Promise<CateringPackage> {
+    const saved = (await unwrap(this.client.rpc("save_catering_package", { p_workspace_id: workspaceId, p_package: input, p_id: id ?? null }))) as string;
+    return this.getPackage(saved);
+  }
+
+  async setPackageActive(id: string, isActive: boolean): Promise<CateringPackage> {
+    await unwrap(this.client.rpc("set_catering_package_active", { p_id: id, p_active: isActive }));
+    return this.getPackage(id);
+  }
+
+  async deletePackage(id: string): Promise<void> {
+    await unwrap(this.client.rpc("delete_catering_package", { p_id: id }));
   }
 }
 

@@ -39,10 +39,17 @@ export class ItemService {
       unit: input.unit.trim(),
       revenueAccountId: input.revenueAccountId || null,
       category: input.category?.trim() || null,
+      estimatedPrice: input.estimatedPrice ?? null,
+      estimatedPer: input.estimatedPer ?? 1,
     };
     if (clean.code === "") fail("EMPTY_NAME", "Kode barang wajib diisi");
     if (clean.name === "") fail("EMPTY_NAME", "Nama barang wajib diisi");
     if (clean.unit === "") fail("EMPTY_NAME", "Satuan dasar wajib diisi (mis. pcs, gram, ml)");
+    // Harga perkiraan: Rp bulat ≥ 0 per jumlah satuan dasar bulat ≥ 1 (Fase 10C).
+    if (clean.estimatedPrice !== null && (!Number.isSafeInteger(clean.estimatedPrice) || clean.estimatedPrice < 0)) {
+      fail("INVALID_AMOUNT", "Harga perkiraan harus bilangan bulat ≥ 0");
+    }
+    if (!Number.isSafeInteger(clean.estimatedPer) || clean.estimatedPer < 1) fail("INVALID_QUANTITY", "Harga perkiraan per jumlah satuan minimal 1");
     if (clean.revenueAccountId) {
       const account = await this.deps.accounts.getById(clean.revenueAccountId);
       if (!account || account.workspaceId !== workspaceId || account.accountType !== "revenue") {

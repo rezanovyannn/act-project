@@ -8,6 +8,7 @@ import type {
   AuditLog,
   BusinessProfile,
   CateringOrder,
+  CateringPackage,
   Contact,
   Invoice,
   IsoTimestamp,
@@ -50,13 +51,15 @@ export interface WorkspaceBackup {
   /** Pesanan katering & invoice DP (ADR 024). */
   cateringOrders: CateringOrder[];
   orderBills: OrderBill[];
+  /** Paket menu katering (Fase 10C). */
+  cateringPackages: CateringPackage[];
   auditLogs: AuditLog[];
   summary: { accounts: number; periods: number; journals: number; journalLines: number; items: number; auditLogs: number };
 }
 
 export function buildBackup(
   parts: Pick<WorkspaceBackup, "workspace" | "accounts" | "periods" | "journals" | "items" | "auditLogs"> &
-    Partial<Pick<WorkspaceBackup, "stockCounts" | "menus" | "recipes" | "portionSummaries" | "menuSales" | "profile" | "contacts" | "invoices" | "cateringOrders" | "orderBills">>,
+    Partial<Pick<WorkspaceBackup, "stockCounts" | "menus" | "recipes" | "portionSummaries" | "menuSales" | "profile" | "contacts" | "invoices" | "cateringOrders" | "orderBills" | "cateringPackages">>,
   exportedAt: IsoTimestamp,
 ): WorkspaceBackup {
   return {
@@ -73,6 +76,7 @@ export function buildBackup(
     invoices: [],
     cateringOrders: [],
     orderBills: [],
+    cateringPackages: [],
     ...parts,
     summary: {
       accounts: parts.accounts.length,
